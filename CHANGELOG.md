@@ -1,5 +1,46 @@
 # Changelog
 
+## v1.2.0 — Full Stack (2026-03-03)
+
+Everything from the roadmap, in one push.
+
+### Auto-Reconnect Watchdog
+- Health monitor detects sustained VPN failure (3 consecutive checks, ~90s)
+- Automatically attempts `wg-quick up wg0` to restore the tunnel
+- Configurable via `AUTO_RECONNECT=true` (default on)
+
+### Notification Webhooks
+- Discord, Slack, Gotify, and generic webhook support
+- Fires on VPN disconnect, reconnect, port forwarding changes
+- Set `NOTIFY_WEBHOOK_URL` for Discord/Slack/generic, `NOTIFY_GOTIFY_URL` + `NOTIFY_GOTIFY_TOKEN` for Gotify
+
+### Speed Test
+- `POST /api/v1/vpn/speedtest` — downloads 10MB from Cloudflare CDN, measures tunnel throughput
+- Returns download_mbps, bytes, duration
+
+### Config Backup/Restore
+- `GET /api/v1/backup` — downloads tar.gz of tunnelvision.yml, qBittorrent.conf, and VPN configs
+- `POST /api/v1/restore` — uploads backup archive, restores config (restart required)
+
+### Connection History
+- `GET /api/v1/vpn/history` — tracks server rotations, disconnects, reconnects
+- Persists to `/config/connection-history.json` (survives container restarts)
+
+### Grafana Dashboard Template
+- Pre-built JSON at `examples/grafana-dashboard.json`
+- VPN status, killswitch, uptime, transfer rates, total bytes, health — all wired to Prometheus metrics
+
+### One-Liner Install Script
+- `curl -fsSL https://raw.githubusercontent.com/jasondostal/tunnelvision/main/scripts/install.sh | bash`
+- Creates directory, downloads docker-compose.yml, prompts for WireGuard config
+
+### Settings Panel Updates
+- PIA credentials (pia_user, pia_pass, port_forward_enabled)
+- Auto-reconnect toggle
+- Notification webhook configuration (Discord, Slack, Gotify)
+
+---
+
 ## v1.1.0 — Provider Enrichment (2026-03-03)
 
 Three deep provider integrations. Progressive enrichment — set your provider, features light up.

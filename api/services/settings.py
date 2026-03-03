@@ -26,6 +26,13 @@ CONFIGURABLE_FIELDS = {
     "mqtt_port": {"env": "MQTT_PORT", "default": "1883", "secret": False},
     "mqtt_user": {"env": "MQTT_USER", "default": "", "secret": False},
     "mqtt_pass": {"env": "MQTT_PASS", "default": "", "secret": True},
+    "pia_user": {"env": "PIA_USER", "default": "", "secret": False},
+    "pia_pass": {"env": "PIA_PASS", "default": "", "secret": True},
+    "port_forward_enabled": {"env": "PORT_FORWARD_ENABLED", "default": "false", "secret": False},
+    "auto_reconnect": {"env": "AUTO_RECONNECT", "default": "true", "secret": False},
+    "notify_webhook_url": {"env": "NOTIFY_WEBHOOK_URL", "default": "", "secret": False},
+    "notify_gotify_url": {"env": "NOTIFY_GOTIFY_URL", "default": "", "secret": False},
+    "notify_gotify_token": {"env": "NOTIFY_GOTIFY_TOKEN", "default": "", "secret": True},
 }
 
 

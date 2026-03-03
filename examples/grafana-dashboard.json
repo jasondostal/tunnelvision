@@ -1,0 +1,138 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "title": "VPN Status",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "targets": [{
+        "expr": "tunnelvision_vpn_up",
+        "legendFormat": "VPN"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "DOWN", "color": "red" } }, "type": "value" },
+            { "options": { "1": { "text": "UP", "color": "green" } }, "type": "value" }
+          ],
+          "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      }
+    },
+    {
+      "title": "Killswitch",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "targets": [{
+        "expr": "tunnelvision_killswitch_active",
+        "legendFormat": "Killswitch"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "DISABLED", "color": "red" } }, "type": "value" },
+            { "options": { "1": { "text": "ACTIVE", "color": "green" } }, "type": "value" }
+          ],
+          "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      }
+    },
+    {
+      "title": "VPN Uptime",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "targets": [{
+        "expr": "tunnelvision_vpn_connected_seconds",
+        "legendFormat": "Uptime"
+      }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "Public IP / Location",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [{
+        "expr": "tunnelvision_public_ip_info",
+        "legendFormat": "{{ip}} — {{city}}, {{country}}"
+      }]
+    },
+    {
+      "title": "Container Uptime",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [{
+        "expr": "tunnelvision_container_uptime_seconds",
+        "legendFormat": "Container"
+      }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "VPN Transfer — Download",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [{
+        "expr": "rate(tunnelvision_transfer_rx_bytes_total[5m])",
+        "legendFormat": "Download"
+      }],
+      "fieldConfig": { "defaults": { "unit": "Bps", "color": { "mode": "fixed", "fixedColor": "#5ce5c5" } } }
+    },
+    {
+      "title": "VPN Transfer — Upload",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [{
+        "expr": "rate(tunnelvision_transfer_tx_bytes_total[5m])",
+        "legendFormat": "Upload"
+      }],
+      "fieldConfig": { "defaults": { "unit": "Bps", "color": { "mode": "fixed", "fixedColor": "#e8a838" } } }
+    },
+    {
+      "title": "Total Downloaded",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 12 },
+      "targets": [{
+        "expr": "tunnelvision_transfer_rx_bytes_total",
+        "legendFormat": "Downloaded"
+      }],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "title": "Total Uploaded",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 12 },
+      "targets": [{
+        "expr": "tunnelvision_transfer_tx_bytes_total",
+        "legendFormat": "Uploaded"
+      }],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "title": "Healthy",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 12 },
+      "targets": [{
+        "expr": "tunnelvision_healthy",
+        "legendFormat": "Health"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "UNHEALTHY", "color": "red" } }, "type": "value" },
+            { "options": { "1": { "text": "HEALTHY", "color": "green" } }, "type": "value" }
+          ]
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["tunnelvision", "vpn", "wireguard"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "TunnelVision",
+  "uid": "tunnelvision",
+  "version": 1
+}

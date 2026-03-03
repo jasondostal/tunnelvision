@@ -14,6 +14,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from api.services.vpn import get_provider
+from api.services.history import log_event
 
 router = APIRouter()
 
@@ -415,6 +416,8 @@ async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
             if result.returncode != 0:
                 return ConnectResponse(success=False, error="OpenVPN reconnect failed")
 
+        log_event("reconnect", {"vpn_type": vpn_type})
         return ConnectResponse(success=True)
     except Exception as e:
+        log_event("reconnect_failed", {"vpn_type": vpn_type, "error": str(e)})
         return ConnectResponse(success=False, error=str(e))

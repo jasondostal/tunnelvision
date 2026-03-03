@@ -101,6 +101,13 @@ async def vpn_status(request: Request):
     )
 
 
+@router.get("/vpn/history")
+async def vpn_history(limit: int = 50):
+    """Connection history — server rotations, disconnects, reconnects."""
+    from api.services.history import get_history
+    return {"history": get_history(limit)}
+
+
 @router.get("/vpn/ip", response_model=VPNIPResponse)
 async def vpn_ip(request: Request):
     """Just the public IP — for Homepage widgets and quick checks."""
