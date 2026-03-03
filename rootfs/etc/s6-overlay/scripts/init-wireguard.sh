@@ -98,6 +98,14 @@ WRAPPER
     WG_ENDPOINT=$(wg show wg0 endpoints | awk '{print $2}' | head -1)
     VPN_INTERFACE="wg0"
 
+    # Set DNS to VPN provider's DNS (killswitch blocks all other DNS)
+    # Read from original config (cleaned copy may have stripped DNS)
+    VPN_DNS=$(grep -i '^\s*DNS' "$WG_CONF" 2>/dev/null | sed 's/.*=\s*//' | tr -d ' ' | cut -d',' -f1)
+    if [ -n "$VPN_DNS" ]; then
+        echo "nameserver $VPN_DNS" > /etc/resolv.conf
+        echo "[tunnelvision] DNS set to $VPN_DNS"
+    fi
+
     echo "up" > /var/run/tunnelvision/vpn_state
     echo "$WG_IP" > /var/run/tunnelvision/vpn_ip
     echo "$WG_ENDPOINT" > /var/run/tunnelvision/vpn_endpoint
