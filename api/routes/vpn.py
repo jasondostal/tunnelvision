@@ -22,20 +22,27 @@ async def vpn_status(request: Request):
     """Full VPN connection status with transfer stats and location."""
     config = request.app.state.config
 
-    # Sidecar mode: read VPN state from gluetun
+    # Sidecar mode: read all VPN state from gluetun
     if config.vpn_provider == "gluetun":
         from api.services.providers.gluetun import GluetunProvider
         gluetun = GluetunProvider()
         gluetun_status = await gluetun.get_vpn_status()
         state = "up" if gluetun_status == "running" else "down"
+        check = await gluetun.check_connection()
+        public_ip = check.ip
+        country = check.country
+        city = check.city
+        vpn_ip = ""
+        endpoint = ""
+        killswitch = "gluetun"  # Gluetun manages the firewall
     else:
         state = _read_state("/var/run/tunnelvision/vpn_state", "disabled" if not config.vpn_enabled else "unknown")
-    public_ip = _read_state("/var/run/tunnelvision/public_ip")
-    vpn_ip = _read_state("/var/run/tunnelvision/vpn_ip")
-    endpoint = _read_state("/var/run/tunnelvision/vpn_endpoint")
-    killswitch = _read_state("/var/run/tunnelvision/killswitch_state", "disabled")
-    country = _read_state("/var/run/tunnelvision/country")
-    city = _read_state("/var/run/tunnelvision/city")
+        public_ip = _read_state("/var/run/tunnelvision/public_ip")
+        country = _read_state("/var/run/tunnelvision/country")
+        city = _read_state("/var/run/tunnelvision/city")
+        vpn_ip = _read_state("/var/run/tunnelvision/vpn_ip")
+        endpoint = _read_state("/var/run/tunnelvision/vpn_endpoint")
+        killswitch = _read_state("/var/run/tunnelvision/killswitch_state", "disabled")
 
     # Parse timestamps
     connected_since = None
