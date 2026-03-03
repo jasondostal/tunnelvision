@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.1.0 — Real-Time Events (2026-03-03)
+
+### Server-Sent Events (SSE)
+- `GET /api/v1/events` — persistent SSE stream for real-time state push
+- Broadcasts on VPN state changes, control actions, IP changes
+- 30s keepalive to prevent connection drops
+- Dashboard UI now uses SSE — instant updates instead of 10s polling
+- HACS integration uses SSE — instant HA entity updates instead of 15s polling
+- Polling remains as fallback for resilience
+
+### HACS Integration v0.2.0
+- VPN switch — toggle on/off maps to connect/disconnect
+- Killswitch switch — toggle on/off maps to enable/disable
+- Removed redundant buttons (disconnect, reconnect, killswitch enable/disable)
+- IoT class upgraded from `local_polling` to `local_push`
+- Entity count: 12 sensors + 4 binary sensors + 5 buttons + 2 switches = 23
+
+---
+
 ## v2.0.0 — Sidecar Mode (2026-03-03)
 
 TunnelVision can now front gluetun. Use gluetun for the tunnel, TunnelVision for the eyes.

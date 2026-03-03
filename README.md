@@ -108,7 +108,7 @@ Or use `/api/v1/qbt/status` for torrent-focused widgets:
   <img src="images/screenshot-ha.png" alt="TunnelVision Home Assistant Entities" width="400">
 </p>
 
-Native [HACS integration](https://github.com/jasondostal/tunnelvision-ha). 25 entities, config flow, zero YAML.
+Native [HACS integration](https://github.com/jasondostal/tunnelvision-ha). 23 entities, real-time SSE updates, config flow, zero YAML.
 
 **Install via HACS:**
 1. HACS → Integrations → Three dots → **Custom Repositories**
@@ -119,10 +119,11 @@ Native [HACS integration](https://github.com/jasondostal/tunnelvision-ha). 25 en
 You get:
 - **12 sensors** — VPN state, public IP, location, speeds, transfer stats, torrent counts, provider
 - **4 binary sensors** — VPN connected, killswitch active, healthy, qBittorrent running
-- **9 buttons** — Restart VPN, rotate server, disconnect, reconnect, restart qBit, pause/resume torrents, enable/disable killswitch
+- **5 buttons** — Restart VPN, rotate server, restart qBit, pause/resume torrents
+- **2 switches** — VPN on/off, Killswitch on/off (reflect actual state)
 - **3 services** — `tunnelvision.vpn`, `tunnelvision.qbittorrent`, `tunnelvision.killswitch` for automations
 
-No MQTT required. Direct API polling every 15 seconds.
+No MQTT required. Real-time updates via SSE with polling fallback.
 
 ### Prometheus + Grafana
 
