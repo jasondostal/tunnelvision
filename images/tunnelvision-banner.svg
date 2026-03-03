@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400">
+  <defs>
+    <!-- Tunnel gradient - dark to warm amber center -->
+    <radialGradient id="tunnelGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.4"/>
+      <stop offset="30%" stop-color="#D97706" stop-opacity="0.15"/>
+      <stop offset="70%" stop-color="#1a1a2e" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#0a0a14"/>
+    </radialGradient>
+    <!-- Data flow gradient -->
+    <linearGradient id="dataFlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06B6D4" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#06B6D4" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#06B6D4" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Accent glow -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="400" fill="#0a0a14"/>
+
+  <!-- Tunnel perspective lines (converging to center) -->
+  <g opacity="0.15" stroke="#F59E0B" stroke-width="1">
+    <!-- Top lines -->
+    <line x1="0" y1="0" x2="600" y2="200"/>
+    <line x1="200" y1="0" x2="600" y2="200"/>
+    <line x1="400" y1="0" x2="600" y2="200"/>
+    <line x1="600" y1="0" x2="600" y2="200"/>
+    <line x1="800" y1="0" x2="600" y2="200"/>
+    <line x1="1000" y1="0" x2="600" y2="200"/>
+    <line x1="1200" y1="0" x2="600" y2="200"/>
+    <!-- Bottom lines -->
+    <line x1="0" y1="400" x2="600" y2="200"/>
+    <line x1="200" y1="400" x2="600" y2="200"/>
+    <line x1="400" y1="400" x2="600" y2="200"/>
+    <line x1="600" y1="400" x2="600" y2="200"/>
+    <line x1="800" y1="400" x2="600" y2="200"/>
+    <line x1="1000" y1="400" x2="600" y2="200"/>
+    <line x1="1200" y1="400" x2="600" y2="200"/>
+  </g>
+
+  <!-- Tunnel rings (depth perspective) -->
+  <g fill="none" stroke="#F59E0B" opacity="0.08">
+    <ellipse cx="600" cy="200" rx="500" ry="180" stroke-width="1"/>
+    <ellipse cx="600" cy="200" rx="380" ry="140" stroke-width="1"/>
+    <ellipse cx="600" cy="200" rx="260" ry="100" stroke-width="1"/>
+    <ellipse cx="600" cy="200" rx="140" ry="60" stroke-width="1.5"/>
+    <ellipse cx="600" cy="200" rx="60" ry="25" stroke-width="2"/>
+  </g>
+
+  <!-- Central glow -->
+  <ellipse cx="600" cy="200" rx="120" ry="50" fill="url(#tunnelGlow)" opacity="0.8"/>
+
+  <!-- Data flow particles -->
+  <g filter="url(#glow)">
+    <!-- Flowing left to center -->
+    <circle cx="150" cy="195" r="2" fill="#06B6D4" opacity="0.3"/>
+    <circle cx="250" cy="192" r="2.5" fill="#06B6D4" opacity="0.4"/>
+    <circle cx="350" cy="198" r="2" fill="#06B6D4" opacity="0.5"/>
+    <circle cx="430" cy="196" r="3" fill="#06B6D4" opacity="0.6"/>
+    <circle cx="510" cy="199" r="2.5" fill="#06B6D4" opacity="0.7"/>
+    <!-- Flowing center to right -->
+    <circle cx="690" cy="201" r="2.5" fill="#06B6D4" opacity="0.7"/>
+    <circle cx="770" cy="204" r="3" fill="#06B6D4" opacity="0.6"/>
+    <circle cx="850" cy="198" r="2" fill="#06B6D4" opacity="0.5"/>
+    <circle cx="950" cy="208" r="2.5" fill="#06B6D4" opacity="0.4"/>
+    <circle cx="1050" cy="205" r="2" fill="#06B6D4" opacity="0.3"/>
+  </g>
+
+  <!-- Data flow lines -->
+  <line x1="100" y1="195" x2="550" y2="200" stroke="url(#dataFlow)" stroke-width="1" opacity="0.4"/>
+  <line x1="650" y1="200" x2="1100" y2="205" stroke="url(#dataFlow)" stroke-width="1" opacity="0.4"/>
+
+  <!-- Central eye/lens (the "vision" part) -->
+  <g filter="url(#softGlow)" transform="translate(600, 200)">
+    <!-- Outer ring -->
+    <ellipse cx="0" cy="0" rx="28" ry="12" fill="none" stroke="#F59E0B" stroke-width="2" opacity="0.8"/>
+    <!-- Inner bright core -->
+    <ellipse cx="0" cy="0" rx="8" ry="8" fill="#F59E0B" opacity="0.9"/>
+    <ellipse cx="0" cy="0" rx="4" ry="4" fill="#FDE68A"/>
+  </g>
+
+  <!-- Title text -->
+  <text x="600" y="310" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="52" font-weight="700" fill="#FAFAFA" letter-spacing="4">
+    TUNNELVISION
+  </text>
+
+  <!-- Tagline -->
+  <text x="600" y="345" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" fill="#A1A1AA" letter-spacing="6" font-weight="300">
+    SEE THROUGH THE TUNNEL
+  </text>
+
+  <!-- Subtle border -->
+  <rect x="1" y="1" width="1198" height="398" fill="none" stroke="#F59E0B" stroke-opacity="0.1" rx="4"/>
+</svg>

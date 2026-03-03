@@ -1,0 +1,31 @@
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# Runtime data
+config/
+downloads/
+wireguard/
+
+# Documentation (not needed in image)
+docs/
+images/
+*.md
+!api/README.md
+
+# Dev files
+docker-compose.dev.yml
+docker-compose.override.yml
+.env
+.env.*
+Makefile
+
+# Node
+ui/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

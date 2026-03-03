@@ -1,0 +1,14 @@
+#!/command/with-contenv bash
+# ============================================================================
+# TunnelVision — qBittorrent-nox Service
+# ============================================================================
+
+PUID=$(cat /var/run/tunnelvision/puid 2>/dev/null || echo 1000)
+
+echo "[tunnelvision] Starting qBittorrent-nox..."
+
+exec s6-setuidgid "#${PUID}" \
+    qbittorrent-nox \
+        --profile=/config \
+        --webui-port="${WEBUI_PORT:-8080}" \
+        2>&1

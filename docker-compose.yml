@@ -1,0 +1,56 @@
+# ============================================================================
+# TunnelVision — Production docker-compose
+# ============================================================================
+
+services:
+  tunnelvision:
+    image: ghcr.io/jasondostal/tunnelvision:latest
+    container_name: tunnelvision
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=1
+    ports:
+      - "8080:8080"   # qBittorrent WebUI
+      - "8081:8081"   # TunnelVision API
+    volumes:
+      - ./config:/config
+      - /media/usbdrive/torrents:/downloads
+      # Mount your WireGuard config
+      - ./wireguard:/config/wireguard
+    environment:
+      # --- General ---
+      - TZ=America/Chicago
+      - PUID=1000
+      - PGID=1000
+
+      # --- VPN ---
+      - VPN_ENABLED=true
+      - VPN_PROVIDER=custom         # 'custom' or 'mullvad'
+      - KILLSWITCH_ENABLED=true
+
+      # --- qBittorrent ---
+      - WEBUI_PORT=8080
+      - WEBUI_ALLOWED_NETWORKS=192.168.0.0/16,172.16.0.0/12,10.0.0.0/8
+
+      # --- API ---
+      - API_ENABLED=true
+      - API_PORT=8081
+      # - API_KEY=your-secret-key   # Uncomment to require authentication
+
+      # --- UI ---
+      - UI_ENABLED=true
+
+      # --- Health ---
+      - HEALTH_CHECK_INTERVAL=30
+
+    # networks:
+    #   - homelab
+
+# networks:
+#   homelab:
+#     external: true

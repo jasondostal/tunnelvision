@@ -1,0 +1,47 @@
+# ============================================================================
+# TunnelVision — Homepage Custom API Widget
+# Add this to your Homepage services.yaml
+# ============================================================================
+#
+# Requires the customapi widget: https://gethomepage.dev/widgets/services/customapi/
+#
+# This widget shows:
+#   - VPN connection status (up/down)
+#   - Public IP address
+#   - Download/upload speeds
+#   - Active torrent count
+
+- TunnelVision:
+    icon: mdi-vpn
+    href: http://your-host:8081
+    description: qBittorrent + WireGuard VPN
+    widget:
+      type: customapi
+      url: http://tunnelvision:8081/api/v1/health
+      # headers:
+      #   X-API-Key: your-api-key    # Uncomment if API_KEY is set
+      mappings:
+        - field: vpn
+          label: VPN
+          format: text
+        - field: qbittorrent
+          label: qBit
+          format: text
+        - field: healthy
+          label: Healthy
+          format: text
+
+# --- Alternative: VPN IP widget ---
+# Shows just the VPN public IP — useful as a quick glance widget.
+#
+# - TunnelVision VPN:
+#     widget:
+#       type: customapi
+#       url: http://tunnelvision:8081/api/v1/vpn/ip
+#       mappings:
+#         - field: ip
+#           label: Public IP
+#           format: text
+#         - field: vpn_active
+#           label: VPN Active
+#           format: text

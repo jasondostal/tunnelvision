@@ -1,0 +1,57 @@
+#!/command/with-contenv bash
+# ============================================================================
+# TunnelVision — Background Health Monitor
+# Periodically checks VPN health and writes state for the API.
+# ============================================================================
+
+HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-30}
+VPN_ENABLED=${VPN_ENABLED:-true}
+
+echo "[tunnelvision] Health monitor started (interval: ${HEALTH_CHECK_INTERVAL}s)"
+
+while true; do
+    HEALTH_JSON="{}"
+    NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    HEALTHY=true
+
+    # --- VPN Health ---
+    if [ "$VPN_ENABLED" = "true" ]; then
+        if ip link show wg0 &>/dev/null; then
+            VPN_STATE="up"
+            # Get public IP through VPN
+            PUBLIC_IP=$(curl -sf --max-time 5 https://am.i.mullvad.net/ip 2>/dev/null || \
+                        curl -sf --max-time 5 https://ifconfig.me 2>/dev/null || \
+                        echo "unknown")
+            # Get transfer stats
+            WG_STATS=$(wg show wg0 transfer 2>/dev/null | head -1)
+            RX_BYTES=$(echo "$WG_STATS" | awk '{print $2}')
+            TX_BYTES=$(echo "$WG_STATS" | awk '{print $3}')
+            # Get latest handshake age
+            LAST_HS=$(wg show wg0 latest-handshakes 2>/dev/null | awk '{print $2}' | head -1)
+        else
+            VPN_STATE="down"
+            PUBLIC_IP="unknown"
+            RX_BYTES="0"
+            TX_BYTES="0"
+            LAST_HS="0"
+            HEALTHY=false
+        fi
+    else
+        VPN_STATE="disabled"
+        PUBLIC_IP="n/a"
+        RX_BYTES="0"
+        TX_BYTES="0"
+        LAST_HS="0"
+    fi
+
+    # --- Write state files for API ---
+    echo "$PUBLIC_IP" > /var/run/tunnelvision/public_ip
+    echo "$VPN_STATE" > /var/run/tunnelvision/vpn_state
+    echo "$RX_BYTES" > /var/run/tunnelvision/rx_bytes
+    echo "$TX_BYTES" > /var/run/tunnelvision/tx_bytes
+    echo "$LAST_HS" > /var/run/tunnelvision/last_handshake
+    echo "$NOW" > /var/run/tunnelvision/last_health_check
+    echo "$HEALTHY" > /var/run/tunnelvision/healthy
+
+    sleep "$HEALTH_CHECK_INTERVAL"
+done

@@ -1,0 +1,91 @@
+# ============================================================================
+# TunnelVision — Full Media Stack Example
+# qBittorrent + WireGuard + Sonarr + Radarr + Prowlarr
+# ============================================================================
+#
+# This example shows TunnelVision as the VPN gateway for your media stack.
+# Prowlarr routes through TunnelVision's network for protected indexer access.
+# Sonarr and Radarr connect to qBittorrent via the exposed WebUI port.
+
+services:
+  tunnelvision:
+    image: ghcr.io/jasondostal/tunnelvision:latest
+    container_name: tunnelvision
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=1
+    ports:
+      - "8080:8080"   # qBittorrent WebUI
+      - "8081:8081"   # TunnelVision API + Dashboard
+    volumes:
+      - ./tunnelvision/config:/config
+      - ./tunnelvision/wireguard:/config/wireguard
+      - /media/torrents:/downloads
+    environment:
+      - TZ=America/Chicago
+      - PUID=1000
+      - PGID=1000
+      - VPN_ENABLED=true
+      - VPN_PROVIDER=custom
+      - KILLSWITCH_ENABLED=true
+      - WEBUI_PORT=8080
+      - API_PORT=8081
+      - WEBUI_ALLOWED_NETWORKS=192.168.0.0/16,172.16.0.0/12,10.0.0.0/8
+    networks:
+      - media
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - ./sonarr:/config
+      - /media:/media
+    ports:
+      - "8989:8989"
+    networks:
+      - media
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - ./radarr:/config
+      - /media:/media
+    ports:
+      - "7878:7878"
+    networks:
+      - media
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - ./prowlarr:/config
+    ports:
+      - "9696:9696"
+    networks:
+      - media
+
+networks:
+  media:
+    driver: bridge

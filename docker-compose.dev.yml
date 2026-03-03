@@ -1,0 +1,42 @@
+# ============================================================================
+# TunnelVision — Development docker-compose
+# Builds from source, mounts code for live reload
+# ============================================================================
+
+services:
+  tunnelvision:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tunnelvision-dev
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=1
+    ports:
+      - "8080:8080"   # qBittorrent WebUI
+      - "8081:8081"   # TunnelVision API
+      - "5173:5173"   # Vite dev server (UI hot reload)
+    volumes:
+      - ./config:/config
+      - ./downloads:/downloads
+      - ./wireguard:/config/wireguard
+      # Mount API source for live reload
+      - ./api:/app/api
+    environment:
+      - TZ=America/Chicago
+      - PUID=1000
+      - PGID=1000
+      - VPN_ENABLED=false           # Disable VPN for local dev
+      - KILLSWITCH_ENABLED=false
+      - WEBUI_PORT=8080
+      - WEBUI_ALLOWED_NETWORKS=0.0.0.0/0
+      - API_ENABLED=true
+      - API_PORT=8081
+      - API_RELOAD=true             # Enable uvicorn auto-reload
+      - UI_ENABLED=true
+      - HEALTH_CHECK_INTERVAL=10

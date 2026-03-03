@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <radialGradient id="spGlow" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.25"/>
+      <stop offset="40%" stop-color="#D97706" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#0a0a14"/>
+    </radialGradient>
+    <linearGradient id="spFlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06B6D4" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#06B6D4" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#06B6D4" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="spBlur">
+      <feGaussianBlur stdDeviation="6"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="#0a0a14"/>
+  <rect width="1280" height="640" fill="url(#spGlow)"/>
+
+  <!-- Tunnel perspective lines -->
+  <g opacity="0.1" stroke="#F59E0B" stroke-width="1">
+    <line x1="0" y1="0" x2="640" y2="260"/>
+    <line x1="320" y1="0" x2="640" y2="260"/>
+    <line x1="640" y1="0" x2="640" y2="260"/>
+    <line x1="960" y1="0" x2="640" y2="260"/>
+    <line x1="1280" y1="0" x2="640" y2="260"/>
+    <line x1="0" y1="640" x2="640" y2="260"/>
+    <line x1="320" y1="640" x2="640" y2="260"/>
+    <line x1="640" y1="640" x2="640" y2="260"/>
+    <line x1="960" y1="640" x2="640" y2="260"/>
+    <line x1="1280" y1="640" x2="640" y2="260"/>
+  </g>
+
+  <!-- Tunnel rings -->
+  <g fill="none" stroke="#F59E0B" opacity="0.06">
+    <ellipse cx="640" cy="260" rx="500" ry="250"/>
+    <ellipse cx="640" cy="260" rx="350" ry="175"/>
+    <ellipse cx="640" cy="260" rx="200" ry="100"/>
+    <ellipse cx="640" cy="260" rx="80" ry="40"/>
+  </g>
+
+  <!-- Central eye -->
+  <g filter="url(#spBlur)" transform="translate(640, 260)">
+    <ellipse rx="30" ry="14" fill="none" stroke="#F59E0B" stroke-width="2.5" opacity="0.7"/>
+    <circle r="9" fill="#F59E0B" opacity="0.85"/>
+    <circle r="4.5" fill="#FDE68A"/>
+  </g>
+
+  <!-- Data particles -->
+  <g filter="url(#spBlur)">
+    <circle cx="200" cy="258" r="3" fill="#06B6D4" opacity="0.3"/>
+    <circle cx="350" cy="255" r="3.5" fill="#06B6D4" opacity="0.5"/>
+    <circle cx="500" cy="259" r="3" fill="#06B6D4" opacity="0.65"/>
+    <circle cx="780" cy="261" r="3" fill="#06B6D4" opacity="0.65"/>
+    <circle cx="930" cy="265" r="3.5" fill="#06B6D4" opacity="0.5"/>
+    <circle cx="1080" cy="262" r="3" fill="#06B6D4" opacity="0.3"/>
+  </g>
+
+  <!-- Title -->
+  <text x="640" y="420" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="72" font-weight="700" fill="#FAFAFA" letter-spacing="6">
+    TUNNELVISION
+  </text>
+
+  <!-- Tagline -->
+  <text x="640" y="470" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="22" fill="#A1A1AA" letter-spacing="4" font-weight="300">
+    ALL-IN-ONE qBITTORRENT + WIREGUARD + API
+  </text>
+
+  <!-- Feature pills -->
+  <g font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="500">
+    <!-- WireGuard -->
+    <rect x="300" y="510" width="120" height="32" rx="16" fill="#F59E0B" fill-opacity="0.15" stroke="#F59E0B" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="360" y="531" text-anchor="middle" fill="#F59E0B">WireGuard</text>
+    <!-- Killswitch -->
+    <rect x="440" y="510" width="120" height="32" rx="16" fill="#EF4444" fill-opacity="0.15" stroke="#EF4444" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="500" y="531" text-anchor="middle" fill="#EF4444">Killswitch</text>
+    <!-- REST API -->
+    <rect x="580" y="510" width="120" height="32" rx="16" fill="#06B6D4" fill-opacity="0.15" stroke="#06B6D4" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="640" y="531" text-anchor="middle" fill="#06B6D4">REST API</text>
+    <!-- Dashboard -->
+    <rect x="720" y="510" width="120" height="32" rx="16" fill="#8B5CF6" fill-opacity="0.15" stroke="#8B5CF6" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="780" y="531" text-anchor="middle" fill="#8B5CF6">Dashboard</text>
+    <!-- Homepage -->
+    <rect x="860" y="510" width="120" height="32" rx="16" fill="#10B981" fill-opacity="0.15" stroke="#10B981" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="920" y="531" text-anchor="middle" fill="#10B981">Homepage</text>
+  </g>
+
+  <!-- Subtle border -->
+  <rect x="1" y="1" width="1278" height="638" fill="none" stroke="#F59E0B" stroke-opacity="0.08" rx="4"/>
+</svg>
