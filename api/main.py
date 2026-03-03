@@ -80,7 +80,6 @@ async def api_root():
             "health": "/api/v1/health",
             "vpn_status": "/api/v1/vpn/status",
             "vpn_ip": "/api/v1/vpn/ip",
-            "vpn_widget": "/api/v1/vpn/widget",
             "vpn_check": "/api/v1/vpn/check",
             "vpn_server": "/api/v1/vpn/server",
             "vpn_account": "/api/v1/vpn/account",

@@ -26,6 +26,7 @@ class VPNStatusResponse(BaseModel):
     endpoint: str = ""
     country: str = Field("", description="Exit country (geo-IP, works with any provider)")
     city: str = Field("", description="Exit city (geo-IP, works with any provider)")
+    location: str = Field("", description="Human-readable location (city, country)")
     interface: str = "wg0"
     connected_since: datetime | None = None
     last_handshake: datetime | None = None

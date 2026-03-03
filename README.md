@@ -69,7 +69,7 @@ curl http://localhost:8081/api/v1/vpn/ip | jq .
 | Endpoint | What it returns |
 |----------|----------------|
 | `GET /api/v1/health` | Container health — VPN, killswitch, qBittorrent, uptime |
-| `GET /api/v1/vpn/status` | Full VPN status — IP, endpoint, transfer stats, handshake |
+| `GET /api/v1/vpn/status` | Full VPN status — IP, country, city, transfer stats, handshake |
 | `GET /api/v1/vpn/ip` | Just the public IP — perfect for widgets |
 | `GET /api/v1/vpn/check` | Provider-verified connection — Mullvad exit IP confirmation, blacklist status |
 | `GET /api/v1/vpn/server` | Server metadata — hostname, location, hosting provider, owned status |

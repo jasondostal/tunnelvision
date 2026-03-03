@@ -5,29 +5,28 @@
 #
 # Requires the customapi widget: https://gethomepage.dev/widgets/services/customapi/
 #
-# The /api/v1/vpn/widget endpoint is designed specifically for Homepage.
-# It returns flat, human-readable fields — country, city, IP, speeds.
-# Works with ANY VPN provider, not just Mullvad.
+# All widgets use /api/v1/vpn/status — the canonical source of truth.
+# Country/city/location work with ANY VPN provider via geo-IP services.
 
 # --- Recommended: Full status widget ---
 # Shows: VPN state, location (city + country), public IP, killswitch status
 - TunnelVision:
     icon: mdi-vpn
-    href: http://your-host:8081
+    href: http://your-host:8080
     description: qBittorrent + WireGuard VPN
     widget:
       type: customapi
-      url: http://tunnelvision:8081/api/v1/vpn/widget
+      url: http://tunnelvision:8081/api/v1/vpn/status
       # headers:
       #   X-API-Key: your-api-key    # Uncomment if API_KEY is set
       mappings:
-        - field: vpn
+        - field: state
           label: VPN
           format: text
         - field: location
           label: Location
           format: text
-        - field: ip
+        - field: public_ip
           label: IP
           format: text
         - field: killswitch
@@ -39,33 +38,17 @@
 #
 # - TunnelVision:
 #     icon: mdi-vpn
-#     href: http://your-host:8081
+#     href: http://your-host:8080
 #     description: VPN Status
 #     widget:
 #       type: customapi
-#       url: http://tunnelvision:8081/api/v1/vpn/widget
+#       url: http://tunnelvision:8081/api/v1/vpn/status
 #       mappings:
 #         - field: location
 #           label: Exit
 #           format: text
-#         - field: ip
+#         - field: public_ip
 #           label: IP
-#           format: text
-
-# --- Alternative: Transfer stats widget ---
-# Shows: download/upload totals (human-readable)
-#
-# - TunnelVision Transfer:
-#     icon: mdi-transfer
-#     widget:
-#       type: customapi
-#       url: http://tunnelvision:8081/api/v1/vpn/widget
-#       mappings:
-#         - field: download
-#           label: Down
-#           format: text
-#         - field: upload
-#           label: Up
 #           format: text
 
 # --- Alternative: Health widget ---
