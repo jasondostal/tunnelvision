@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <filter id="g">
+      <feGaussianBlur stdDeviation="1.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Eye shape — the tunnel opening -->
+  <path d="M4,24 Q24,6 44,24 Q24,42 4,24Z" fill="#F59E0B" fill-opacity="0.15" stroke="#F59E0B" stroke-width="2" filter="url(#g)"/>
+  <!-- Iris -->
+  <circle cx="24" cy="24" r="8" fill="#F59E0B" opacity="0.9"/>
+  <!-- Pupil -->
+  <circle cx="24" cy="24" r="4" fill="#FDE68A"/>
+  <!-- Highlight -->
+  <circle cx="26" cy="22" r="1.5" fill="#FFFBEB" opacity="0.9"/>
+</svg>

@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   TunnelVision — Design Tokens
+   Amber primary, cyan accent, dark-first. OKLCH color system.
+   ============================================================================ */
+
+@theme {
+  /* Tunnel amber — primary */
+  --color-amber-50: oklch(0.987 0.022 85);
+  --color-amber-100: oklch(0.962 0.059 85);
+  --color-amber-200: oklch(0.924 0.12 85);
+  --color-amber-300: oklch(0.879 0.169 75);
+  --color-amber-400: oklch(0.828 0.189 70);
+  --color-amber-500: oklch(0.769 0.188 70);
+  --color-amber-600: oklch(0.666 0.179 58);
+  --color-amber-700: oklch(0.555 0.163 48);
+  --color-amber-800: oklch(0.473 0.137 46);
+  --color-amber-900: oklch(0.414 0.112 45);
+
+  /* Data cyan — accent */
+  --color-cyan-400: oklch(0.789 0.154 194);
+  --color-cyan-500: oklch(0.715 0.143 195);
+  --color-cyan-600: oklch(0.609 0.126 196);
+
+  /* Surfaces */
+  --color-surface-bg: oklch(0.1 0 0);
+  --color-surface-card: oklch(0.155 0 0);
+  --color-surface-card-hover: oklch(0.18 0 0);
+  --color-surface-border: oklch(0.25 0 0);
+
+  /* Text */
+  --color-text-primary: oklch(0.95 0 0);
+  --color-text-secondary: oklch(0.65 0 0);
+  --color-text-muted: oklch(0.45 0 0);
+
+  /* Status */
+  --color-status-up: oklch(0.723 0.191 149);
+  --color-status-down: oklch(0.637 0.237 25);
+  --color-status-warning: oklch(0.769 0.188 70);
+  --color-status-disabled: oklch(0.45 0 0);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-surface-bg);
+  color: var(--color-text-primary);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Mono for values */
+.font-mono {
+  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+}

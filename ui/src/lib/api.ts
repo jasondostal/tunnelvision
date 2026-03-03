@@ -1,0 +1,46 @@
+/** Typed API client with GET cache and inflight dedup. */
+
+import type {
+  HealthResponse,
+  VPNStatusResponse,
+  QBTStatusResponse,
+  SystemResponse,
+} from "./types";
+
+const cache = new Map<string, { data: unknown; ts: number }>();
+const inflight = new Map<string, Promise<unknown>>();
+const CACHE_TTL = 5_000; // 5s — health monitor updates every 30s anyway
+
+async function get<T>(path: string): Promise<T> {
+  const now = Date.now();
+  const cached = cache.get(path);
+  if (cached && now - cached.ts < CACHE_TTL) return cached.data as T;
+
+  const existing = inflight.get(path);
+  if (existing) return existing as Promise<T>;
+
+  const promise = fetch(path)
+    .then((r) => {
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json() as Promise<T>;
+    })
+    .then((data) => {
+      cache.set(path, { data, ts: Date.now() });
+      inflight.delete(path);
+      return data;
+    })
+    .catch((err) => {
+      inflight.delete(path);
+      throw err;
+    });
+
+  inflight.set(path, promise);
+  return promise;
+}
+
+export const api = {
+  health: () => get<HealthResponse>("/api/v1/health"),
+  vpnStatus: () => get<VPNStatusResponse>("/api/v1/vpn/status"),
+  qbtStatus: () => get<QBTStatusResponse>("/api/v1/qbt/status"),
+  system: () => get<SystemResponse>("/api/v1/system"),
+};
