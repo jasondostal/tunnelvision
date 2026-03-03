@@ -8,7 +8,7 @@
 
 # --- Recommended: VPN status at a glance ---
 - TunnelVision:
-    icon: /icons/tunnelvision.png   # or mdi-vpn if you don't have the icon
+    icon: https://raw.githubusercontent.com/jasondostal/tunnelvision/main/images/tunnelvision-mark-dark-512.png
     href: http://your-host:8081
     description: VPN + qBittorrent
     widget:

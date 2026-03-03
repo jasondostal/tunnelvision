@@ -45,7 +45,7 @@ Drops right into [Homepage](https://gethomepage.dev) using the `customapi` widge
 
 ```yaml
 - TunnelVision:
-    icon: /icons/tunnelvision.png   # or mdi-vpn
+    icon: https://raw.githubusercontent.com/jasondostal/tunnelvision/main/images/tunnelvision-mark-dark-512.png
     href: http://your-host:8081
     description: VPN + qBittorrent
     widget:

@@ -8,7 +8,7 @@ export function HealthCard({ data }: { data: HealthResponse }) {
     <div className="rounded-xl border border-surface-border bg-surface-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <HeartPulse className="h-5 w-5 text-cyan-500" />
+          <HeartPulse className="h-5 w-5 text-red-500" />
           <h2 className="text-sm font-semibold tracking-wide text-text-primary">
             Health
           </h2>

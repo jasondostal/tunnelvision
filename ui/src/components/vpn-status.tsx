@@ -1,12 +1,12 @@
 import { useState } from "react";
 import {
+  Eye,
   Shield,
   Globe,
   MapPin,
   Clock,
   ArrowDownToLine,
   ArrowUpFromLine,
-  Eye,
   RotateCw,
   Power,
   Shuffle,

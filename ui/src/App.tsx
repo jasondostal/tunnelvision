@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Eye, ExternalLink, LogOut, Settings } from "lucide-react";
+import { ExternalLink, LogOut, Settings } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { api } from "@/lib/api";
 import type { AuthResponse } from "@/lib/api";
 import { usePoll } from "@/lib/use-poll";
@@ -68,7 +69,7 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
       {/* Header */}
       <header className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Eye className="h-6 w-6 text-amber-500" />
+          <Logo className="h-6 w-6" />
           <h1 className="text-lg font-bold tracking-wide text-text-primary">
             TunnelVision
           </h1>

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Eye, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { api } from "@/lib/api";
 
 interface LoginProps {
@@ -31,7 +32,7 @@ export function Login({ onSuccess }: LoginProps) {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <Eye className="mx-auto mb-3 h-10 w-10 text-amber-500" />
+          <Logo className="mx-auto mb-3 h-10 w-10" />
           <h1 className="text-xl font-bold text-text-primary">TunnelVision</h1>
           <p className="mt-1 text-sm text-text-muted">Sign in to continue</p>
         </div>

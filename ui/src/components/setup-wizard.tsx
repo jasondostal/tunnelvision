@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
+import { Logo } from "@/components/logo";
 import {
-  Eye,
   Shield,
   ChevronRight,
   Check,
@@ -136,7 +136,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
       {/* Welcome */}
       {step === "welcome" && (
         <div className="text-center">
-          <Eye className="mx-auto mb-6 h-16 w-16 text-amber-500" />
+          <Logo className="mx-auto mb-6 h-16 w-16" />
           <h1 className="mb-3 text-2xl font-bold text-text-primary">
             Welcome to TunnelVision
           </h1>
@@ -320,7 +320,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
       {step === "done" && (
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/15">
-            <Eye className="h-8 w-8 text-amber-500" />
+            <Logo className="h-8 w-8" />
           </div>
           <h2 className="mb-2 text-xl font-bold text-text-primary">
             You're connected!
