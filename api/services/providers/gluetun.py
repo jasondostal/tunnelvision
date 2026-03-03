@@ -1,0 +1,94 @@
+"""Gluetun sidecar provider — reads VPN state from gluetun's control server.
+
+TunnelVision becomes the observability layer; gluetun handles the tunnel.
+Inherits all 30+ providers that gluetun supports.
+
+Endpoints used:
+- http://<gluetun>:8000/v1/vpn/status — VPN running/stopped
+- http://<gluetun>:8000/v1/publicip/ip — current VPN exit IP
+- http://<gluetun>:8000/v1/portforward — forwarded port (if available)
+"""
+
+import os
+from datetime import datetime, timezone
+
+import httpx
+
+from api.services.providers.base import VPNProvider, ConnectionCheck
+from api.services.providers.custom import CustomProvider
+
+
+class GluetunProvider(VPNProvider):
+    """Reads VPN state from gluetun's control server API."""
+
+    def __init__(self):
+        self._base_url = os.getenv("GLUETUN_URL", "http://gluetun:8000")
+        self._api_key = os.getenv("GLUETUN_API_KEY", "")
+        # Fall back to CustomProvider for geo-IP (gluetun only returns the IP, not location)
+        self._geo = CustomProvider()
+
+    @property
+    def name(self) -> str:
+        return "gluetun"
+
+    def _headers(self) -> dict:
+        if self._api_key:
+            return {"X-API-Key": self._api_key}
+        return {}
+
+    async def check_connection(self) -> ConnectionCheck:
+        """Get VPN status from gluetun, enrich with geo-IP for location."""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                # Get public IP from gluetun
+                ip_resp = await client.get(
+                    f"{self._base_url}/v1/publicip/ip",
+                    headers=self._headers(),
+                )
+                ip_data = ip_resp.json() if ip_resp.status_code == 200 else {}
+                public_ip = ip_data.get("public_ip", "")
+
+            if public_ip:
+                # Enrich with geo-IP for country/city
+                geo = await self._geo.check_connection()
+                return ConnectionCheck(
+                    ip=public_ip,
+                    country=geo.country,
+                    city=geo.city,
+                    organization=geo.organization,
+                    is_vpn_ip=None,
+                    checked_at=datetime.now(timezone.utc),
+                )
+        except Exception:
+            pass
+
+        return ConnectionCheck(checked_at=datetime.now(timezone.utc))
+
+    async def get_vpn_status(self) -> str:
+        """Get gluetun VPN status: running/stopped."""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(
+                    f"{self._base_url}/v1/vpn/status",
+                    headers=self._headers(),
+                )
+                if resp.status_code == 200:
+                    return resp.json().get("status", "unknown")
+        except Exception:
+            pass
+        return "unknown"
+
+    async def get_forwarded_port(self) -> int | None:
+        """Get gluetun's forwarded port (if port forwarding is enabled)."""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(
+                    f"{self._base_url}/v1/portforward",
+                    headers=self._headers(),
+                )
+                if resp.status_code == 200:
+                    port = resp.json().get("port", 0)
+                    return port if port > 0 else None
+        except Exception:
+            pass
+        return None

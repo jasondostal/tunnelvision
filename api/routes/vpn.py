@@ -22,7 +22,14 @@ async def vpn_status(request: Request):
     """Full VPN connection status with transfer stats and location."""
     config = request.app.state.config
 
-    state = _read_state("/var/run/tunnelvision/vpn_state", "disabled" if not config.vpn_enabled else "unknown")
+    # Sidecar mode: read VPN state from gluetun
+    if config.vpn_provider == "gluetun":
+        from api.services.providers.gluetun import GluetunProvider
+        gluetun = GluetunProvider()
+        gluetun_status = await gluetun.get_vpn_status()
+        state = "up" if gluetun_status == "running" else "down"
+    else:
+        state = _read_state("/var/run/tunnelvision/vpn_state", "disabled" if not config.vpn_enabled else "unknown")
     public_ip = _read_state("/var/run/tunnelvision/public_ip")
     vpn_ip = _read_state("/var/run/tunnelvision/vpn_ip")
     endpoint = _read_state("/var/run/tunnelvision/vpn_endpoint")
@@ -73,14 +80,19 @@ async def vpn_status(request: Request):
         else:
             uptime = f"{total_secs // 86400}d {(total_secs % 86400) // 3600}h"
 
-    # Port forwarding (PIA)
+    # Port forwarding (PIA or gluetun)
     forwarded_port = None
-    pf_str = _read_state("/var/run/tunnelvision/forwarded_port")
-    if pf_str:
-        try:
-            forwarded_port = int(pf_str)
-        except ValueError:
-            pass
+    if config.vpn_provider == "gluetun":
+        from api.services.providers.gluetun import GluetunProvider
+        gluetun = GluetunProvider()
+        forwarded_port = await gluetun.get_forwarded_port()
+    else:
+        pf_str = _read_state("/var/run/tunnelvision/forwarded_port")
+        if pf_str:
+            try:
+                forwarded_port = int(pf_str)
+            except ValueError:
+                pass
 
     return VPNStatusResponse(
         state=state,

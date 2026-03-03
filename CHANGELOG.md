@@ -1,5 +1,30 @@
 # Changelog
 
+## v2.0.0 — Sidecar Mode (2026-03-03)
+
+TunnelVision can now front gluetun. Use gluetun for the tunnel, TunnelVision for the eyes.
+
+### Gluetun Sidecar Mode
+- Set `VPN_PROVIDER=gluetun` — TunnelVision reads VPN state from gluetun's control server API
+- Inherits all 30+ providers that gluetun supports — no provider-specific code needed
+- Reads public IP, VPN status, and forwarded port from gluetun
+- Enriches with geo-IP for country/city (gluetun's API only returns the IP)
+- Full observability stack works in sidecar mode: dashboard, HA integration, Homepage widget, Prometheus, notifications
+- Example compose at `examples/docker-compose.sidecar.yml`
+
+### Two Modes, One Product
+- **Standalone** — all-in-one container with built-in VPN, killswitch, qBittorrent (existing behavior)
+- **Sidecar** — pairs with gluetun, adds dashboard + API + integrations on top
+
+### New Env Vars
+- `GLUETUN_URL` — gluetun control server URL (default `http://gluetun:8000`)
+- `GLUETUN_API_KEY` — gluetun API key (if auth enabled)
+
+### Provider Count: 5
+custom, mullvad, ivpn, pia, gluetun (sidecar)
+
+---
+
 ## v1.2.0 — Full Stack (2026-03-03)
 
 Everything from the roadmap, in one push.

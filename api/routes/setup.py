@@ -115,6 +115,12 @@ async def list_providers():
                 "setup_type": "paste",
             },
             {
+                "id": "gluetun",
+                "name": "Gluetun (Sidecar)",
+                "description": "Already running gluetun? TunnelVision adds the dashboard, HA integration, and observability layer on top.",
+                "setup_type": "sidecar",
+            },
+            {
                 "id": "custom",
                 "name": "Custom / Other",
                 "description": "Any WireGuard or OpenVPN provider. Paste your config or drop files in the config directory.",

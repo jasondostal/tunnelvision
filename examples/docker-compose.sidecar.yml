@@ -1,0 +1,60 @@
+# ============================================================================
+# TunnelVision — Sidecar Mode (with gluetun)
+# Gluetun handles the VPN tunnel. TunnelVision adds the observability layer.
+# ============================================================================
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "8080:8080"   # qBittorrent WebUI (through gluetun's network)
+      - "8081:8081"   # TunnelVision API + Dashboard
+      - "8000:8000"   # Gluetun control server
+    environment:
+      - VPN_SERVICE_PROVIDER=mullvad   # or: ivpn, pia, protonvpn, nordvpn, etc.
+      - VPN_TYPE=wireguard
+      # Provider-specific settings (see gluetun docs)
+      # - WIREGUARD_PRIVATE_KEY=...
+      # - WIREGUARD_ADDRESSES=...
+      # - SERVER_COUNTRIES=Switzerland
+      - HTTP_CONTROL_SERVER_ADDRESS=:8000
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"   # Route through gluetun's VPN
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - WEBUI_PORT=8080
+    volumes:
+      - ./config/qbittorrent:/config
+      - ./downloads:/downloads
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+
+  tunnelvision:
+    image: ghcr.io/jasondostal/tunnelvision:latest
+    container_name: tunnelvision
+    network_mode: "service:gluetun"   # Same network as gluetun + qBit
+    environment:
+      - VPN_ENABLED=false              # Gluetun handles the VPN
+      - VPN_PROVIDER=gluetun           # Sidecar mode — reads from gluetun API
+      - GLUETUN_URL=http://localhost:8000   # Gluetun is on the same network
+      # - GLUETUN_API_KEY=...          # If gluetun auth is enabled
+      - KILLSWITCH_ENABLED=false       # Gluetun handles the killswitch
+      - API_PORT=8081
+      - UI_ENABLED=true
+    volumes:
+      - ./config/tunnelvision:/config
+    restart: unless-stopped
+    depends_on:
+      - gluetun

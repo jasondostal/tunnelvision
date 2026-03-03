@@ -21,6 +21,10 @@ class Config:
     vpn_city: str = field(default_factory=lambda: os.getenv("VPN_CITY", ""))
     killswitch_enabled: bool = field(default_factory=lambda: os.getenv("KILLSWITCH_ENABLED", "true").lower() == "true")
 
+    # Sidecar mode (gluetun)
+    gluetun_url: str = field(default_factory=lambda: os.getenv("GLUETUN_URL", "http://gluetun:8000"))
+    gluetun_api_key: str = field(default_factory=lambda: os.getenv("GLUETUN_API_KEY", ""))
+
     # PIA-specific
     pia_user: str = field(default_factory=lambda: os.getenv("PIA_USER", ""))
     pia_pass: str = field(default_factory=lambda: os.getenv("PIA_PASS", ""))

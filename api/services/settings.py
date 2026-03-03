@@ -26,6 +26,8 @@ CONFIGURABLE_FIELDS = {
     "mqtt_port": {"env": "MQTT_PORT", "default": "1883", "secret": False},
     "mqtt_user": {"env": "MQTT_USER", "default": "", "secret": False},
     "mqtt_pass": {"env": "MQTT_PASS", "default": "", "secret": True},
+    "gluetun_url": {"env": "GLUETUN_URL", "default": "http://gluetun:8000", "secret": False},
+    "gluetun_api_key": {"env": "GLUETUN_API_KEY", "default": "", "secret": True},
     "pia_user": {"env": "PIA_USER", "default": "", "secret": False},
     "pia_pass": {"env": "PIA_PASS", "default": "", "secret": True},
     "port_forward_enabled": {"env": "PORT_FORWARD_ENABLED", "default": "false", "secret": False},
