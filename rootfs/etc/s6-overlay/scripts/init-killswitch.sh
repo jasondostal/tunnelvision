@@ -39,7 +39,7 @@ if [ "$VPN_TYPE_DETECTED" = "wireguard" ]; then
     VPN_ENDPOINT_IP=$(wg show wg0 endpoints | awk '{print $2}' | cut -d: -f1 | head -1)
     VPN_ENDPOINT_PORT=$(wg show wg0 endpoints | awk '{print $2}' | cut -d: -f2 | head -1)
     VPN_PROTO="udp"
-    VPN_DNS=$(grep -i "DNS" /etc/wireguard/wg0.conf 2>/dev/null | head -1 | sed 's/.*=\s*//' | tr -d ' ' | cut -d',' -f1)
+    VPN_DNS="${VPN_DNS:-$(grep -i 'DNS' /etc/wireguard/wg0.conf 2>/dev/null | head -1 | sed 's/.*=\s*//' | tr -d ' ' | cut -d',' -f1)}"
 elif [ "$VPN_TYPE_DETECTED" = "openvpn" ]; then
     # Parse endpoint from OpenVPN config or log
     VPN_ENDPOINT_IP=$(grep -i '^remote ' /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null | head -1 | awk '{print $2}')
