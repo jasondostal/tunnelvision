@@ -71,6 +71,19 @@ for net in "${NETS[@]}"; do
     fi
 done
 
+# --- Route allowed networks through host network (not VPN) ---
+# wg-quick's fwmark routing sends ALL responses through wg0.
+# We need LAN traffic to go back through eth0 so Docker port mapping works.
+DEFAULT_GW=$(cat /var/run/tunnelvision/default_gateway 2>/dev/null)
+DEFAULT_IF=$(cat /var/run/tunnelvision/default_interface 2>/dev/null)
+if [ -n "$DEFAULT_GW" ] && [ -n "$DEFAULT_IF" ]; then
+    for net in "${NETS[@]}"; do
+        net=$(echo "$net" | tr -d ' ')
+        ip route add "$net" via "$DEFAULT_GW" dev "$DEFAULT_IF" 2>/dev/null || true
+        echo "[tunnelvision] Route: $net via $DEFAULT_GW ($DEFAULT_IF)"
+    done
+fi
+
 # --- Apply nftables rules ---
 nft -f - <<EOF
 flush ruleset
