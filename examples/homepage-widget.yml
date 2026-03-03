@@ -1,47 +1,88 @@
 # ============================================================================
-# TunnelVision — Homepage Custom API Widget
-# Add this to your Homepage services.yaml
+# TunnelVision — Homepage Custom API Widgets
+# Add these to your Homepage services.yaml
 # ============================================================================
 #
 # Requires the customapi widget: https://gethomepage.dev/widgets/services/customapi/
 #
-# This widget shows:
-#   - VPN connection status (up/down)
-#   - Public IP address
-#   - Download/upload speeds
-#   - Active torrent count
+# The /api/v1/vpn/widget endpoint is designed specifically for Homepage.
+# It returns flat, human-readable fields — country, city, IP, speeds.
+# Works with ANY VPN provider, not just Mullvad.
 
+# --- Recommended: Full status widget ---
+# Shows: VPN state, location (city + country), public IP, killswitch status
 - TunnelVision:
     icon: mdi-vpn
     href: http://your-host:8081
     description: qBittorrent + WireGuard VPN
     widget:
       type: customapi
-      url: http://tunnelvision:8081/api/v1/health
+      url: http://tunnelvision:8081/api/v1/vpn/widget
       # headers:
       #   X-API-Key: your-api-key    # Uncomment if API_KEY is set
       mappings:
         - field: vpn
           label: VPN
           format: text
-        - field: qbittorrent
-          label: qBit
+        - field: location
+          label: Location
           format: text
-        - field: healthy
-          label: Healthy
+        - field: ip
+          label: IP
+          format: text
+        - field: killswitch
+          label: Killswitch
           format: text
 
-# --- Alternative: VPN IP widget ---
-# Shows just the VPN public IP — useful as a quick glance widget.
+# --- Alternative: Compact widget ---
+# Shows: location + IP only (for tighter dashboards)
 #
-# - TunnelVision VPN:
+# - TunnelVision:
+#     icon: mdi-vpn
+#     href: http://your-host:8081
+#     description: VPN Status
 #     widget:
 #       type: customapi
-#       url: http://tunnelvision:8081/api/v1/vpn/ip
+#       url: http://tunnelvision:8081/api/v1/vpn/widget
 #       mappings:
-#         - field: ip
-#           label: Public IP
+#         - field: location
+#           label: Exit
 #           format: text
-#         - field: vpn_active
-#           label: VPN Active
+#         - field: ip
+#           label: IP
+#           format: text
+
+# --- Alternative: Transfer stats widget ---
+# Shows: download/upload totals (human-readable)
+#
+# - TunnelVision Transfer:
+#     icon: mdi-transfer
+#     widget:
+#       type: customapi
+#       url: http://tunnelvision:8081/api/v1/vpn/widget
+#       mappings:
+#         - field: download
+#           label: Down
+#           format: text
+#         - field: upload
+#           label: Up
+#           format: text
+
+# --- Alternative: Health widget ---
+# Uses the /health endpoint for container-level status
+#
+# - TunnelVision Health:
+#     icon: mdi-heart-pulse
+#     widget:
+#       type: customapi
+#       url: http://tunnelvision:8081/api/v1/health
+#       mappings:
+#         - field: vpn
+#           label: VPN
+#           format: text
+#         - field: qbittorrent
+#           label: qBit
+#           format: text
+#         - field: healthy
+#           label: Healthy
 #           format: text

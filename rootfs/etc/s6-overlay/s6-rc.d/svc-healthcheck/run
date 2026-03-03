@@ -1,16 +1,17 @@
 #!/command/with-contenv bash
 # ============================================================================
 # TunnelVision — Background Health Monitor
-# Periodically checks VPN health and writes state for the API.
+# Periodically checks VPN health and writes state for the API + widgets.
+# Uses geo-aware IP services so country/city work with ANY VPN provider.
 # ============================================================================
 
 HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-30}
 VPN_ENABLED=${VPN_ENABLED:-true}
+VPN_PROVIDER=${VPN_PROVIDER:-custom}
 
 echo "[tunnelvision] Health monitor started (interval: ${HEALTH_CHECK_INTERVAL}s)"
 
 while true; do
-    HEALTH_JSON="{}"
     NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     HEALTHY=true
 
@@ -18,10 +19,39 @@ while true; do
     if [ "$VPN_ENABLED" = "true" ]; then
         if ip link show wg0 &>/dev/null; then
             VPN_STATE="up"
-            # Get public IP through VPN
-            PUBLIC_IP=$(curl -sf --max-time 5 https://am.i.mullvad.net/ip 2>/dev/null || \
-                        curl -sf --max-time 5 https://ifconfig.me 2>/dev/null || \
-                        echo "unknown")
+
+            # Get public IP + location (geo-aware — works with any provider)
+            GEO_JSON=""
+            if [ "$VPN_PROVIDER" = "mullvad" ]; then
+                GEO_JSON=$(curl -sf --max-time 8 https://am.i.mullvad.net/json 2>/dev/null)
+            fi
+            if [ -z "$GEO_JSON" ]; then
+                GEO_JSON=$(curl -sf --max-time 8 https://ipwho.is/ 2>/dev/null)
+            fi
+            if [ -z "$GEO_JSON" ]; then
+                GEO_JSON=$(curl -sf --max-time 8 "http://ip-api.com/json/?fields=query,country,city,isp" 2>/dev/null)
+            fi
+
+            # Parse with jq (available in Alpine)
+            if [ -n "$GEO_JSON" ]; then
+                # Try mullvad format first, then ipwho.is, then ip-api
+                PUBLIC_IP=$(echo "$GEO_JSON" | jq -r '.ip // .query // empty' 2>/dev/null)
+                COUNTRY=$(echo "$GEO_JSON" | jq -r '.country // empty' 2>/dev/null)
+                CITY=$(echo "$GEO_JSON" | jq -r '.city // empty' 2>/dev/null)
+                ORG=$(echo "$GEO_JSON" | jq -r '.organization // .connection.isp // .isp // empty' 2>/dev/null)
+                # Mullvad-specific
+                IS_MULLVAD=$(echo "$GEO_JSON" | jq -r '.mullvad_exit_ip // empty' 2>/dev/null)
+                BLACKLISTED=$(echo "$GEO_JSON" | jq -r '.blacklisted.blacklisted // empty' 2>/dev/null)
+            else
+                # Last resort — plain IP
+                PUBLIC_IP=$(curl -sf --max-time 5 https://ifconfig.me/ip 2>/dev/null || echo "unknown")
+                COUNTRY=""
+                CITY=""
+                ORG=""
+                IS_MULLVAD=""
+                BLACKLISTED=""
+            fi
+
             # Get transfer stats
             WG_STATS=$(wg show wg0 transfer 2>/dev/null | head -1)
             RX_BYTES=$(echo "$WG_STATS" | awk '{print $2}')
@@ -31,6 +61,11 @@ while true; do
         else
             VPN_STATE="down"
             PUBLIC_IP="unknown"
+            COUNTRY=""
+            CITY=""
+            ORG=""
+            IS_MULLVAD=""
+            BLACKLISTED=""
             RX_BYTES="0"
             TX_BYTES="0"
             LAST_HS="0"
@@ -39,14 +74,24 @@ while true; do
     else
         VPN_STATE="disabled"
         PUBLIC_IP="n/a"
+        COUNTRY=""
+        CITY=""
+        ORG=""
+        IS_MULLVAD=""
+        BLACKLISTED=""
         RX_BYTES="0"
         TX_BYTES="0"
         LAST_HS="0"
     fi
 
-    # --- Write state files for API ---
+    # --- Write state files for API + widgets ---
     echo "$PUBLIC_IP" > /var/run/tunnelvision/public_ip
     echo "$VPN_STATE" > /var/run/tunnelvision/vpn_state
+    echo "$COUNTRY" > /var/run/tunnelvision/country
+    echo "$CITY" > /var/run/tunnelvision/city
+    echo "$ORG" > /var/run/tunnelvision/organization
+    echo "$IS_MULLVAD" > /var/run/tunnelvision/is_mullvad_ip
+    echo "$BLACKLISTED" > /var/run/tunnelvision/blacklisted
     echo "$RX_BYTES" > /var/run/tunnelvision/rx_bytes
     echo "$TX_BYTES" > /var/run/tunnelvision/tx_bytes
     echo "$LAST_HS" > /var/run/tunnelvision/last_handshake
