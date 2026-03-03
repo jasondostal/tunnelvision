@@ -1,10 +1,11 @@
-/** Visibility-aware polling — pauses when tab is hidden. */
+/** Visibility-aware polling with SSE-triggered refresh. */
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
 export function usePoll<T>(
   fetcher: () => Promise<T>,
-  intervalMs: number = 10_000
+  intervalMs: number = 10_000,
+  refreshSignal: number = 0
 ): { data: T | null; error: string | null; loading: boolean } {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +52,11 @@ export function usePoll<T>(
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [tick, intervalMs]);
+
+  // SSE-triggered refresh — tick whenever refreshSignal changes
+  useEffect(() => {
+    if (refreshSignal > 0) tick();
+  }, [refreshSignal, tick]);
 
   return { data, error, loading };
 }

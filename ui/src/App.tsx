@@ -11,6 +11,7 @@ import { SystemInfo } from "@/components/system-info";
 import { SetupWizard } from "@/components/setup-wizard";
 import { Login } from "@/components/login";
 import { SettingsPanel } from "@/components/settings-panel";
+import { useSSE } from "@/lib/use-sse";
 
 const POLL_INTERVAL = 10_000; // 10s
 
@@ -43,9 +44,14 @@ export default function App() {
 function Dashboard({ authState }: { authState: AuthResponse | null }) {
   const [setupComplete, setSetupComplete] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const health = usePoll(useCallback(() => api.health(), []), POLL_INTERVAL);
-  const vpn = usePoll(useCallback(() => api.vpnStatus(), []), POLL_INTERVAL);
-  const qbt = usePoll(useCallback(() => api.qbtStatus(), []), POLL_INTERVAL);
+  const [sseRefresh, setSSERefresh] = useState(0);
+
+  // SSE — instant refresh on VPN state changes
+  useSSE(() => setSSERefresh((n) => n + 1));
+
+  const health = usePoll(useCallback(() => api.health(), []), POLL_INTERVAL, sseRefresh);
+  const vpn = usePoll(useCallback(() => api.vpnStatus(), []), POLL_INTERVAL, sseRefresh);
+  const qbt = usePoll(useCallback(() => api.qbtStatus(), []), POLL_INTERVAL, sseRefresh);
   const system = usePoll(useCallback(() => api.system(), []), 30_000);
 
   const loading = health.loading || vpn.loading;
