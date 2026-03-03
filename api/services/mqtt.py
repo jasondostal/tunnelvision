@@ -59,6 +59,7 @@ class MQTTService:
 
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
+        self.client.on_message = self._on_message
 
         try:
             self.client.connect(self.broker, self.port, keepalive=60)
@@ -79,6 +80,9 @@ class MQTTService:
             self._connected = True
             # Publish availability
             client.publish(f"{self.prefix}/available", "online", qos=1, retain=True)
+            # Subscribe to commands
+            client.subscribe(f"{self.prefix}/command")
+            log.info(f"Subscribed to {self.prefix}/command")
             # Publish HA Discovery
             self._publish_discovery()
         else:
@@ -87,6 +91,44 @@ class MQTTService:
     def _on_disconnect(self, client, userdata, flags, reason_code, properties=None):
         self._connected = False
         log.warning(f"MQTT disconnected: {reason_code}")
+
+    def _on_message(self, client, userdata, msg):
+        """Handle incoming commands from HA or other MQTT clients."""
+        import subprocess
+        command = msg.payload.decode().strip().lower()
+        log.info(f"MQTT command received: {command}")
+
+        commands = {
+            "vpn_restart": ["POST", "/api/v1/vpn/restart"],
+            "vpn_disconnect": ["POST", "/api/v1/vpn/disconnect"],
+            "vpn_reconnect": ["POST", "/api/v1/vpn/reconnect"],
+            "vpn_rotate": ["POST", "/api/v1/vpn/rotate"],
+            "killswitch_enable": ["POST", "/api/v1/killswitch/enable"],
+            "killswitch_disable": ["POST", "/api/v1/killswitch/disable"],
+            "qbt_restart": ["POST", "/api/v1/qbt/restart"],
+            "qbt_pause": ["POST", "/api/v1/qbt/pause"],
+            "qbt_resume": ["POST", "/api/v1/qbt/resume"],
+        }
+
+        if command not in commands:
+            log.warning(f"Unknown MQTT command: {command}")
+            client.publish(f"{self.prefix}/command_result",
+                          json.dumps({"success": False, "error": f"Unknown command: {command}"}))
+            return
+
+        method, path = commands[command]
+        try:
+            result = subprocess.run(
+                ["curl", "-sf", "-X", method, f"http://localhost:8081{path}"],
+                capture_output=True, text=True, timeout=30,
+            )
+            client.publish(f"{self.prefix}/command_result", result.stdout or '{"success": true}')
+        except Exception as e:
+            client.publish(f"{self.prefix}/command_result",
+                          json.dumps({"success": False, "error": str(e)}))
+
+        # Publish updated state immediately
+        self.publish_state()
 
     def publish_state(self):
         """Publish current state to MQTT. Called by health monitor."""
@@ -221,6 +263,34 @@ class MQTTService:
             "device_class": "data_size",
             "state_class": "total_increasing",
             "icon": "mdi:upload",
+        }, device, availability)
+
+        # --- Buttons (HA 2024.2+ button platform via MQTT) ---
+        for btn_id, btn_name, btn_icon, btn_cmd in [
+            ("vpn_restart", "Restart VPN", "mdi:vpn", "vpn_restart"),
+            ("vpn_rotate", "Rotate Server", "mdi:earth-arrow-right", "vpn_rotate"),
+            ("vpn_disconnect", "Disconnect VPN", "mdi:vpn-off", "vpn_disconnect"),
+            ("qbt_restart", "Restart qBittorrent", "mdi:restart", "qbt_restart"),
+            ("qbt_pause", "Pause All Torrents", "mdi:pause-circle", "qbt_pause"),
+            ("qbt_resume", "Resume All Torrents", "mdi:play-circle", "qbt_resume"),
+        ]:
+            self._discover("button", btn_id, {
+                "name": btn_name,
+                "command_topic": f"{self.prefix}/command",
+                "payload_press": btn_cmd,
+                "icon": btn_icon,
+            }, device, availability)
+
+        # --- Switch (killswitch toggle) ---
+        self._discover("switch", "killswitch_toggle", {
+            "name": "Killswitch",
+            "state_topic": f"{self.prefix}/killswitch",
+            "command_topic": f"{self.prefix}/command",
+            "payload_on": "killswitch_enable",
+            "payload_off": "killswitch_disable",
+            "state_on": "active",
+            "state_off": "disabled",
+            "icon": "mdi:shield-lock",
         }, device, availability)
 
         log.info("HA Discovery messages published")

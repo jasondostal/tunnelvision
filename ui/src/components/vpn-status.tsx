@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Shield,
   Globe,
@@ -6,9 +7,13 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Eye,
+  RotateCw,
+  Power,
+  Shuffle,
+  Loader2,
 } from "lucide-react";
 import type { VPNStatusResponse } from "@/lib/types";
-import { humanBytes, humanDuration } from "@/lib/utils";
+import { humanBytes, humanDuration, cn } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
 
 function Stat({
@@ -35,6 +40,53 @@ function Stat({
       </div>
     </div>
   );
+}
+
+function ActionButton({
+  icon: Icon,
+  label,
+  onClick,
+  variant = "default",
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick: () => void;
+  variant?: "default" | "danger";
+}) {
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      await onClick();
+    } finally {
+      setTimeout(() => setLoading(false), 1500);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      className={cn(
+        "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors disabled:opacity-50",
+        variant === "danger"
+          ? "border-status-down/20 text-status-down hover:bg-status-down/10"
+          : "border-surface-border text-text-secondary hover:border-amber-500/30 hover:text-amber-400"
+      )}
+    >
+      {loading ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Icon className="h-3.5 w-3.5" />
+      )}
+      {label}
+    </button>
+  );
+}
+
+async function apiPost(path: string) {
+  await fetch(path, { method: "POST" });
 }
 
 export function VPNStatus({ data }: { data: VPNStatusResponse }) {
@@ -73,7 +125,7 @@ export function VPNStatus({ data }: { data: VPNStatusResponse }) {
       )}
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+      <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-3">
         {!data.location && (
           <Stat icon={Globe} label="Public IP" value={data.public_ip} mono />
         )}
@@ -93,6 +145,35 @@ export function VPNStatus({ data }: { data: VPNStatusResponse }) {
         />
         {data.provider !== "custom" && (
           <Stat icon={Globe} label="Provider" value={data.provider} />
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-wrap gap-2 border-t border-surface-border pt-3">
+        <ActionButton
+          icon={RotateCw}
+          label="Restart VPN"
+          onClick={() => apiPost("/api/v1/vpn/restart")}
+        />
+        <ActionButton
+          icon={Shuffle}
+          label="Rotate Server"
+          onClick={() => apiPost("/api/v1/vpn/rotate")}
+        />
+        {data.state === "up" && (
+          <ActionButton
+            icon={Power}
+            label="Disconnect"
+            onClick={() => apiPost("/api/v1/vpn/disconnect")}
+            variant="danger"
+          />
+        )}
+        {data.state === "down" && (
+          <ActionButton
+            icon={Power}
+            label="Reconnect"
+            onClick={() => apiPost("/api/v1/vpn/reconnect")}
+          />
         )}
       </div>
     </div>

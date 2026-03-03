@@ -1,4 +1,5 @@
-import { Download, Upload, FileDown, HardDrive } from "lucide-react";
+import { useState } from "react";
+import { Download, Upload, FileDown, HardDrive, RotateCw, Loader2 } from "lucide-react";
 import type { QBTStatusResponse } from "@/lib/types";
 import { humanSpeed } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
@@ -63,6 +64,36 @@ export function QBTStatus({ data }: { data: QBTStatusResponse }) {
           </div>
         )}
       </div>
+
+      {/* Controls */}
+      <div className="mt-3 border-t border-surface-border pt-3">
+        <RestartButton />
+      </div>
     </div>
+  );
+}
+
+function RestartButton() {
+  const [loading, setLoading] = useState(false);
+  return (
+    <button
+      onClick={async () => {
+        setLoading(true);
+        try {
+          await fetch("/api/v1/qbt/restart", { method: "POST" });
+        } finally {
+          setTimeout(() => setLoading(false), 2000);
+        }
+      }}
+      disabled={loading}
+      className="flex items-center gap-1.5 rounded-lg border border-surface-border px-2.5 py-1.5 text-xs text-text-secondary transition-colors hover:border-amber-500/30 hover:text-amber-400 disabled:opacity-50"
+    >
+      {loading ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <RotateCw className="h-3.5 w-3.5" />
+      )}
+      Restart qBit
+    </button>
   );
 }
