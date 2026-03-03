@@ -64,16 +64,22 @@ curl http://localhost:8081/api/v1/vpn/ip | jq .
 
 **qBittorrent-nox.** Full-featured torrent client with WebUI. Your existing qBittorrent config migrates directly — just mount your config directory.
 
-**REST API.** The real differentiator. Six endpoints that give you full visibility:
+**REST API.** The real differentiator. Ten endpoints that give you full visibility:
 
 | Endpoint | What it returns |
 |----------|----------------|
 | `GET /api/v1/health` | Container health — VPN, killswitch, qBittorrent, uptime |
 | `GET /api/v1/vpn/status` | Full VPN status — IP, endpoint, transfer stats, handshake |
 | `GET /api/v1/vpn/ip` | Just the public IP — perfect for widgets |
+| `GET /api/v1/vpn/check` | Provider-verified connection — Mullvad exit IP confirmation, blacklist status |
+| `GET /api/v1/vpn/server` | Server metadata — hostname, location, hosting provider, owned status |
+| `GET /api/v1/vpn/account` | Account status — expiry date, days remaining |
+| `GET /api/v1/vpn/servers` | Available servers — filterable by country/city |
 | `GET /api/v1/qbt/status` | Download/upload speeds, active torrents, version |
 | `GET /api/v1/system` | Container versions, uptime, resource info |
 | `GET /api/v1/config` | Current configuration (no secrets exposed) |
+
+**Works with any WireGuard provider.** Mount a `wg0.conf` from Mullvad, IVPN, Proton, AirVPN, or your own WireGuard server — TunnelVision handles the rest. Set `VPN_PROVIDER=mullvad` for rich API integration (server metadata, IP verification, account expiry). Leave it as `custom` for generic operation with any provider.
 
 **Homepage integration.** Ships with a [customapi widget example](examples/homepage-widget.yml) that drops right into your Homepage dashboard.
 
@@ -97,6 +103,7 @@ All via environment variables. Sensible defaults for everything.
 | `PGID` | `1000` | Group ID for file permissions |
 | `TZ` | `America/Chicago` | Container timezone |
 | `HEALTH_CHECK_INTERVAL` | `30` | Seconds between health checks |
+| `MULLVAD_ACCOUNT` | *(empty)* | Mullvad account number for expiry checking (provider=mullvad only) |
 
 ## Architecture
 

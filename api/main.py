@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api import __version__
 from api.config import load_config
-from api.routes import health, vpn, qbt, system, config as config_routes
+from api.routes import health, vpn, qbt, system, config as config_routes, provider
 
 
 @asynccontextmanager
@@ -61,6 +61,7 @@ app.include_router(vpn.router, prefix="/api/v1", tags=["vpn"])
 app.include_router(qbt.router, prefix="/api/v1", tags=["qbittorrent"])
 app.include_router(system.router, prefix="/api/v1", tags=["system"])
 app.include_router(config_routes.router, prefix="/api/v1", tags=["config"])
+app.include_router(provider.router, prefix="/api/v1", tags=["provider"])
 
 # Mount UI static files (if built)
 try:
@@ -79,6 +80,10 @@ async def api_root():
             "health": "/api/v1/health",
             "vpn_status": "/api/v1/vpn/status",
             "vpn_ip": "/api/v1/vpn/ip",
+            "vpn_check": "/api/v1/vpn/check",
+            "vpn_server": "/api/v1/vpn/server",
+            "vpn_account": "/api/v1/vpn/account",
+            "vpn_servers": "/api/v1/vpn/servers",
             "qbt_status": "/api/v1/qbt/status",
             "system": "/api/v1/system",
             "config": "/api/v1/config",
