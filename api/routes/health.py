@@ -54,6 +54,13 @@ async def health_check(request: Request):
 
     uptime = time.time() - request.app.state.started_at
 
+    # Publish state to MQTT on each health check
+    try:
+        from api.services.mqtt import get_mqtt_service
+        get_mqtt_service().publish_state()
+    except Exception:
+        pass
+
     return HealthResponse(
         healthy=healthy_str == "true" and qbt_state == "running",
         vpn=vpn_state,

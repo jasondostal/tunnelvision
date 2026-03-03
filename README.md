@@ -81,6 +81,14 @@ curl http://localhost:8081/api/v1/vpn/ip | jq .
 
 **Works with any WireGuard provider.** Mount a `wg0.conf` from Mullvad, IVPN, Proton, AirVPN, or your own WireGuard server — TunnelVision handles the rest. Set `VPN_PROVIDER=mullvad` for rich API integration (server metadata, IP verification, account expiry). Leave it as `custom` for generic operation with any provider.
 
+**Server rotation.** Set `VPN_COUNTRY=ch` and every reconnect picks a random Swiss server. No country set? Fully random from the entire pool. Works with Mullvad's API (auto-generates configs) or config-file rotation (drop multiple .conf/.ovpn files).
+
+**OpenVPN + WireGuard.** Both engines supported. Set `VPN_TYPE=auto` (default) and TunnelVision detects from your config file. Drop a `.ovpn` or a `.conf` — it just works.
+
+**Home Assistant auto-discovery.** Set `MQTT_ENABLED=true` and point at your MQTT broker. TunnelVision entities appear in Home Assistant automatically — VPN status, public IP, country, city, speeds, killswitch. Zero config on the HA side. Real-time push, not polling.
+
+**Prometheus metrics.** `GET /metrics` exposes everything in Prometheus text format. Wire it into Grafana for dashboards and AlertManager for notifications.
+
 **Homepage integration.** Ships with a [customapi widget example](examples/homepage-widget.yml) that drops right into your Homepage dashboard.
 
 **Optional dashboard.** A React-based UI served on the API port for visual monitoring. Disable it with `UI_ENABLED=false` if you only want the API.
@@ -91,14 +99,21 @@ All via environment variables. Sensible defaults for everything.
 
 | Variable | Default | What it does |
 |----------|---------|-------------|
-| `VPN_ENABLED` | `true` | Enable/disable WireGuard VPN |
+| `VPN_ENABLED` | `true` | Enable/disable VPN |
+| `VPN_TYPE` | `auto` | VPN engine: `auto`, `wireguard`, or `openvpn` |
 | `VPN_PROVIDER` | `custom` | VPN provider: `custom` or `mullvad` |
+| `VPN_COUNTRY` | *(empty)* | Filter server rotation by country (e.g. `ch`, `us`) |
+| `VPN_CITY` | *(empty)* | Filter server rotation by city (e.g. `zurich`) |
 | `KILLSWITCH_ENABLED` | `true` | Enable nftables killswitch |
 | `WEBUI_PORT` | `8080` | qBittorrent WebUI port |
 | `API_PORT` | `8081` | TunnelVision API port |
 | `API_KEY` | *(empty)* | Set to require `X-API-Key` header on API calls |
 | `UI_ENABLED` | `true` | Serve the web dashboard |
 | `WEBUI_ALLOWED_NETWORKS` | `192.168.0.0/16,...` | Networks allowed to access WebUI and API |
+| `MQTT_ENABLED` | `false` | Enable MQTT with Home Assistant auto-discovery |
+| `MQTT_BROKER` | *(empty)* | MQTT broker hostname/IP |
+| `MQTT_PORT` | `1883` | MQTT broker port |
+| `MQTT_USER` / `MQTT_PASS` | *(empty)* | MQTT authentication |
 | `PUID` | `1000` | User ID for file permissions |
 | `PGID` | `1000` | Group ID for file permissions |
 | `TZ` | `America/Chicago` | Container timezone |

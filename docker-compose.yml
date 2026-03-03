@@ -30,8 +30,11 @@ services:
 
       # --- VPN ---
       - VPN_ENABLED=true
+      - VPN_TYPE=auto               # 'auto', 'wireguard', or 'openvpn'
       - VPN_PROVIDER=custom         # 'custom' or 'mullvad'
       - KILLSWITCH_ENABLED=true
+      # - VPN_COUNTRY=              # Filter server rotation by country (e.g. 'ch', 'us')
+      # - VPN_CITY=                 # Filter server rotation by city (e.g. 'zurich')
 
       # --- qBittorrent ---
       - WEBUI_PORT=8080
@@ -44,6 +47,13 @@ services:
 
       # --- UI ---
       - UI_ENABLED=true
+
+      # --- MQTT (Home Assistant auto-discovery) ---
+      # - MQTT_ENABLED=true
+      # - MQTT_BROKER=192.168.1.x   # Your MQTT broker IP
+      # - MQTT_PORT=1883
+      # - MQTT_USER=
+      # - MQTT_PASS=
 
       # --- Health ---
       - HEALTH_CHECK_INTERVAL=30

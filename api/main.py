@@ -16,9 +16,19 @@ from api.routes import health, vpn, qbt, system, config as config_routes, provid
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan — startup and shutdown."""
+    from api.services.mqtt import get_mqtt_service
+
     app.state.config = load_config()
     app.state.started_at = time.time()
+
+    # Start MQTT if configured
+    mqtt_svc = get_mqtt_service()
+    mqtt_svc.start()
+
     yield
+
+    # Shutdown
+    mqtt_svc.stop()
 
 
 app = FastAPI(
