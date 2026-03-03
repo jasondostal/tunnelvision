@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import {
   Eye,
   Shield,
-  Globe,
   ChevronRight,
   Check,
   Loader2,
