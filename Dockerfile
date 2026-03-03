@@ -10,7 +10,7 @@ FROM node:22-alpine AS ui-builder
 
 WORKDIR /build
 COPY ui/package*.json ./
-RUN npm ci --no-audit
+RUN npm install --no-audit
 COPY ui/ ./
 RUN npm run build
 
@@ -52,7 +52,6 @@ ENV TZ=America/Chicago \
     # API
     API_ENABLED=true \
     API_PORT=8081 \
-    API_KEY="" \
     # UI
     UI_ENABLED=true \
     # Health
