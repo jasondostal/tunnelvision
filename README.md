@@ -108,11 +108,13 @@ Or use `/api/v1/qbt/status` for torrent-focused widgets:
   <img src="images/screenshot-ha.png" alt="TunnelVision Home Assistant Entities" width="400">
 </p>
 
-Native HACS integration. 25 entities, config flow, zero YAML.
+Native [HACS integration](https://github.com/jasondostal/tunnelvision-ha). 25 entities, config flow, zero YAML.
 
-1. Copy [`custom_components/tunnelvision`](https://github.com/jasondostal/tunnelvision-ha) to your HA `custom_components/` directory
-2. Restart Home Assistant
-3. **Settings > Integrations > Add > TunnelVision** — enter your host and port
+**Install via HACS:**
+1. HACS → Integrations → Three dots → **Custom Repositories**
+2. Paste `https://github.com/jasondostal/tunnelvision-ha` → category **Integration** → **Add**
+3. Search **TunnelVision** → **Download** → Restart HA
+4. **Settings → Integrations → Add → TunnelVision** — enter your host and port
 
 You get:
 - **12 sensors** — VPN state, public IP, location, speeds, transfer stats, torrent counts, provider
