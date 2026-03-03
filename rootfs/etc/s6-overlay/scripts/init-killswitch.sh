@@ -42,8 +42,8 @@ if [ "$VPN_TYPE_DETECTED" = "wireguard" ]; then
     VPN_DNS=$(grep -i "DNS" /etc/wireguard/wg0.conf 2>/dev/null | head -1 | sed 's/.*=\s*//' | tr -d ' ' | cut -d',' -f1)
 elif [ "$VPN_TYPE_DETECTED" = "openvpn" ]; then
     # Parse endpoint from OpenVPN config or log
-    VPN_ENDPOINT_IP=$(grep -oP '(?<=remote\s)\S+' /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null | head -1)
-    VPN_ENDPOINT_PORT=$(grep -oP '(?<=remote\s\S{1,100}\s)\d+' /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null | head -1)
+    VPN_ENDPOINT_IP=$(grep -i '^remote ' /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null | head -1 | awk '{print $2}')
+    VPN_ENDPOINT_PORT=$(grep -i '^remote ' /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null | head -1 | awk '{print $3}')
     VPN_ENDPOINT_PORT=${VPN_ENDPOINT_PORT:-1194}
     # OpenVPN can use TCP or UDP
     if grep -qi "proto tcp" /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null; then
@@ -51,7 +51,7 @@ elif [ "$VPN_TYPE_DETECTED" = "openvpn" ]; then
     else
         VPN_PROTO="udp"
     fi
-    VPN_DNS=$(grep -oP '(?<=dhcp-option DNS\s)\S+' /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null | head -1)
+    VPN_DNS=$(grep -i 'dhcp-option DNS' /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null | head -1 | awk '{print $NF}')
 fi
 
 VPN_DNS=${VPN_DNS:-"10.64.0.1"}

@@ -94,7 +94,7 @@ WRAPPER
         exit 1
     fi
 
-    WG_IP=$(ip -4 addr show wg0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    WG_IP=$(ip -4 addr show wg0 | awk '/inet / {print $2}' | cut -d/ -f1)
     WG_ENDPOINT=$(wg show wg0 endpoints | awk '{print $2}' | head -1)
     VPN_INTERFACE="wg0"
 
@@ -143,7 +143,7 @@ elif [ "$VPN_TYPE" = "openvpn" ]; then
         exit 1
     fi
 
-    TUN_IP=$(ip -4 addr show tun0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    TUN_IP=$(ip -4 addr show tun0 | awk '/inet / {print $2}' | cut -d/ -f1)
     VPN_INTERFACE="tun0"
 
     echo "up" > /var/run/tunnelvision/vpn_state
