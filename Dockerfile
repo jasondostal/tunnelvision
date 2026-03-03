@@ -21,7 +21,7 @@ FROM python:3.12-alpine AS api-builder
 
 WORKDIR /build
 COPY api/requirements.txt ./
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --target=/install -r requirements.txt
 
 # ---------------------------------------------------------------------------
 # Stage 3: Runtime
@@ -103,7 +103,7 @@ RUN addgroup -g 1000 tunnelvision && \
     adduser -D -u 1000 -G tunnelvision -h /config tunnelvision
 
 # Copy Python API dependencies from builder
-COPY --from=api-builder /install /usr/local
+COPY --from=api-builder /install /usr/lib/python3.12/site-packages/
 
 # Copy API source
 COPY api/ /app/api/
