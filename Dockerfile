@@ -44,6 +44,7 @@ ENV TZ=America/Chicago \
     PGID=1000 \
     # VPN
     VPN_ENABLED=true \
+    VPN_TYPE=wireguard \
     VPN_PROVIDER=custom \
     KILLSWITCH_ENABLED=true \
     # qBittorrent
@@ -91,6 +92,7 @@ RUN apk add --no-cache \
     nftables \
     python3 \
     py3-pip \
+    openvpn \
     qbittorrent-nox \
     shadow \
     tzdata \

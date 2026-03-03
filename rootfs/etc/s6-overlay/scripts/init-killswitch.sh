@@ -2,6 +2,7 @@
 # ============================================================================
 # TunnelVision — nftables Killswitch
 # Blocks all traffic that doesn't go through the VPN tunnel.
+# Works with both WireGuard (wg0) and OpenVPN (tun0).
 # ============================================================================
 set -e
 
@@ -27,15 +28,35 @@ fi
 
 echo "[tunnelvision] Applying killswitch firewall rules..."
 
-# --- Read VPN endpoint from WireGuard config ---
-VPN_ENDPOINT_IP=$(wg show wg0 endpoints | awk '{print $2}' | cut -d: -f1 | head -1)
-VPN_ENDPOINT_PORT=$(wg show wg0 endpoints | awk '{print $2}' | cut -d: -f2 | head -1)
-VPN_DNS=$(grep -i "DNS" /etc/wireguard/wg0.conf | head -1 | sed 's/.*=\s*//' | tr -d ' ' | cut -d',' -f1)
+# --- Detect VPN interface and type ---
+VPN_IF=$(cat /var/run/tunnelvision/vpn_interface 2>/dev/null || echo "wg0")
+VPN_TYPE_DETECTED=$(cat /var/run/tunnelvision/vpn_type 2>/dev/null || echo "wireguard")
 
-# Default DNS to common VPN DNS if not set
+echo "[tunnelvision] VPN interface: $VPN_IF ($VPN_TYPE_DETECTED)"
+
+# --- Get endpoint info based on VPN type ---
+if [ "$VPN_TYPE_DETECTED" = "wireguard" ]; then
+    VPN_ENDPOINT_IP=$(wg show wg0 endpoints | awk '{print $2}' | cut -d: -f1 | head -1)
+    VPN_ENDPOINT_PORT=$(wg show wg0 endpoints | awk '{print $2}' | cut -d: -f2 | head -1)
+    VPN_PROTO="udp"
+    VPN_DNS=$(grep -i "DNS" /etc/wireguard/wg0.conf 2>/dev/null | head -1 | sed 's/.*=\s*//' | tr -d ' ' | cut -d',' -f1)
+elif [ "$VPN_TYPE_DETECTED" = "openvpn" ]; then
+    # Parse endpoint from OpenVPN config or log
+    VPN_ENDPOINT_IP=$(grep -oP '(?<=remote\s)\S+' /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null | head -1)
+    VPN_ENDPOINT_PORT=$(grep -oP '(?<=remote\s\S{1,100}\s)\d+' /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null | head -1)
+    VPN_ENDPOINT_PORT=${VPN_ENDPOINT_PORT:-1194}
+    # OpenVPN can use TCP or UDP
+    if grep -qi "proto tcp" /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null; then
+        VPN_PROTO="tcp"
+    else
+        VPN_PROTO="udp"
+    fi
+    VPN_DNS=$(grep -oP '(?<=dhcp-option DNS\s)\S+' /config/openvpn/*.ovpn /config/openvpn/*.conf 2>/dev/null | head -1)
+fi
+
 VPN_DNS=${VPN_DNS:-"10.64.0.1"}
 
-echo "[tunnelvision] VPN endpoint: ${VPN_ENDPOINT_IP}:${VPN_ENDPOINT_PORT}"
+echo "[tunnelvision] VPN endpoint: ${VPN_ENDPOINT_IP}:${VPN_ENDPOINT_PORT} (${VPN_PROTO})"
 echo "[tunnelvision] VPN DNS: ${VPN_DNS}"
 
 # --- Build allowed networks set elements ---
@@ -73,60 +94,51 @@ table ip tunnelvision {
     chain input {
         type filter hook input priority 0; policy drop;
 
-        # Loopback
         iif lo accept
-
-        # Established/related connections
         ct state established,related accept
 
-        # VPN tunnel traffic
-        iifname "wg0" accept
+        # VPN tunnel traffic (wg0 or tun0)
+        iifname "${VPN_IF}" accept
 
-        # WireGuard handshake responses
-        ip saddr ${VPN_ENDPOINT_IP} udp sport ${VPN_ENDPOINT_PORT} accept
+        # VPN handshake responses
+        ip saddr ${VPN_ENDPOINT_IP} ${VPN_PROTO} sport ${VPN_ENDPOINT_PORT} accept
 
         # WebUI + API from allowed networks
         ip saddr @allowed_networks tcp dport ${WEBUI_PORT} accept
         ip saddr @allowed_networks tcp dport ${API_PORT} accept
 
-        # ICMP essentials
         icmp type { destination-unreachable, time-exceeded, echo-request } accept
     }
 
     chain forward {
         type filter hook forward priority 0; policy drop;
 
-        # For containers using network_mode: service:tunnelvision
-        oifname "wg0" accept
-        iifname "wg0" ct state established,related accept
+        oifname "${VPN_IF}" accept
+        iifname "${VPN_IF}" ct state established,related accept
     }
 
     chain output {
         type filter hook output priority 0; policy drop;
 
-        # Loopback
         oif lo accept
-
-        # Established/related
         ct state established,related accept
 
         # DNS: ONLY to VPN DNS, ONLY through tunnel
-        oifname "wg0" udp dport 53 ip daddr ${VPN_DNS} accept
-        oifname "wg0" tcp dport 53 ip daddr ${VPN_DNS} accept
+        oifname "${VPN_IF}" udp dport 53 ip daddr ${VPN_DNS} accept
+        oifname "${VPN_IF}" tcp dport 53 ip daddr ${VPN_DNS} accept
         udp dport 53 reject
         tcp dport 53 reject with tcp reset
 
         # All traffic through VPN tunnel
-        oifname "wg0" accept
+        oifname "${VPN_IF}" accept
 
-        # WireGuard handshake to endpoint
-        ip daddr ${VPN_ENDPOINT_IP} udp dport ${VPN_ENDPOINT_PORT} accept
+        # VPN handshake to endpoint
+        ip daddr ${VPN_ENDPOINT_IP} ${VPN_PROTO} dport ${VPN_ENDPOINT_PORT} accept
 
         # WebUI + API responses to allowed networks
         ip daddr @allowed_networks tcp sport ${WEBUI_PORT} accept
         ip daddr @allowed_networks tcp sport ${API_PORT} accept
 
-        # ICMP essentials
         icmp type { destination-unreachable, time-exceeded, echo-reply } accept
     }
 }

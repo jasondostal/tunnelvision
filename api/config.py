@@ -15,7 +15,10 @@ class Config:
 
     # VPN
     vpn_enabled: bool = field(default_factory=lambda: os.getenv("VPN_ENABLED", "true").lower() == "true")
+    vpn_type: str = field(default_factory=lambda: os.getenv("VPN_TYPE", "auto"))
     vpn_provider: str = field(default_factory=lambda: os.getenv("VPN_PROVIDER", "custom"))
+    vpn_country: str = field(default_factory=lambda: os.getenv("VPN_COUNTRY", ""))
+    vpn_city: str = field(default_factory=lambda: os.getenv("VPN_CITY", ""))
     killswitch_enabled: bool = field(default_factory=lambda: os.getenv("KILLSWITCH_ENABLED", "true").lower() == "true")
 
     # qBittorrent
