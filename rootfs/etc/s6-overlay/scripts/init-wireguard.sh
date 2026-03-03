@@ -103,10 +103,10 @@ WRAPPER
     if [ -z "$RESOLVED_DNS" ]; then
         RESOLVED_DNS=$(grep -i '^\s*DNS' "$WG_CONF" 2>/dev/null | sed 's/.*=\s*//' | tr -d ' ' | cut -d',' -f1)
     fi
-    if [ -n "$RESOLVED_DNS" ]; then
-        echo "nameserver $RESOLVED_DNS" > /etc/resolv.conf
-        echo "[tunnelvision] DNS set to $RESOLVED_DNS"
-    fi
+    # Default to Mullvad DNS if nothing found
+    RESOLVED_DNS="${RESOLVED_DNS:-10.64.0.1}"
+    echo "nameserver $RESOLVED_DNS" > /etc/resolv.conf
+    echo "[tunnelvision] DNS set to $RESOLVED_DNS"
 
     echo "up" > /var/run/tunnelvision/vpn_state
     echo "$WG_IP" > /var/run/tunnelvision/vpn_ip
