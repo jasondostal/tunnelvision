@@ -69,11 +69,22 @@ echo "$VPN_TYPE" > /var/run/tunnelvision/vpn_type
 if [ "$VPN_TYPE" = "wireguard" ]; then
     echo "[tunnelvision] Using WireGuard: $WG_CONF"
 
-    # Create a cleaned copy — strip PostUp/PostDown sysctl commands
-    # (Docker sets these via --sysctl, wg-quick can't write to /proc in container)
+    # Create a cleaned copy — strip PostUp/PostDown that might conflict
     mkdir -p /etc/wireguard
-    sed '/PostUp\|PostDown\|sysctl/d' "$WG_CONF" > /etc/wireguard/wg0.conf
+    sed '/PostUp\|PostDown/d' "$WG_CONF" > /etc/wireguard/wg0.conf
     chmod 600 /etc/wireguard/wg0.conf
+
+    # wg-quick's built-in fwmark routing tries sysctl which is read-only
+    # in containers. Docker --sysctl already sets it. Wrap sysctl to
+    # succeed silently on read-only errors (standard container pattern).
+    if [ ! -f /usr/local/bin/sysctl.real ]; then
+        mv /sbin/sysctl /usr/local/bin/sysctl.real 2>/dev/null || true
+        cat > /sbin/sysctl << 'WRAPPER'
+#!/bin/sh
+/usr/local/bin/sysctl.real "$@" 2>/dev/null || true
+WRAPPER
+        chmod +x /sbin/sysctl
+    fi
 
     wg-quick up wg0
 
