@@ -154,6 +154,13 @@ elif [ "$VPN_TYPE" = "openvpn" ]; then
     TUN_IP=$(ip -4 addr show tun0 | awk '/inet / {print $2}' | cut -d/ -f1)
     VPN_INTERFACE="tun0"
 
+    # Set DNS to VPN provider's DNS
+    OVPN_DNS=$(grep -i 'dhcp-option DNS' "$OVPN_CONF" 2>/dev/null | head -1 | awk '{print $NF}')
+    if [ -n "$OVPN_DNS" ]; then
+        echo "nameserver $OVPN_DNS" > /etc/resolv.conf
+        echo "[tunnelvision] DNS set to $OVPN_DNS"
+    fi
+
     echo "up" > /var/run/tunnelvision/vpn_state
     echo "$TUN_IP" > /var/run/tunnelvision/vpn_ip
     echo "$VPN_INTERFACE" > /var/run/tunnelvision/vpn_interface
