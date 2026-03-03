@@ -18,6 +18,10 @@ Drop your WireGuard config, `docker compose up`, and you can see everything — 
 
 Works with **any WireGuard provider**. Mullvad, IVPN, Proton, AirVPN, PIA, or your own server.
 
+<p align="center">
+  <img src="images/screenshot-dashboard.png" alt="TunnelVision Dashboard" width="700">
+</p>
+
 ## Quick Start
 
 ```bash
@@ -40,6 +44,10 @@ curl http://localhost:8081/api/v1/health | jq .
 ## Integrations
 
 ### Homepage
+
+<p align="center">
+  <img src="images/screenshot-homepage.png" alt="TunnelVision Homepage Widget" width="700">
+</p>
 
 Drops right into [Homepage](https://gethomepage.dev) using the `customapi` widget. Pick the fields you want to see:
 
@@ -95,6 +103,10 @@ Or use `/api/v1/qbt/status` for torrent-focused widgets:
 </details>
 
 ### Home Assistant
+
+<p align="center">
+  <img src="images/screenshot-ha.png" alt="TunnelVision Home Assistant Entities" width="400">
+</p>
 
 Native HACS integration. 25 entities, config flow, zero YAML.
 
