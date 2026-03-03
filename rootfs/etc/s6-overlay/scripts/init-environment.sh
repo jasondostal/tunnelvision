@@ -41,14 +41,21 @@ if grep -q "WebUI\\\\Port=" /config/qBittorrent/config/qBittorrent.conf; then
     sed -i "s/WebUI\\\\Port=.*/WebUI\\\\Port=${WEBUI_PORT}/" /config/qBittorrent/config/qBittorrent.conf
 fi
 
+# --- Ensure localhost auth bypass (API needs unauthenticated local access) ---
+QBT_CONF="/config/qBittorrent/config/qBittorrent.conf"
+if ! grep -q "LocalHostAuth" "$QBT_CONF"; then
+    echo "[tunnelvision] Patching qBittorrent config: localhost auth bypass"
+    sed -i '/\[Preferences\]/a WebUI\\LocalHostAuth=false\nWebUI\\AuthSubnetWhitelist=127.0.0.0/8\nWebUI\\AuthSubnetWhitelistEnabled=true' "$QBT_CONF"
+fi
+
 # --- Permissions ---
 chown -R "$PUID:$PGID" /config /downloads 2>/dev/null || true
 chown -R "$PUID:$PGID" /var/run/tunnelvision 2>/dev/null || true
 
 # --- Timezone ---
 if [ -n "$TZ" ] && [ -f "/usr/share/zoneinfo/$TZ" ]; then
-    ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime
-    echo "$TZ" > /etc/timezone
+    ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime 2>/dev/null || true
+    echo "$TZ" > /etc/timezone 2>/dev/null || true
 fi
 
 # --- Write runtime state for other services ---

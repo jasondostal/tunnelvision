@@ -1,17 +1,47 @@
-import { useCallback, useState } from "react";
-import { Eye, ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Eye, ExternalLink, LogOut, Settings } from "lucide-react";
 import { api } from "@/lib/api";
+import type { AuthResponse } from "@/lib/api";
 import { usePoll } from "@/lib/use-poll";
 import { VPNStatus } from "@/components/vpn-status";
 import { HealthCard } from "@/components/health-card";
 import { QBTStatus } from "@/components/qbt-status";
 import { SystemInfo } from "@/components/system-info";
 import { SetupWizard } from "@/components/setup-wizard";
+import { Login } from "@/components/login";
+import { SettingsPanel } from "@/components/settings-panel";
 
 const POLL_INTERVAL = 10_000; // 10s
 
 export default function App() {
+  const [authState, setAuthState] = useState<AuthResponse | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    api.checkAuth().then((r) => {
+      setAuthState(r);
+      setAuthChecked(true);
+    });
+  }, []);
+
+  if (!authChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-500/30 border-t-amber-500" />
+      </div>
+    );
+  }
+
+  if (authState?.login_required && !authState?.authenticated) {
+    return <Login onSuccess={() => api.checkAuth().then(setAuthState)} />;
+  }
+
+  return <Dashboard authState={authState} />;
+}
+
+function Dashboard({ authState }: { authState: AuthResponse | null }) {
   const [setupComplete, setSetupComplete] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const health = usePoll(useCallback(() => api.health(), []), POLL_INTERVAL);
   const vpn = usePoll(useCallback(() => api.vpnStatus(), []), POLL_INTERVAL);
   const qbt = usePoll(useCallback(() => api.qbtStatus(), []), POLL_INTERVAL);
@@ -27,7 +57,6 @@ export default function App() {
       <SetupWizard
         onComplete={() => {
           setSetupComplete(true);
-          // Force reload to pick up new state
           setTimeout(() => window.location.reload(), 1000);
         }}
       />
@@ -70,6 +99,22 @@ export default function App() {
             API Docs
             <ExternalLink className="h-3 w-3" />
           </a>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-surface-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-amber-500/30 hover:text-amber-400"
+            title="Settings"
+          >
+            <Settings className="h-3 w-3" />
+          </button>
+          {authState?.login_required && (
+            <button
+              onClick={() => api.logout().then(() => window.location.reload())}
+              className="flex items-center gap-1.5 rounded-lg border border-surface-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-status-down/30 hover:text-status-down"
+              title="Sign out"
+            >
+              <LogOut className="h-3 w-3" />
+            </button>
+          )}
         </div>
       </header>
 
@@ -93,18 +138,15 @@ export default function App() {
       {/* Dashboard grid */}
       {!loading && (
         <div className="grid gap-4 sm:grid-cols-2">
-          {/* VPN status — full width hero */}
           {vpn.data && (
             <div className="sm:col-span-2">
               <VPNStatus data={vpn.data} />
             </div>
           )}
 
-          {/* Health + qBit side by side */}
           {health.data && <HealthCard data={health.data} />}
           {qbt.data && <QBTStatus data={qbt.data} />}
 
-          {/* System info — full width bottom */}
           {system.data && (
             <div className="sm:col-span-2">
               <SystemInfo data={system.data} />
@@ -113,10 +155,13 @@ export default function App() {
         </div>
       )}
 
-      {/* Footer */}
       <footer className="mt-6 text-center text-xs text-text-muted">
         See through the tunnel
       </footer>
+
+      {showSettings && (
+        <SettingsPanel onClose={() => setShowSettings(false)} />
+      )}
     </div>
   );
 }

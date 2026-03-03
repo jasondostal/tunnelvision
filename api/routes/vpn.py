@@ -59,6 +59,20 @@ async def vpn_status(request: Request):
     elif country:
         location = country
 
+    # Human-readable uptime
+    uptime = ""
+    if connected_since:
+        delta = datetime.now(timezone.utc) - connected_since
+        total_secs = int(delta.total_seconds())
+        if total_secs < 60:
+            uptime = f"{total_secs}s"
+        elif total_secs < 3600:
+            uptime = f"{total_secs // 60}m"
+        elif total_secs < 86400:
+            uptime = f"{total_secs // 3600}h {(total_secs % 3600) // 60}m"
+        else:
+            uptime = f"{total_secs // 86400}d {(total_secs % 86400) // 3600}h"
+
     return VPNStatusResponse(
         state=state,
         public_ip=public_ip,
@@ -68,6 +82,7 @@ async def vpn_status(request: Request):
         city=city,
         location=location,
         connected_since=connected_since,
+        uptime=uptime,
         last_handshake=last_handshake,
         transfer_rx=rx,
         transfer_tx=tx,

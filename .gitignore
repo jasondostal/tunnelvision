@@ -33,3 +33,7 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# Temp
+*.zip
+tvwhat.png

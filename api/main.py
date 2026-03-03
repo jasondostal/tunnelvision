@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api import __version__
 from api.config import load_config
-from api.routes import health, vpn, qbt, system, config as config_routes, provider, setup, connect, metrics, control
+from api.routes import auth, health, vpn, qbt, system, config as config_routes, provider, setup, connect, metrics, control, settings
 
 
 @asynccontextmanager
@@ -50,22 +50,44 @@ app.add_middleware(
 )
 
 
-# API key middleware (if configured)
+# Auth middleware — layered: proxy header → API key → session cookie
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    """Optional API key authentication."""
+    """Authentication: local login, proxy header bypass, or API key."""
+    from api.routes.auth import check_auth
+
     config = getattr(request.app.state, "config", None)
-    if config and config.api_auth_required:
-        # Skip auth for docs, health, setup, and UI static files
-        path = request.url.path
-        if path.startswith("/api/") and not path.startswith("/api/v1/setup/") and path not in ("/api/docs", "/api/redoc", "/api/openapi.json", "/metrics"):
-            api_key = request.headers.get("X-API-Key", "")
-            if api_key != config.api_key:
-                return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
+    if not config:
+        return await call_next(request)
+
+    path = request.url.path
+
+    # Always open: auth endpoints, setup, docs, metrics, static assets
+    open_paths = ("/api/v1/auth/", "/api/v1/setup/", "/api/docs", "/api/redoc", "/api/openapi.json", "/metrics")
+    if any(path.startswith(p) for p in open_paths) or not path.startswith("/api/"):
+        return await call_next(request)
+
+    # Check API key first (programmatic access — Homepage, HACS, Prometheus)
+    if config.api_key and request.headers.get("X-API-Key") == config.api_key:
+        return await call_next(request)
+
+    # If API key is required and not provided, reject
+    if config.api_auth_required and not request.headers.get("X-API-Key"):
+        # Fall through to session/proxy check if login is also configured
+        if not config.login_required:
+            return JSONResponse(status_code=401, content={"detail": "Missing or invalid API key"})
+
+    # Check login auth (proxy header, session cookie)
+    if config.login_required:
+        user = check_auth(request)
+        if user is None:
+            return JSONResponse(status_code=401, content={"detail": "Authentication required"})
+
     return await call_next(request)
 
 
 # Mount API routes
+app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(vpn.router, prefix="/api/v1", tags=["vpn"])
 app.include_router(qbt.router, prefix="/api/v1", tags=["qbittorrent"])
@@ -75,6 +97,7 @@ app.include_router(provider.router, prefix="/api/v1", tags=["provider"])
 app.include_router(setup.router, prefix="/api/v1", tags=["setup"])
 app.include_router(connect.router, prefix="/api/v1", tags=["connect"])
 app.include_router(control.router, prefix="/api/v1", tags=["control"])
+app.include_router(settings.router, prefix="/api/v1", tags=["settings"])
 app.include_router(metrics.router, tags=["metrics"])  # /metrics at root, no /api/v1 prefix
 
 # Mount UI static files (if built)

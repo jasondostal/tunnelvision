@@ -28,6 +28,11 @@ class Config:
     api_port: int = field(default_factory=lambda: int(os.getenv("API_PORT", "8081")))
     api_key: str = field(default_factory=lambda: os.getenv("API_KEY", ""))
 
+    # Auth
+    admin_user: str = field(default_factory=lambda: os.getenv("ADMIN_USER", ""))
+    admin_pass: str = field(default_factory=lambda: os.getenv("ADMIN_PASS", ""))
+    auth_proxy_header: str = field(default_factory=lambda: os.getenv("AUTH_PROXY_HEADER", ""))
+
     # UI
     ui_enabled: bool = field(default_factory=lambda: os.getenv("UI_ENABLED", "true").lower() == "true")
 
@@ -37,6 +42,10 @@ class Config:
     @property
     def api_auth_required(self) -> bool:
         return bool(self.api_key)
+
+    @property
+    def login_required(self) -> bool:
+        return bool(self.admin_user)
 
 
 def load_config() -> Config:

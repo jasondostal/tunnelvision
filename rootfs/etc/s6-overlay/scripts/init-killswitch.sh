@@ -135,21 +135,15 @@ table ip tunnelvision {
     }
 
     chain output {
-        type filter hook output priority 0; policy drop;
+        type filter hook postrouting priority 0; policy drop;
 
-        oif lo accept
-        ct state established,related accept
+        # Loopback (internal service-to-service: API, healthcheck, qBit)
+        oifname "lo" accept
 
-        # DNS: ONLY through tunnel (resolv.conf controls which server)
-        oifname "${VPN_IF}" udp dport 53 accept
-        oifname "${VPN_IF}" tcp dport 53 accept
-        udp dport 53 reject
-        tcp dport 53 reject with tcp reset
-
-        # All traffic through VPN tunnel
+        # All traffic through VPN tunnel (DNS included — resolv.conf controls server)
         oifname "${VPN_IF}" accept
 
-        # VPN handshake to endpoint
+        # VPN handshake to endpoint (must exit on host interface, not tunnel)
         ip daddr ${VPN_ENDPOINT_IP} ${VPN_PROTO} dport ${VPN_ENDPOINT_PORT} accept
 
         # WebUI + API responses to allowed networks

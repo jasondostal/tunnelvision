@@ -1,19 +1,16 @@
 # ============================================================================
-# TunnelVision — Homepage Custom API Widgets
-# Add these to your Homepage services.yaml
+# TunnelVision — Homepage Widget Examples
+# https://gethomepage.dev/widgets/services/customapi/
 # ============================================================================
 #
-# Requires the customapi widget: https://gethomepage.dev/widgets/services/customapi/
-#
-# All widgets use /api/v1/vpn/status — the canonical source of truth.
-# Country/city/location work with ANY VPN provider via geo-IP services.
+# Pick any 4 fields. Mix and match from /api/v1/vpn/status or /api/v1/qbt/status.
+# All widgets use the customapi type — no custom widget code needed.
 
-# --- Recommended: Full status widget ---
-# Shows: VPN state, location (city + country), public IP, killswitch status
+# --- Recommended: VPN status at a glance ---
 - TunnelVision:
-    icon: mdi-vpn
-    href: http://your-host:8080
-    description: qBittorrent + WireGuard VPN
+    icon: /icons/tunnelvision.png   # or mdi-vpn if you don't have the icon
+    href: http://your-host:8081
+    description: VPN + qBittorrent
     widget:
       type: customapi
       url: http://tunnelvision:8081/api/v1/vpn/status
@@ -29,43 +26,98 @@
         - field: public_ip
           label: IP
           format: text
-        - field: killswitch
-          label: Killswitch
+        - field: uptime
+          label: Uptime
           format: text
 
-# --- Alternative: Compact widget ---
-# Shows: location + IP only (for tighter dashboards)
+# --- Alternative: Security-focused ---
+# Shows: VPN state, IP, killswitch, uptime
 #
 # - TunnelVision:
-#     icon: mdi-vpn
-#     href: http://your-host:8080
-#     description: VPN Status
+#     icon: /icons/tunnelvision.png
+#     href: http://your-host:8081
+#     description: VPN + Killswitch
 #     widget:
 #       type: customapi
 #       url: http://tunnelvision:8081/api/v1/vpn/status
 #       mappings:
-#         - field: location
-#           label: Exit
+#         - field: state
+#           label: VPN
 #           format: text
 #         - field: public_ip
 #           label: IP
 #           format: text
+#         - field: killswitch
+#           label: Killswitch
+#           format: text
+#         - field: uptime
+#           label: Uptime
+#           format: text
 
-# --- Alternative: Health widget ---
-# Uses the /health endpoint for container-level status
+# --- Alternative: Location-focused ---
+# Shows: country, city, IP, provider
 #
-# - TunnelVision Health:
-#     icon: mdi-heart-pulse
+# - TunnelVision:
+#     icon: /icons/tunnelvision.png
+#     href: http://your-host:8081
+#     description: VPN Exit Node
 #     widget:
 #       type: customapi
-#       url: http://tunnelvision:8081/api/v1/health
+#       url: http://tunnelvision:8081/api/v1/vpn/status
 #       mappings:
-#         - field: vpn
-#           label: VPN
+#         - field: country
+#           label: Country
 #           format: text
-#         - field: qbittorrent
+#         - field: city
+#           label: City
+#           format: text
+#         - field: public_ip
+#           label: IP
+#           format: text
+#         - field: provider
+#           label: Provider
+#           format: text
+
+# --- Alternative: Torrent-focused ---
+# Uses /api/v1/qbt/status instead
+#
+# - TunnelVision:
+#     icon: /icons/tunnelvision.png
+#     href: http://your-host:8080
+#     description: qBittorrent via VPN
+#     widget:
+#       type: customapi
+#       url: http://tunnelvision:8081/api/v1/qbt/status
+#       mappings:
+#         - field: state
 #           label: qBit
 #           format: text
-#         - field: healthy
-#           label: Healthy
-#           format: text
+#         - field: active_torrents
+#           label: Active
+#           format: number
+#         - field: total_torrents
+#           label: Total
+#           format: number
+#         - field: download_speed
+#           label: Down
+#           format: bytes
+
+# --- Available fields reference ---
+#
+# /api/v1/vpn/status:
+#   state          "up"                    Connection status
+#   location       "Zurich, Switzerland"   City + Country
+#   public_ip      "193.32.127.220"        VPN exit IP
+#   uptime         "2h 34m"               Time connected
+#   killswitch     "active"                Firewall status
+#   country        "Switzerland"           Exit country
+#   city           "Zurich"                Exit city
+#   provider       "mullvad"               VPN provider
+#
+# /api/v1/qbt/status:
+#   state            "running"             qBit health
+#   download_speed   5242880               Bytes/s download
+#   upload_speed     1048576               Bytes/s upload
+#   active_torrents  3                     Active count
+#   total_torrents   47                    Total count
+#   version          "v5.0.2"              qBit version

@@ -30,6 +30,7 @@ class VPNStatusResponse(BaseModel):
     location: str = Field("", description="Human-readable location (city, country)")
     interface: str = "wg0"
     connected_since: datetime | None = None
+    uptime: str = Field("", description="Human-readable VPN uptime (e.g. '2h 34m')")
     last_handshake: datetime | None = None
     transfer_rx: int = Field(0, description="Bytes received through VPN")
     transfer_tx: int = Field(0, description="Bytes sent through VPN")

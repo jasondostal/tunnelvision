@@ -14,6 +14,7 @@ echo "[tunnelvision] Starting qBittorrent-nox..."
 
 exec s6-setuidgid tunnelvision \
     qbittorrent-nox \
+        --confirm-legal-notice \
         --profile=/config \
         --webui-port="${WEBUI_PORT:-8080}" \
         2>&1

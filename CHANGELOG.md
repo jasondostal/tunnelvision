@@ -1,0 +1,48 @@
+# Changelog
+
+## v1.0.0 — Initial Release (2026-03-03)
+
+Everything. The whole thing. One container, full visibility.
+
+### Container
+- Alpine 3.21 base with s6-overlay v3 process supervision
+- WireGuard + OpenVPN dual-engine VPN (auto-detect from config)
+- nftables killswitch — blocks all non-tunnel traffic, IPv6 disabled
+- DNS resolution through tunnel (postrouting hook)
+- qBittorrent-nox with localhost auth bypass for internal API access
+
+### API (22+ endpoints)
+- Health, VPN status, qBittorrent status, system info, config
+- VPN control: restart, disconnect, reconnect, rotate server
+- Killswitch control: enable, disable
+- qBittorrent control: restart, pause, resume all torrents
+- Provider abstraction: generic (any WireGuard) + Mullvad (server list, account, connection check)
+- Server rotation by country/city
+- Setup wizard API for guided first-run
+- Settings API with persistent YAML config (`/config/tunnelvision.yml`)
+- Prometheus metrics endpoint (`/metrics`)
+
+### Dashboard
+- React 19 + Vite + Tailwind v4 dark-first UI
+- VPN status hero with location, IP, transfer stats, action buttons
+- Health card, qBittorrent card, system info
+- Setup wizard (5-step guided onboarding)
+- Settings panel (gear icon) — configures auth, VPN, MQTT, general settings
+- Login screen with session auth
+
+### Authentication
+- Optional single-user local login (`ADMIN_USER` + `ADMIN_PASS`)
+- Reverse proxy header bypass (`AUTH_PROXY_HEADER`) — works with Authentik, Authelia, Traefik, nginx
+- API key for programmatic access (`API_KEY` + `X-API-Key` header)
+- All three layers stack, all optional
+
+### Integrations
+- Home Assistant MQTT auto-discovery (sensors, binary sensors, buttons, switch)
+- Homepage customapi widget with configurable field selection
+- Prometheus metrics for Grafana dashboards
+- Sonarr/Radarr/Prowlarr compatible (standard qBittorrent download client)
+
+### Deployment
+- Multi-arch Docker images (amd64 + arm64)
+- GitHub Actions CI/CD
+- `docker compose up` — one command

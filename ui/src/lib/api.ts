@@ -38,9 +38,33 @@ async function get<T>(path: string): Promise<T> {
   return promise;
 }
 
+export interface AuthResponse {
+  authenticated: boolean;
+  user?: string;
+  login_required?: boolean;
+}
+
 export const api = {
   health: () => get<HealthResponse>("/api/v1/health"),
   vpnStatus: () => get<VPNStatusResponse>("/api/v1/vpn/status"),
   qbtStatus: () => get<QBTStatusResponse>("/api/v1/qbt/status"),
   system: () => get<SystemResponse>("/api/v1/system"),
+
+  async checkAuth(): Promise<AuthResponse> {
+    const r = await fetch("/api/v1/auth/me");
+    return r.json();
+  },
+
+  async login(username: string, password: string): Promise<boolean> {
+    const r = await fetch("/api/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    return r.ok;
+  },
+
+  async logout(): Promise<void> {
+    await fetch("/api/v1/auth/logout", { method: "POST" });
+  },
 };
