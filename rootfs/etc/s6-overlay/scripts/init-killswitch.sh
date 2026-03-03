@@ -135,7 +135,7 @@ table ip tunnelvision {
     }
 
     chain output {
-        type filter hook output priority 0; policy drop;
+        type filter hook postrouting priority 0; policy drop;
 
         oif lo accept
         ct state established,related accept
