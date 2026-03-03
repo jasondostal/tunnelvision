@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Dark background variant (for light surfaces) -->
+  <circle cx="24" cy="24" r="23" fill="#0a0a14"/>
+  <!-- Eye shape -->
+  <path d="M8,24 Q24,11 40,24 Q24,37 8,24Z" fill="#F59E0B" fill-opacity="0.15" stroke="#F59E0B" stroke-width="1.5"/>
+  <!-- Iris -->
+  <circle cx="24" cy="24" r="6.5" fill="#F59E0B" opacity="0.9"/>
+  <!-- Pupil -->
+  <circle cx="24" cy="24" r="3.5" fill="#FDE68A"/>
+  <!-- Highlight -->
+  <circle cx="25.5" cy="22.5" r="1.2" fill="#FFFBEB" opacity="0.9"/>
+</svg>
