@@ -69,8 +69,11 @@ echo "$VPN_TYPE" > /var/run/tunnelvision/vpn_type
 if [ "$VPN_TYPE" = "wireguard" ]; then
     echo "[tunnelvision] Using WireGuard: $WG_CONF"
 
+    # Create a cleaned copy — strip PostUp/PostDown sysctl commands
+    # (Docker sets these via --sysctl, wg-quick can't write to /proc in container)
     mkdir -p /etc/wireguard
-    ln -sf "$WG_CONF" /etc/wireguard/wg0.conf
+    sed '/PostUp\|PostDown\|sysctl/d' "$WG_CONF" > /etc/wireguard/wg0.conf
+    chmod 600 /etc/wireguard/wg0.conf
 
     wg-quick up wg0
 
