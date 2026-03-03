@@ -36,6 +36,7 @@ class VPNStatusResponse(BaseModel):
     transfer_tx: int = Field(0, description="Bytes sent through VPN")
     killswitch: str = "active"
     provider: str = "custom"
+    forwarded_port: int | None = Field(None, description="Port forwarding port (PIA, if enabled)")
 
 
 class VPNIPResponse(BaseModel):

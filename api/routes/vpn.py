@@ -73,6 +73,15 @@ async def vpn_status(request: Request):
         else:
             uptime = f"{total_secs // 86400}d {(total_secs % 86400) // 3600}h"
 
+    # Port forwarding (PIA)
+    forwarded_port = None
+    pf_str = _read_state("/var/run/tunnelvision/forwarded_port")
+    if pf_str:
+        try:
+            forwarded_port = int(pf_str)
+        except ValueError:
+            pass
+
     return VPNStatusResponse(
         state=state,
         public_ip=public_ip,
@@ -88,6 +97,7 @@ async def vpn_status(request: Request):
         transfer_tx=tx,
         killswitch=killswitch,
         provider=config.vpn_provider,
+        forwarded_port=forwarded_port,
     )
 
 

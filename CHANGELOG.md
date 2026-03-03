@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.1.0 — Provider Enrichment (2026-03-03)
+
+Three deep provider integrations. Progressive enrichment — set your provider, features light up.
+
+### IVPN Provider
+- Public server list with WireGuard public keys (`api.ivpn.net/v5/servers.json`)
+- Connection verification via `api.ivpn.net/v4/geo-lookup` (confirms IVPN exit IP)
+- Auto-generate wg0.conf from server list — no manual config needed
+- Server rotation by country/city
+- Same pattern as Mullvad — set `VPN_PROVIDER=ivpn` + `WIREGUARD_PRIVATE_KEY` + `WIREGUARD_ADDRESSES`
+
+### PIA (Private Internet Access) Provider
+- Token-based auth with `PIA_USER` + `PIA_PASS` — no WireGuard private key needed
+- Ephemeral key negotiation — generates fresh WireGuard keypair per connection
+- Server list from `serverlist.piaservers.net` with port-forward capability flags
+- **Port forwarding** — set `PORT_FORWARD_ENABLED=true`, TunnelVision gets a port assignment and keeps it alive (15-min refresh). Port visible in API (`forwarded_port` field) and state file.
+- Prefers port-forward-capable servers when port forwarding is enabled
+
+### Other
+- `forwarded_port` field added to `/api/v1/vpn/status`
+- Setup wizard updated with IVPN and PIA provider descriptions
+- Provider count: custom + Mullvad + IVPN + PIA (4 total)
+
+---
+
 ## v1.0.0 — Initial Release (2026-03-03)
 
 Everything. The whole thing. One container, full visibility.

@@ -5,12 +5,16 @@ import os
 from api.services.providers.base import VPNProvider, ConnectionCheck, ServerInfo, AccountInfo
 from api.services.providers.custom import CustomProvider
 from api.services.providers.mullvad import MullvadProvider
+from api.services.providers.ivpn import IVPNProvider
+from api.services.providers.pia import PIAProvider
 
 
 # Provider registry — add new providers here
 PROVIDERS: dict[str, type[VPNProvider]] = {
     "custom": CustomProvider,
     "mullvad": MullvadProvider,
+    "ivpn": IVPNProvider,
+    "pia": PIAProvider,
 }
 
 

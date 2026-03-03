@@ -99,8 +99,14 @@ async def list_providers():
             {
                 "id": "ivpn",
                 "name": "IVPN",
-                "description": "Open-source VPN. Paste your WireGuard config from the IVPN dashboard.",
-                "setup_type": "paste",
+                "description": "Privacy-focused, open-source. Auto-generates configs, server rotation, connection verification.",
+                "setup_type": "account",
+            },
+            {
+                "id": "pia",
+                "name": "Private Internet Access",
+                "description": "Port forwarding support. Authenticates with username/password, auto-negotiates WireGuard keys.",
+                "setup_type": "account",
             },
             {
                 "id": "proton",
@@ -110,8 +116,8 @@ async def list_providers():
             },
             {
                 "id": "custom",
-                "name": "Custom WireGuard",
-                "description": "Any WireGuard server. Paste your wg0.conf or generate one from your provider.",
+                "name": "Custom / Other",
+                "description": "Any WireGuard or OpenVPN provider. Paste your config or drop files in the config directory.",
                 "setup_type": "paste",
             },
         ]

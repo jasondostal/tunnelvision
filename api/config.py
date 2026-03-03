@@ -21,6 +21,11 @@ class Config:
     vpn_city: str = field(default_factory=lambda: os.getenv("VPN_CITY", ""))
     killswitch_enabled: bool = field(default_factory=lambda: os.getenv("KILLSWITCH_ENABLED", "true").lower() == "true")
 
+    # PIA-specific
+    pia_user: str = field(default_factory=lambda: os.getenv("PIA_USER", ""))
+    pia_pass: str = field(default_factory=lambda: os.getenv("PIA_PASS", ""))
+    port_forward_enabled: bool = field(default_factory=lambda: os.getenv("PORT_FORWARD_ENABLED", "false").lower() == "true")
+
     # qBittorrent
     webui_port: int = field(default_factory=lambda: int(os.getenv("WEBUI_PORT", "8080")))
 
