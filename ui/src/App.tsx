@@ -78,6 +78,15 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
               v{system.data.version}
             </span>
           )}
+          {vpn.data && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide ${
+              vpn.data.provider === "gluetun"
+                ? "bg-cyan-500/15 text-cyan-400"
+                : "bg-amber-500/15 text-amber-400"
+            }`}>
+              {vpn.data.provider === "gluetun" ? "SIDECAR" : "STANDALONE"}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {vpn.data && (
