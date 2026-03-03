@@ -1,7 +1,14 @@
 #!/command/with-contenv bash
 # ============================================================================
 # TunnelVision — qBittorrent-nox Service
+# Skips in setup mode — VPN must be configured first.
 # ============================================================================
+
+SETUP_REQUIRED=$(cat /var/run/tunnelvision/setup_required 2>/dev/null || echo "false")
+if [ "$SETUP_REQUIRED" = "true" ]; then
+    echo "[tunnelvision] Setup mode — qBittorrent waiting for VPN configuration"
+    exec sleep infinity
+fi
 
 PUID=$(cat /var/run/tunnelvision/puid 2>/dev/null || echo 1000)
 

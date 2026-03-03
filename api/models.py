@@ -9,6 +9,7 @@ class HealthResponse(BaseModel):
     """Container health status."""
 
     healthy: bool
+    setup_required: bool = False
     vpn: str = Field(description="VPN state: up, down, disabled, error")
     killswitch: str = Field(description="Killswitch state: active, disabled")
     qbittorrent: str = Field(description="qBittorrent state: running, stopped")

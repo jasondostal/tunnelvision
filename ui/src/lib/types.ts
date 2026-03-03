@@ -2,6 +2,7 @@
 
 export interface HealthResponse {
   healthy: boolean;
+  setup_required: boolean;
   vpn: string;
   killswitch: string;
   qbittorrent: string;

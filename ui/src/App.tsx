@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Eye, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
 import { usePoll } from "@/lib/use-poll";
@@ -6,10 +6,12 @@ import { VPNStatus } from "@/components/vpn-status";
 import { HealthCard } from "@/components/health-card";
 import { QBTStatus } from "@/components/qbt-status";
 import { SystemInfo } from "@/components/system-info";
+import { SetupWizard } from "@/components/setup-wizard";
 
 const POLL_INTERVAL = 10_000; // 10s
 
 export default function App() {
+  const [setupComplete, setSetupComplete] = useState(false);
   const health = usePoll(useCallback(() => api.health(), []), POLL_INTERVAL);
   const vpn = usePoll(useCallback(() => api.vpnStatus(), []), POLL_INTERVAL);
   const qbt = usePoll(useCallback(() => api.qbtStatus(), []), POLL_INTERVAL);
@@ -17,6 +19,20 @@ export default function App() {
 
   const loading = health.loading || vpn.loading;
   const error = health.error || vpn.error;
+
+  // Setup mode — show wizard instead of dashboard
+  const needsSetup = health.data?.setup_required && !setupComplete;
+  if (needsSetup) {
+    return (
+      <SetupWizard
+        onComplete={() => {
+          setSetupComplete(true);
+          // Force reload to pick up new state
+          setTimeout(() => window.location.reload(), 1000);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto min-h-screen max-w-3xl px-4 py-6">
@@ -36,7 +52,7 @@ export default function App() {
         <div className="flex items-center gap-3">
           {vpn.data && (
             <a
-              href={`http://${window.location.hostname}:${vpn.data.endpoint ? "8080" : "8080"}`}
+              href={`http://${window.location.hostname}:8080`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 rounded-lg border border-surface-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-amber-500/30 hover:text-amber-400"

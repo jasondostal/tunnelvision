@@ -24,9 +24,22 @@ async def health_check(request: Request):
     """Comprehensive container health status."""
     config = request.app.state.config
 
+    setup_required = _read_state("/var/run/tunnelvision/setup_required", "false") == "true"
     vpn_state = _read_state("/var/run/tunnelvision/vpn_state", "disabled" if not config.vpn_enabled else "unknown")
     killswitch_state = _read_state("/var/run/tunnelvision/killswitch_state", "disabled")
     healthy_str = _read_state("/var/run/tunnelvision/healthy", "true")
+
+    # In setup mode, qBit isn't running — that's expected
+    if setup_required:
+        return HealthResponse(
+            healthy=True,
+            setup_required=True,
+            vpn="setup_required",
+            killswitch="disabled",
+            qbittorrent="waiting",
+            uptime_seconds=round(time.time() - request.app.state.started_at, 1),
+            checked_at=datetime.now(timezone.utc),
+        )
 
     # Check qBittorrent
     try:

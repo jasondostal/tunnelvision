@@ -11,6 +11,14 @@ WEBUI_PORT=${WEBUI_PORT:-8080}
 API_PORT=${API_PORT:-8081}
 WEBUI_ALLOWED_NETWORKS=${WEBUI_ALLOWED_NETWORKS:-"192.168.0.0/16,172.16.0.0/12,10.0.0.0/8"}
 
+# Skip in setup mode
+SETUP_REQUIRED=$(cat /var/run/tunnelvision/setup_required 2>/dev/null || echo "false")
+if [ "$SETUP_REQUIRED" = "true" ]; then
+    echo "[tunnelvision] Setup mode — skipping killswitch"
+    echo "disabled" > /var/run/tunnelvision/killswitch_state
+    exit 0
+fi
+
 if [ "$VPN_ENABLED" != "true" ] || [ "$KILLSWITCH_ENABLED" != "true" ]; then
     echo "[tunnelvision] Killswitch disabled — skipping firewall rules"
     echo "disabled" > /var/run/tunnelvision/killswitch_state

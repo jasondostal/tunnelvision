@@ -2,6 +2,7 @@
 # ============================================================================
 # TunnelVision — WireGuard Initialization
 # Brings up the WireGuard VPN tunnel.
+# If no config found, enters setup mode instead of failing.
 # ============================================================================
 set -e
 
@@ -10,6 +11,7 @@ VPN_ENABLED=${VPN_ENABLED:-true}
 if [ "$VPN_ENABLED" != "true" ]; then
     echo "[tunnelvision] VPN disabled — skipping WireGuard setup"
     echo "disabled" > /var/run/tunnelvision/vpn_state
+    echo "false" > /var/run/tunnelvision/setup_required
     exit 0
 fi
 
@@ -21,13 +23,18 @@ if [ -f /config/wireguard/wg0.conf ]; then
     WG_CONF="/config/wireguard/wg0.conf"
 elif [ -f /config/wireguard/wg-tunnel.conf ]; then
     WG_CONF="/config/wireguard/wg-tunnel.conf"
-else
-    echo "[tunnelvision] ERROR: No WireGuard config found in /config/wireguard/"
-    echo "[tunnelvision] Expected: /config/wireguard/wg0.conf"
-    echo "error" > /var/run/tunnelvision/vpn_state
-    exit 1
 fi
 
+# --- No config? Enter setup mode ---
+if [ -z "$WG_CONF" ]; then
+    echo "[tunnelvision] No WireGuard config found — entering setup mode"
+    echo "[tunnelvision] Open the dashboard to configure your VPN"
+    echo "setup_required" > /var/run/tunnelvision/vpn_state
+    echo "true" > /var/run/tunnelvision/setup_required
+    exit 0
+fi
+
+echo "false" > /var/run/tunnelvision/setup_required
 echo "[tunnelvision] Using WireGuard config: $WG_CONF"
 
 # --- Create symlink for wg-quick ---

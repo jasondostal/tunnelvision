@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api import __version__
 from api.config import load_config
-from api.routes import health, vpn, qbt, system, config as config_routes, provider
+from api.routes import health, vpn, qbt, system, config as config_routes, provider, setup
 
 
 @asynccontextmanager
@@ -46,9 +46,9 @@ async def auth_middleware(request: Request, call_next):
     """Optional API key authentication."""
     config = getattr(request.app.state, "config", None)
     if config and config.api_auth_required:
-        # Skip auth for docs, health, and UI static files
+        # Skip auth for docs, health, setup, and UI static files
         path = request.url.path
-        if path.startswith("/api/") and path not in ("/api/docs", "/api/redoc", "/api/openapi.json"):
+        if path.startswith("/api/") and not path.startswith("/api/v1/setup/") and path not in ("/api/docs", "/api/redoc", "/api/openapi.json"):
             api_key = request.headers.get("X-API-Key", "")
             if api_key != config.api_key:
                 return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
@@ -62,6 +62,7 @@ app.include_router(qbt.router, prefix="/api/v1", tags=["qbittorrent"])
 app.include_router(system.router, prefix="/api/v1", tags=["system"])
 app.include_router(config_routes.router, prefix="/api/v1", tags=["config"])
 app.include_router(provider.router, prefix="/api/v1", tags=["provider"])
+app.include_router(setup.router, prefix="/api/v1", tags=["setup"])
 
 # Mount UI static files (if built)
 try:
