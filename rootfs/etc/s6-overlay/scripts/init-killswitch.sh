@@ -85,8 +85,12 @@ if [ -n "$DEFAULT_GW" ] && [ -n "$DEFAULT_IF" ]; then
 fi
 
 # --- Apply nftables rules ---
+# NOTE: Do NOT 'flush ruleset' — wg-quick adds nft rules for fwmark routing
+# that we need to keep. Only delete/recreate our own tables.
+nft delete table ip6 block_ipv6 2>/dev/null || true
+nft delete table ip tunnelvision 2>/dev/null || true
+
 nft -f - <<EOF
-flush ruleset
 
 # Block ALL IPv6 (leak prevention)
 table ip6 block_ipv6 {
@@ -136,9 +140,9 @@ table ip tunnelvision {
         oif lo accept
         ct state established,related accept
 
-        # DNS: ONLY to VPN DNS, ONLY through tunnel
-        oifname "${VPN_IF}" udp dport 53 ip daddr ${VPN_DNS} accept
-        oifname "${VPN_IF}" tcp dport 53 ip daddr ${VPN_DNS} accept
+        # DNS: ONLY through tunnel (resolv.conf controls which server)
+        oifname "${VPN_IF}" udp dport 53 accept
+        oifname "${VPN_IF}" tcp dport 53 accept
         udp dport 53 reject
         tcp dport 53 reject with tcp reset
 
