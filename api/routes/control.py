@@ -5,6 +5,8 @@ import subprocess
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from api.routes.events import broadcast
+
 router = APIRouter()
 
 
@@ -42,6 +44,7 @@ async def vpn_disconnect():
 
     if ok:
         Path("/var/run/tunnelvision/vpn_state").write_text("down")
+        broadcast("vpn_state", {"state": "down", "action": "disconnect"})
 
     return ActionResponse(
         success=ok,
@@ -66,6 +69,7 @@ async def vpn_restart():
 
     if ok:
         Path("/var/run/tunnelvision/vpn_state").write_text("up")
+        broadcast("vpn_state", {"state": "up", "action": "restart"})
 
     return ActionResponse(
         success=ok,

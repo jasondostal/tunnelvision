@@ -5,6 +5,10 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Request
 
 from api.models import VPNStatusResponse, VPNIPResponse
+from api.routes.events import broadcast
+
+# Track last state for change detection
+_last_state: dict = {}
 
 router = APIRouter()
 
@@ -101,7 +105,7 @@ async def vpn_status(request: Request):
             except ValueError:
                 pass
 
-    return VPNStatusResponse(
+    response = VPNStatusResponse(
         state=state,
         public_ip=public_ip,
         vpn_ip=vpn_ip,
@@ -118,6 +122,14 @@ async def vpn_status(request: Request):
         provider=config.vpn_provider,
         forwarded_port=forwarded_port,
     )
+
+    # Broadcast state changes to SSE clients
+    current = {"state": state, "public_ip": public_ip, "killswitch": killswitch, "forwarded_port": forwarded_port}
+    if current != _last_state:
+        broadcast("vpn_status", response.model_dump(mode="json"))
+        _last_state.update(current)
+
+    return response
 
 
 @router.get("/vpn/history")

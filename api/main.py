@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api import __version__
 from api.config import load_config
-from api.routes import auth, health, vpn, qbt, system, config as config_routes, provider, setup, connect, metrics, control, settings, speedtest, backup
+from api.routes import auth, health, vpn, qbt, system, config as config_routes, provider, setup, connect, metrics, control, settings, speedtest, backup, events
 
 
 @asynccontextmanager
@@ -100,6 +100,7 @@ app.include_router(control.router, prefix="/api/v1", tags=["control"])
 app.include_router(settings.router, prefix="/api/v1", tags=["settings"])
 app.include_router(speedtest.router, prefix="/api/v1", tags=["speedtest"])
 app.include_router(backup.router, prefix="/api/v1", tags=["backup"])
+app.include_router(events.router, prefix="/api/v1", tags=["events"])
 app.include_router(metrics.router, tags=["metrics"])  # /metrics at root, no /api/v1 prefix
 
 # Mount UI static files (if built)
