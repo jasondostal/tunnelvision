@@ -83,6 +83,7 @@ ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLA
 RUN tar -C / -Jxpf /tmp/s6-overlay-symlinks-noarch.tar.xz && rm /tmp/s6-overlay-symlinks-noarch.tar.xz
 
 # Install runtime dependencies
+# wireguard-go was removed from Alpine 3.21 stable; pull it from edge community
 RUN apk add --no-cache \
     bash \
     bind-tools \
@@ -96,8 +97,10 @@ RUN apk add --no-cache \
     qbittorrent-nox \
     shadow \
     tzdata \
-    wireguard-go \
-    wireguard-tools
+    wireguard-tools && \
+    apk add --no-cache \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
+    wireguard-go
 
 # Create app user (will be modified at runtime by init-environment)
 RUN addgroup -g 1000 tunnelvision && \
