@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { X, Save, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { X, Save, RotateCcw, Zap, RefreshCw } from "lucide-react";
 
 interface FieldMeta {
   secret: boolean;
@@ -94,12 +94,37 @@ const FIELD_HINTS: Record<string, string> = {
   ui_enabled: "true or false",
 };
 
+/** Fields that take effect immediately without container restart. */
+const HOT_RELOAD_FIELDS = new Set([
+  "auto_reconnect",
+  "health_check_interval",
+  "vpn_country",
+  "vpn_city",
+  "notify_webhook_url",
+  "notify_gotify_url",
+  "notify_gotify_token",
+]);
+
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [data, setData] = useState<SettingsData | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [savedForm, setSavedForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [needsRestart, setNeedsRestart] = useState(false);
+
+  /** Which fields have been edited since last save/load. */
+  const dirtyFields = useMemo(() => {
+    const dirty = new Set<string>();
+    for (const key of Object.keys(form)) {
+      if ((form[key] || "") !== (savedForm[key] || "")) {
+        dirty.add(key);
+      }
+    }
+    return dirty;
+  }, [form, savedForm]);
+
+  const isDirty = dirtyFields.size > 0;
 
   useEffect(() => {
     fetch("/api/v1/settings")
@@ -107,6 +132,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       .then((d: SettingsData) => {
         setData(d);
         setForm(d.settings);
+        setSavedForm(d.settings);
       });
   }, []);
 
@@ -128,6 +154,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     );
     if (result.settings) {
       setForm(result.settings);
+      setSavedForm(result.settings);
     }
   };
 
@@ -144,9 +171,19 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       <div className="w-full max-w-lg rounded-xl border border-surface-border bg-surface-bg shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-surface-border px-5 py-4">
-          <h2 className="text-base font-bold text-text-primary">Settings</h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-base font-bold text-text-primary">Settings</h2>
+            {isDirty && (
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                unsaved
+              </span>
+            )}
+          </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              if (isDirty && !confirm("You have unsaved changes. Discard?")) return;
+              onClose();
+            }}
             className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-surface-card hover:text-text-primary"
           >
             <X className="h-4 w-4" />
@@ -169,14 +206,34 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 {group.fields.map((key) => {
                   const meta = data.fields[key];
                   if (!meta) return null;
+                  const fieldDirty = dirtyFields.has(key);
+                  const isHotReload = HOT_RELOAD_FIELDS.has(key);
                   return (
                     <div key={key}>
-                      <label className="mb-1 block text-xs text-text-secondary">
-                        {FIELD_LABELS[key] || key}
-                        <span className="ml-2 font-mono text-text-muted">
-                          ${meta.env}
-                        </span>
-                      </label>
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <label className="text-xs text-text-secondary">
+                          {FIELD_LABELS[key] || key}
+                          <span className="ml-2 font-mono text-text-muted">
+                            ${meta.env}
+                          </span>
+                        </label>
+                        {fieldDirty && (
+                          <span
+                            className="flex items-center gap-0.5 text-[10px]"
+                            title={
+                              isHotReload
+                                ? "Takes effect immediately"
+                                : "Requires container restart"
+                            }
+                          >
+                            {isHotReload ? (
+                              <Zap className="h-2.5 w-2.5 text-status-up" />
+                            ) : (
+                              <RefreshCw className="h-2.5 w-2.5 text-amber-400" />
+                            )}
+                          </span>
+                        )}
+                      </div>
                       <input
                         type={meta.secret ? "password" : "text"}
                         value={form[key] || ""}
@@ -184,7 +241,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                           setForm({ ...form, [key]: e.target.value })
                         }
                         placeholder={FIELD_HINTS[key] || ""}
-                        className="w-full rounded-lg border border-surface-border bg-surface-card px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none transition-colors focus:border-amber-500/50"
+                        className={`w-full rounded-lg border bg-surface-card px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none transition-colors focus:border-amber-500/50 ${
+                          fieldDirty
+                            ? "border-amber-500/50"
+                            : "border-surface-border"
+                        }`}
                       />
                     </div>
                   );
@@ -197,7 +258,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-surface-border px-5 py-3">
           <div className="text-xs">
-            {message && (
+            {message ? (
               <span
                 className={
                   needsRestart ? "text-amber-400" : "text-status-up"
@@ -205,18 +266,32 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               >
                 {message}
               </span>
-            )}
+            ) : isDirty ? (
+              <span className="flex items-center gap-2 text-text-muted">
+                <span className="flex items-center gap-1">
+                  <Zap className="h-2.5 w-2.5 text-status-up" />
+                  instant
+                </span>
+                <span className="flex items-center gap-1">
+                  <RefreshCw className="h-2.5 w-2.5 text-amber-400" />
+                  needs restart
+                </span>
+              </span>
+            ) : null}
           </div>
           <div className="flex gap-2">
             <button
-              onClick={onClose}
+              onClick={() => {
+                if (isDirty && !confirm("You have unsaved changes. Discard?")) return;
+                onClose();
+              }}
               className="rounded-lg border border-surface-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface-card"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !isDirty}
               className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-black transition-colors hover:bg-amber-400 disabled:opacity-50"
             >
               {saving ? (
