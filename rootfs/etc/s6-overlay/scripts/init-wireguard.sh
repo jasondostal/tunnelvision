@@ -98,15 +98,20 @@ WRAPPER
     WG_ENDPOINT=$(wg show wg0 endpoints | awk '{print $2}' | head -1)
     VPN_INTERFACE="wg0"
 
-    # Set DNS — env var VPN_DNS overrides config file
-    RESOLVED_DNS="${VPN_DNS:-}"
-    if [ -z "$RESOLVED_DNS" ]; then
-        RESOLVED_DNS=$(grep -i '^\s*DNS' "$WG_CONF" 2>/dev/null | sed 's/.*=\s*//' | tr -d ' ' | cut -d',' -f1)
+    # Set DNS — built-in DNS server overrides everything when enabled
+    DNS_ENABLED=${DNS_ENABLED:-false}
+    if [ "$DNS_ENABLED" = "true" ]; then
+        echo "nameserver 127.0.0.1" > /etc/resolv.conf
+        echo "[tunnelvision] DNS set to 127.0.0.1 (built-in DNS server)"
+    else
+        RESOLVED_DNS="${VPN_DNS:-}"
+        if [ -z "$RESOLVED_DNS" ]; then
+            RESOLVED_DNS=$(grep -i '^\s*DNS' "$WG_CONF" 2>/dev/null | sed 's/.*=\s*//' | tr -d ' ' | cut -d',' -f1)
+        fi
+        RESOLVED_DNS="${RESOLVED_DNS:-10.64.0.1}"
+        echo "nameserver $RESOLVED_DNS" > /etc/resolv.conf
+        echo "[tunnelvision] DNS set to $RESOLVED_DNS"
     fi
-    # Default to Mullvad DNS if nothing found
-    RESOLVED_DNS="${RESOLVED_DNS:-10.64.0.1}"
-    echo "nameserver $RESOLVED_DNS" > /etc/resolv.conf
-    echo "[tunnelvision] DNS set to $RESOLVED_DNS"
 
     echo "up" > /var/run/tunnelvision/vpn_state
     echo "$WG_IP" > /var/run/tunnelvision/vpn_ip
@@ -156,14 +161,20 @@ elif [ "$VPN_TYPE" = "openvpn" ]; then
     TUN_IP=$(ip -4 addr show tun0 | awk '/inet / {print $2}' | cut -d/ -f1)
     VPN_INTERFACE="tun0"
 
-    # Set DNS — env var VPN_DNS overrides config file
-    RESOLVED_DNS="${VPN_DNS:-}"
-    if [ -z "$RESOLVED_DNS" ]; then
-        RESOLVED_DNS=$(grep -i 'dhcp-option DNS' "$OVPN_CONF" 2>/dev/null | head -1 | awk '{print $NF}')
-    fi
-    if [ -n "$RESOLVED_DNS" ]; then
-        echo "nameserver $RESOLVED_DNS" > /etc/resolv.conf
-        echo "[tunnelvision] DNS set to $RESOLVED_DNS"
+    # Set DNS — built-in DNS server overrides everything when enabled
+    DNS_ENABLED=${DNS_ENABLED:-false}
+    if [ "$DNS_ENABLED" = "true" ]; then
+        echo "nameserver 127.0.0.1" > /etc/resolv.conf
+        echo "[tunnelvision] DNS set to 127.0.0.1 (built-in DNS server)"
+    else
+        RESOLVED_DNS="${VPN_DNS:-}"
+        if [ -z "$RESOLVED_DNS" ]; then
+            RESOLVED_DNS=$(grep -i 'dhcp-option DNS' "$OVPN_CONF" 2>/dev/null | head -1 | awk '{print $NF}')
+        fi
+        if [ -n "$RESOLVED_DNS" ]; then
+            echo "nameserver $RESOLVED_DNS" > /etc/resolv.conf
+            echo "[tunnelvision] DNS set to $RESOLVED_DNS"
+        fi
     fi
 
     echo "up" > /var/run/tunnelvision/vpn_state

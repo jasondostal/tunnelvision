@@ -17,6 +17,12 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
+- [x] Docker Secrets support — `_SECRETFILE` env vars for all secret fields (v2.5.0)
+- [x] Firewall granularity — VPN input ports, outbound subnet bypass, custom nftables rules (v2.5.0)
+- [x] Built-in DNS — DoT upstream, caching, ad/malware/surveillance blocking (v2.5.0)
+- [x] ProtonVPN provider — native integration with NAT-PMP port forwarding (v2.5.0)
+- [x] HTTP CONNECT proxy — route non-Docker clients through VPN (v2.5.0)
+- [x] SOCKS5 proxy — with optional Shadowsocks AEAD encryption (v2.5.0)
 - [x] Setup wizard — provider-specific flows for Mullvad, IVPN, PIA, Gluetun with server picker (v2.4.0)
 - [x] Connection history UI — dashboard card with event timeline (v2.4.0)
 - [x] Server browser — modal with country filter, search, connect-to-server (v2.4.0)

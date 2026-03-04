@@ -13,6 +13,9 @@ class HealthResponse(BaseModel):
     vpn: str = Field(description="VPN state: up, down, disabled, error")
     killswitch: str = Field(description="Killswitch state: active, disabled")
     qbittorrent: str = Field(description="qBittorrent state: running, stopped")
+    dns: str = Field("disabled", description="DNS server state: running, stopped, disabled")
+    http_proxy: str = Field("disabled", description="HTTP proxy state: running, stopped, disabled")
+    socks_proxy: str = Field("disabled", description="SOCKS5 proxy state: running, stopped, disabled")
     api: str = "running"
     uptime_seconds: float = 0
     checked_at: datetime

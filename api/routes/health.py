@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
+from api.constants import HealthState, ServiceState, SUBPROCESS_TIMEOUT_QUICK, VpnState
 from api.models import HealthResponse
 
 router = APIRouter()
@@ -18,7 +19,7 @@ async def health_check(request: Request):
     state_mgr = request.app.state.state
 
     setup_required = state_mgr.setup_required
-    vpn_state = state_mgr.read("vpn_state", "disabled" if not config.vpn_enabled else "unknown")
+    vpn_state = state_mgr.read("vpn_state", VpnState.DISABLED if not config.vpn_enabled else VpnState.UNKNOWN)
     killswitch_state = state_mgr.killswitch_state
     healthy_str = state_mgr.healthy
 
@@ -40,13 +41,13 @@ async def health_check(request: Request):
             result = subprocess.run(
                 ["curl", "-sf", "-o", "/dev/null", "--max-time", "3",
                  f"http://localhost:{config.webui_port}"],
-                capture_output=True, timeout=5,
+                capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK,
             )
-            qbt_state = "running" if result.returncode == 0 else "stopped"
+            qbt_state = ServiceState.RUNNING if result.returncode == 0 else "stopped"
         except Exception:
             qbt_state = "stopped"
     else:
-        qbt_state = "disabled"
+        qbt_state = ServiceState.DISABLED
 
     uptime = time.time() - request.app.state.started_at
 
@@ -57,9 +58,9 @@ async def health_check(request: Request):
     except Exception:
         pass
 
-    healthy = healthy_str == "true"
+    healthy = healthy_str == HealthState.TRUE
     if config.qbt_enabled:
-        healthy = healthy and qbt_state == "running"
+        healthy = healthy and qbt_state == ServiceState.RUNNING
 
     # Watchdog snapshot
     watchdog_snapshot = None
@@ -74,6 +75,9 @@ async def health_check(request: Request):
         vpn=vpn_state,
         killswitch=killswitch_state,
         qbittorrent=qbt_state,
+        dns=state_mgr.dns_state,
+        http_proxy=state_mgr.http_proxy_state,
+        socks_proxy=state_mgr.socks_proxy_state,
         uptime_seconds=round(uptime, 1),
         checked_at=datetime.now(timezone.utc),
         watchdog=watchdog_snapshot,

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
+from api.constants import KillswitchState, VpnState
 from api.models import VPNStatusResponse, VPNIPResponse
 from api.routes.events import broadcast
 
@@ -24,7 +25,7 @@ async def vpn_status(request: Request):
         from api.services.providers.gluetun import GluetunProvider
         gluetun = GluetunProvider(config)
         gluetun_status = await gluetun.get_vpn_status()
-        state = "up" if gluetun_status == "running" else "down"
+        state = VpnState.UP if gluetun_status == "running" else VpnState.DOWN
         check = await gluetun.check_connection()
         public_ip = check.ip
         country = check.country
@@ -33,7 +34,7 @@ async def vpn_status(request: Request):
         endpoint = ""
         killswitch = "gluetun"  # Gluetun manages the firewall
     else:
-        state = state_mgr.read("vpn_state", "disabled" if not config.vpn_enabled else "unknown")
+        state = state_mgr.read("vpn_state", VpnState.DISABLED if not config.vpn_enabled else VpnState.UNKNOWN)
         public_ip = state_mgr.public_ip
         country = state_mgr.country
         city = state_mgr.city
@@ -141,5 +142,5 @@ async def vpn_ip(request: Request):
 
     return VPNIPResponse(
         ip=ip,
-        vpn_active=state == "up",
+        vpn_active=state == VpnState.UP,
     )

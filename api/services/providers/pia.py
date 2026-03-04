@@ -17,8 +17,7 @@ Endpoints used:
 import ssl
 from datetime import datetime, timezone
 
-import httpx
-
+from api.constants import PIA_TOKEN_CACHE_TTL, PROVIDER_CACHE_TTL, TIMEOUT_FETCH, http_client
 from api.services.providers.base import (
     VPNProvider,
     ConnectionCheck,
@@ -51,7 +50,7 @@ class PIAProvider(VPNProvider):
     async def check_connection(self) -> ConnectionCheck:
         """Generic IP check — PIA has no branded check endpoint."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with http_client() as client:
                 resp = await client.get("https://ipwho.is/")
                 resp.raise_for_status()
                 data = resp.json()
@@ -80,11 +79,11 @@ class PIAProvider(VPNProvider):
         now = datetime.now(timezone.utc)
         if self._server_cache and self._cache_time:
             age = (now - self._cache_time).total_seconds()
-            if age < 3600:
+            if age < PROVIDER_CACHE_TTL:
                 return self._filter_servers(self._server_cache, country, city)
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with http_client(timeout=TIMEOUT_FETCH) as client:
                 resp = await client.get(self.SERVERS_URL)
                 resp.raise_for_status()
                 data = resp.json()
@@ -121,7 +120,7 @@ class PIAProvider(VPNProvider):
         now = datetime.now(timezone.utc)
         if self._token and self._token_time:
             age = (now - self._token_time).total_seconds()
-            if age < 43200:
+            if age < PIA_TOKEN_CACHE_TTL:
                 return self._token
 
         username = self.config.pia_user if self.config else ""
@@ -130,7 +129,7 @@ class PIAProvider(VPNProvider):
             return None
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with http_client() as client:
                 resp = await client.post(
                     self.TOKEN_URL,
                     data={"username": username, "password": password},

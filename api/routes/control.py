@@ -10,6 +10,14 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from api.config import Config
+from api.constants import (
+    KillswitchState,
+    SUBPROCESS_TIMEOUT_DEFAULT,
+    SUBPROCESS_TIMEOUT_LONG,
+    SUBPROCESS_TIMEOUT_QUICK,
+    SUBPROCESS_TIMEOUT_VPN,
+    VpnState,
+)
 from api.routes.events import broadcast
 from api.services.state import StateManager
 
@@ -23,7 +31,7 @@ class ActionResponse(BaseModel):
     error: str = ""
 
 
-def _run(cmd: list[str], timeout: int = 15) -> tuple[bool, str]:
+def _run(cmd: list[str], timeout: int = SUBPROCESS_TIMEOUT_LONG) -> tuple[bool, str]:
     """Run a command, return (success, output)."""
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -46,8 +54,8 @@ def do_vpn_disconnect(state_mgr: StateManager) -> ActionResponse:
         ok, msg = _run(["killall", "openvpn"])
 
     if ok:
-        state_mgr.vpn_state = "down"
-        broadcast("vpn_state", {"state": "down", "action": "disconnect"})
+        state_mgr.vpn_state = VpnState.DOWN
+        broadcast("vpn_state", {"state": VpnState.DOWN, "action": "disconnect"})
 
     return ActionResponse(
         success=ok,
@@ -61,15 +69,15 @@ def do_vpn_restart(state_mgr: StateManager) -> ActionResponse:
     vpn_type = state_mgr.vpn_type
 
     if vpn_type == "wireguard":
-        _run(["wg-quick", "down", "wg0"], timeout=10)
+        _run(["wg-quick", "down", "wg0"], timeout=SUBPROCESS_TIMEOUT_DEFAULT)
         ok, msg = _run(["wg-quick", "up", "wg0"])
     else:
-        _run(["killall", "openvpn"], timeout=5)
-        ok, msg = _run(["/etc/s6-overlay/scripts/init-wireguard.sh"], timeout=30)
+        _run(["killall", "openvpn"], timeout=SUBPROCESS_TIMEOUT_QUICK)
+        ok, msg = _run(["/etc/s6-overlay/scripts/init-wireguard.sh"], timeout=SUBPROCESS_TIMEOUT_VPN)
 
     if ok:
-        state_mgr.vpn_state = "up"
-        broadcast("vpn_state", {"state": "up", "action": "restart"})
+        state_mgr.vpn_state = VpnState.UP
+        broadcast("vpn_state", {"state": VpnState.UP, "action": "restart"})
 
     return ActionResponse(
         success=ok,
@@ -80,7 +88,7 @@ def do_vpn_restart(state_mgr: StateManager) -> ActionResponse:
 
 
 def do_killswitch_enable() -> ActionResponse:
-    ok, msg = _run(["/etc/s6-overlay/scripts/init-killswitch.sh"], timeout=10)
+    ok, msg = _run(["/etc/s6-overlay/scripts/init-killswitch.sh"], timeout=SUBPROCESS_TIMEOUT_DEFAULT)
     return ActionResponse(
         success=ok,
         action="killswitch_enable",
@@ -92,7 +100,7 @@ def do_killswitch_enable() -> ActionResponse:
 def do_killswitch_disable(state_mgr: StateManager) -> ActionResponse:
     ok, msg = _run(["nft", "flush", "ruleset"])
     if ok:
-        state_mgr.killswitch_state = "disabled"
+        state_mgr.killswitch_state = KillswitchState.DISABLED
 
     return ActionResponse(
         success=ok,

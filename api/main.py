@@ -19,6 +19,8 @@ async def lifespan(app: FastAPI):
     """Application lifespan — startup and shutdown."""
     from api.services.mqtt import get_mqtt_service
     from api.services.watchdog import get_watchdog_service
+    from api.services.http_proxy import get_http_proxy_service
+    from api.services.socks_proxy import get_socks_proxy_service
 
     app.state.config = load_config()
     app.state.state = StateManager()
@@ -32,9 +34,19 @@ async def lifespan(app: FastAPI):
     watchdog_svc = get_watchdog_service(app.state.config, app.state.state)
     watchdog_svc.start()
 
+    # Start HTTP proxy if configured
+    http_proxy_svc = get_http_proxy_service(app.state.config, app.state.state)
+    http_proxy_svc.start()
+
+    # Start SOCKS5 proxy if configured
+    socks_proxy_svc = get_socks_proxy_service(app.state.config, app.state.state)
+    socks_proxy_svc.start()
+
     yield
 
     # Shutdown
+    socks_proxy_svc.stop()
+    http_proxy_svc.stop()
     watchdog_svc.stop()
     mqtt_svc.stop()
 

@@ -10,13 +10,20 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from api.constants import (
+    GLUETUN_DEFAULT_URL,
+    SUBPROCESS_TIMEOUT_DEFAULT,
+    SUBPROCESS_TIMEOUT_LONG,
+    SUBPROCESS_TIMEOUT_QUICK,
+    WG_CONF_PATH,
+    WIREGUARD_DIR,
+    activate_wg_config,
+    http_client,
+)
 from api.services.settings import save_settings
 from api.services.state import StateManager
 
 router = APIRouter()
-
-WIREGUARD_DIR = Path("/config/wireguard")
-WG_CONF_PATH = WIREGUARD_DIR / "wg0.conf"
 
 
 # -- Models --
@@ -119,13 +126,12 @@ async def _validate_pia_creds(body: CredentialsRequest) -> CredentialsResponse |
 
 async def _validate_gluetun(body: CredentialsRequest) -> CredentialsResponse | None:
     """Validate connection to gluetun. Returns error response or None on success."""
-    url = (body.gluetun_url or "http://gluetun:8000").rstrip("/")
+    url = (body.gluetun_url or GLUETUN_DEFAULT_URL).rstrip("/")
     try:
-        import httpx
         headers = {}
         if body.gluetun_api_key:
             headers["X-Api-Key"] = body.gluetun_api_key
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with http_client() as client:
             resp = await client.get(f"{url}/v1/openvpn/status", headers=headers)
             resp.raise_for_status()
     except Exception:
@@ -244,15 +250,12 @@ async def verify_connection():
 
     try:
         # Symlink for wg-quick
-        os.makedirs("/etc/wireguard", exist_ok=True)
-        if os.path.exists("/etc/wireguard/wg0.conf"):
-            os.remove("/etc/wireguard/wg0.conf")
-        os.symlink(str(WG_CONF_PATH), "/etc/wireguard/wg0.conf")
+        activate_wg_config(WG_CONF_PATH)
 
         # Bring up tunnel
         result = subprocess.run(
             ["wg-quick", "up", "wg0"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
         )
         if result.returncode != 0:
             return VerifyResponse(
@@ -263,7 +266,7 @@ async def verify_connection():
         # Check connectivity via geo-IP
         ip_result = subprocess.run(
             ["curl", "-sf", "--max-time", "8", "https://ipwho.is/"],
-            capture_output=True, text=True, timeout=12,
+            capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
         )
 
         public_ip = ""
@@ -280,7 +283,7 @@ async def verify_connection():
                 pass
 
         # Always tear down — setup/complete will bring it up for real
-        subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=10)
+        subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
 
         if not public_ip:
             return VerifyResponse(
@@ -296,10 +299,10 @@ async def verify_connection():
         )
 
     except subprocess.TimeoutExpired:
-        subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=5)
+        subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
         return VerifyResponse(success=False, error="Connection timed out")
     except Exception as e:
-        subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=5)
+        subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
         return VerifyResponse(success=False, error=str(e))
 
 
@@ -343,7 +346,7 @@ async def setup_credentials(body: CredentialsRequest, request: Request):
         if err:
             return err
 
-        url = (body.gluetun_url or "http://gluetun:8000").rstrip("/")
+        url = (body.gluetun_url or GLUETUN_DEFAULT_URL).rstrip("/")
         settings = {"vpn_provider": "gluetun", "gluetun_url": url}
         if body.gluetun_api_key:
             settings["gluetun_api_key"] = body.gluetun_api_key
@@ -381,7 +384,7 @@ async def complete_setup(request: Request):
 
     # Signal s6 to restart the init chain + services
     try:
-        subprocess.run(["s6-svc", "-r", "/run/service/svc-qbittorrent"], capture_output=True, timeout=5)
+        subprocess.run(["s6-svc", "-r", "/run/service/svc-qbittorrent"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
     except Exception:
         pass
 

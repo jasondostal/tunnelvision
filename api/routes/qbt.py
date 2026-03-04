@@ -4,6 +4,7 @@ import subprocess
 
 from fastapi import APIRouter, Request
 
+from api.constants import ServiceState, SUBPROCESS_TIMEOUT_QUICK
 from api.models import QBTStatusResponse
 
 router = APIRouter()
@@ -15,21 +16,21 @@ async def qbt_status(request: Request):
     config = request.app.state.config
 
     if not config.qbt_enabled:
-        return QBTStatusResponse(state="disabled", webui_port=config.webui_port)
+        return QBTStatusResponse(state=ServiceState.DISABLED, webui_port=config.webui_port)
 
     # Check if qBittorrent is responding
     try:
         result = subprocess.run(
             ["curl", "-sf", "--max-time", "3",
              f"http://localhost:{config.webui_port}/api/v2/transfer/info"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK,
         )
         if result.returncode == 0:
             import json
             data = json.loads(result.stdout)
             dl_speed = data.get("dl_info_speed", 0)
             up_speed = data.get("up_info_speed", 0)
-            state = "running"
+            state = ServiceState.RUNNING
         else:
             dl_speed = 0
             up_speed = 0
@@ -37,7 +38,7 @@ async def qbt_status(request: Request):
     except Exception:
         dl_speed = 0
         up_speed = 0
-        state = "error"
+        state = ServiceState.ERROR
 
     # Get version
     version = ""
@@ -45,7 +46,7 @@ async def qbt_status(request: Request):
         result = subprocess.run(
             ["curl", "-sf", "--max-time", "3",
              f"http://localhost:{config.webui_port}/api/v2/app/version"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK,
         )
         if result.returncode == 0:
             version = result.stdout.strip()
@@ -59,7 +60,7 @@ async def qbt_status(request: Request):
         result = subprocess.run(
             ["curl", "-sf", "--max-time", "3",
              f"http://localhost:{config.webui_port}/api/v2/torrents/info"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK,
         )
         if result.returncode == 0:
             import json

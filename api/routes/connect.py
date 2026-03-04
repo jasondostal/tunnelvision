@@ -13,16 +13,23 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from api.constants import (
+    OPENVPN_DIR,
+    SUBPROCESS_TIMEOUT_DEFAULT,
+    SUBPROCESS_TIMEOUT_LONG,
+    SUBPROCESS_TIMEOUT_QUICK,
+    SUBPROCESS_TIMEOUT_VPN,
+    WG_CONF_PATH,
+    WIREGUARD_DIR,
+    activate_wg_config,
+    http_client,
+)
 from api.services.state import StateManager
 from api.services.vpn import get_provider
 from api.services.history import log_event
 from api.routes.events import broadcast
 
 router = APIRouter()
-
-WIREGUARD_DIR = Path("/config/wireguard")
-OPENVPN_DIR = Path("/config/openvpn")
-WG_CONF_PATH = WIREGUARD_DIR / "wg0.conf"
 
 
 class ConnectRequest(BaseModel):
@@ -70,6 +77,8 @@ async def connect_to_server(body: ConnectRequest, request: Request):
         return await _connect_ivpn(body, provider, state_mgr, config)
     if provider.name == "pia":
         return await _connect_pia(body, provider, config, state_mgr)
+    if provider.name == "proton":
+        return await _connect_proton(body, provider, state_mgr, config)
 
     # --- Config-file rotation (custom/other providers) ---
     configs = _list_config_files()
@@ -84,10 +93,7 @@ async def connect_to_server(body: ConnectRequest, request: Request):
     state_mgr.vpn_type = vpn_type
 
     if vpn_type == "wireguard":
-        os.makedirs("/etc/wireguard", exist_ok=True)
-        if os.path.exists("/etc/wireguard/wg0.conf"):
-            os.remove("/etc/wireguard/wg0.conf")
-        os.symlink(str(chosen), "/etc/wireguard/wg0.conf")
+        activate_wg_config(chosen)
 
     state_mgr.active_config = chosen.name
     result = await _reconnect_vpn(vpn_type)
@@ -169,7 +175,7 @@ async def activate_config(name: str, request: Request):
                 if not line.strip().lower().startswith(("postup", "postdown"))
             ]
 
-            subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=10)
+            subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
 
             os.makedirs("/etc/wireguard", exist_ok=True)
             wg_conf = Path("/etc/wireguard/wg0.conf")
@@ -178,7 +184,7 @@ async def activate_config(name: str, request: Request):
 
             result = subprocess.run(
                 ["wg-quick", "up", "wg0"],
-                capture_output=True, text=True, timeout=15,
+                capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
             )
             if result.returncode != 0:
                 return ConnectResponse(success=False, error=result.stderr.strip())
@@ -186,15 +192,15 @@ async def activate_config(name: str, request: Request):
             if config.killswitch_enabled:
                 subprocess.run(
                     ["/etc/s6-overlay/scripts/init-killswitch.sh"],
-                    capture_output=True, timeout=10,
+                    capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
                 )
         else:
-            subprocess.run(["killall", "openvpn"], capture_output=True, timeout=5)
+            subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
             import asyncio
             await asyncio.sleep(2)
             result = subprocess.run(
                 ["/etc/s6-overlay/scripts/init-wireguard.sh"],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
             )
             if result.returncode != 0:
                 return ConnectResponse(success=False, error="OpenVPN reconnect failed")
@@ -258,8 +264,7 @@ async def _connect_mullvad(body: ConnectRequest, provider, state_mgr: StateManag
     pubkey = ""
     ipv4 = ""
     try:
-        import httpx
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with http_client() as client:
             resp = await client.get("https://api.mullvad.net/www/relays/wireguard/")
             for relay in resp.json():
                 if relay.get("hostname") == server.hostname:
@@ -400,17 +405,16 @@ async def _connect_pia(body: ConnectRequest, provider, config, state_mgr: StateM
 
     # Generate ephemeral WireGuard keypair
     try:
-        privkey_result = _sp.run(["wg", "genkey"], capture_output=True, text=True, timeout=5)
+        privkey_result = _sp.run(["wg", "genkey"], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
         private_key = privkey_result.stdout.strip()
-        pubkey_result = _sp.run(["wg", "pubkey"], input=private_key, capture_output=True, text=True, timeout=5)
+        pubkey_result = _sp.run(["wg", "pubkey"], input=private_key, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
         public_key = pubkey_result.stdout.strip()
     except Exception as e:
         return ConnectResponse(success=False, error=f"Key generation failed: {e}")
 
     # Exchange keys with PIA server
     try:
-        import httpx
-        async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+        async with http_client(verify=False) as client:
             resp = await client.get(
                 f"https://{server_ip}:1337/addKey",
                 params={"pt": token, "pubkey": public_key},
@@ -462,22 +466,106 @@ async def _connect_pia(body: ConnectRequest, provider, config, state_mgr: StateM
     return result
 
 
+async def _connect_proton(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:
+    """Connect to a ProtonVPN server. Uses same pattern as Mullvad — pick server, generate config."""
+    servers = await provider.list_servers(country=body.country, city=body.city)
+
+    if not servers:
+        desc = ""
+        if body.country:
+            desc += f" country={body.country}"
+        if body.city:
+            desc += f" city={body.city}"
+        return ConnectResponse(success=False, error=f"No ProtonVPN servers found{desc}")
+
+    # Prefer port-forward capable servers if port forwarding is enabled
+    if config and config.port_forward_enabled:
+        pf_servers = [s for s in servers if getattr(s, "_port_forward", False)]
+        if pf_servers:
+            servers = pf_servers
+
+    if body.hostname:
+        matching = [s for s in servers if s.hostname == body.hostname]
+        if not matching:
+            return ConnectResponse(success=False, error=f"Server {body.hostname} not found")
+        server = matching[0]
+    else:
+        server = random.choice(servers)
+
+    # ProtonVPN config uses pre-existing WireGuard key (generated on protonvpn.com)
+    private_key = config.wireguard_private_key if config else ""
+    address = config.wireguard_addresses if config else ""
+    dns = (config.wireguard_dns if config and config.wireguard_dns else "") or "10.2.0.1"
+
+    if not private_key and WG_CONF_PATH.exists():
+        for line in WG_CONF_PATH.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("PrivateKey"):
+                private_key = stripped.split("=", 1)[1].strip()
+            elif stripped.startswith("Address") and not address:
+                address = stripped.split("=", 1)[1].strip()
+            elif stripped.startswith("DNS") and dns == "10.2.0.1":
+                dns = stripped.split("=", 1)[1].strip()
+
+    if not private_key:
+        return ConnectResponse(
+            success=False,
+            error="No WireGuard private key. Set WIREGUARD_PRIVATE_KEY env or use the setup wizard to paste your ProtonVPN config.",
+        )
+    if not address:
+        return ConnectResponse(success=False, error="No WireGuard address. Set WIREGUARD_ADDRESSES env.")
+
+    server_ip = getattr(server, "_ipv4", "")
+    if not server_ip:
+        return ConnectResponse(success=False, error=f"No IP for {server.hostname}")
+
+    WIREGUARD_DIR.mkdir(parents=True, exist_ok=True)
+    WG_CONF_PATH.write_text(
+        f"[Interface]\n"
+        f"PrivateKey = {private_key}\n"
+        f"Address = {address}\n"
+        f"DNS = {dns}\n\n"
+        f"[Peer]\n"
+        f"PublicKey = \n"  # ProtonVPN pubkey comes from server list or config
+        f"Endpoint = {server_ip}:51820\n"
+        f"AllowedIPs = 0.0.0.0/0\n"
+    )
+    os.chmod(WG_CONF_PATH, 0o600)
+
+    state_mgr.vpn_type = "wireguard"
+    state_mgr.vpn_server_hostname = server.hostname
+    state_mgr.active_config = "wg0.conf"
+
+    result = await _reconnect_vpn("wireguard")
+    result.hostname = server.hostname
+    result.country = server.country
+    result.city = server.city
+
+    # Start NAT-PMP port forwarding if enabled
+    if result.success and config and config.port_forward_enabled and getattr(server, "_port_forward", False):
+        from api.services.natpmp import get_natpmp_service
+        gateway = server_ip  # NAT-PMP gateway is the server
+        get_natpmp_service().start(gateway)
+
+    return result
+
+
 async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
     """Tear down and bring up VPN."""
     try:
         if vpn_type == "wireguard":
-            subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=10)
-            result = subprocess.run(["wg-quick", "up", "wg0"], capture_output=True, text=True, timeout=15)
+            subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
+            result = subprocess.run(["wg-quick", "up", "wg0"], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG)
             if result.returncode != 0:
                 return ConnectResponse(success=False, error=result.stderr.strip())
         elif vpn_type == "openvpn":
-            subprocess.run(["killall", "openvpn"], capture_output=True, timeout=5)
+            subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
             # Give it a moment to clean up
             import asyncio
             await asyncio.sleep(2)
             result = subprocess.run(
                 ["/etc/s6-overlay/scripts/init-wireguard.sh"],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
             )
             if result.returncode != 0:
                 return ConnectResponse(success=False, error="OpenVPN reconnect failed")

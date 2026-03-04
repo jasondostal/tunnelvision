@@ -45,6 +45,32 @@ const FIELD_GROUPS: { label: string; fields: string[] }[] = [
     fields: ["notify_webhook_url", "notify_gotify_url", "notify_gotify_token"],
   },
   {
+    label: "Firewall",
+    fields: ["firewall_vpn_input_ports", "firewall_outbound_subnets", "firewall_custom_rules_file"],
+  },
+  {
+    label: "DNS",
+    fields: [
+      "dns_enabled", "dns_upstream", "dns_dot_enabled", "dns_cache_enabled",
+      "dns_block_ads", "dns_block_malware", "dns_block_surveillance", "dns_custom_blocklist_url",
+    ],
+  },
+  {
+    label: "ProtonVPN",
+    fields: ["proton_user", "proton_pass"],
+  },
+  {
+    label: "HTTP Proxy",
+    fields: ["http_proxy_enabled", "http_proxy_port", "http_proxy_user", "http_proxy_pass"],
+  },
+  {
+    label: "SOCKS5 Proxy",
+    fields: [
+      "socks_proxy_enabled", "socks_proxy_port", "socks_proxy_user", "socks_proxy_pass",
+      "shadowsocks_enabled", "shadowsocks_password", "shadowsocks_cipher",
+    ],
+  },
+  {
     label: "General",
     fields: ["health_check_interval", "ui_enabled"],
   },
@@ -76,6 +102,35 @@ const FIELD_LABELS: Record<string, string> = {
   mqtt_pass: "MQTT Password",
   health_check_interval: "Health Check Interval (s)",
   ui_enabled: "Dashboard UI",
+  // Firewall
+  firewall_vpn_input_ports: "VPN Input Ports",
+  firewall_outbound_subnets: "Outbound Subnets (bypass VPN)",
+  firewall_custom_rules_file: "Custom Rules File",
+  // DNS
+  dns_enabled: "DNS Server",
+  dns_upstream: "Upstream DNS",
+  dns_dot_enabled: "DNS-over-TLS",
+  dns_cache_enabled: "DNS Cache",
+  dns_block_ads: "Block Ads",
+  dns_block_malware: "Block Malware",
+  dns_block_surveillance: "Block Surveillance",
+  dns_custom_blocklist_url: "Custom Blocklist URL",
+  // ProtonVPN
+  proton_user: "Proton Username",
+  proton_pass: "Proton Password",
+  // HTTP Proxy
+  http_proxy_enabled: "HTTP Proxy",
+  http_proxy_port: "HTTP Proxy Port",
+  http_proxy_user: "HTTP Proxy User",
+  http_proxy_pass: "HTTP Proxy Password",
+  // SOCKS5
+  socks_proxy_enabled: "SOCKS5 Proxy",
+  socks_proxy_port: "SOCKS5 Port",
+  socks_proxy_user: "SOCKS5 User",
+  socks_proxy_pass: "SOCKS5 Password",
+  shadowsocks_enabled: "Shadowsocks",
+  shadowsocks_password: "Shadowsocks Password",
+  shadowsocks_cipher: "Shadowsocks Cipher",
 };
 
 const FIELD_HINTS: Record<string, string> = {
@@ -100,6 +155,35 @@ const FIELD_HINTS: Record<string, string> = {
   killswitch_enabled: "true or false",
   mqtt_enabled: "true or false",
   ui_enabled: "true or false",
+  // Firewall
+  firewall_vpn_input_ports: "Comma-separated ports (e.g. 51413,6881)",
+  firewall_outbound_subnets: "CIDRs that bypass VPN (e.g. 192.168.1.0/24)",
+  firewall_custom_rules_file: "Path to nftables rules file",
+  // DNS
+  dns_enabled: "true or false",
+  dns_upstream: "Comma-separated IPs (e.g. 1.1.1.1,1.0.0.1)",
+  dns_dot_enabled: "true or false",
+  dns_cache_enabled: "true or false",
+  dns_block_ads: "true or false (StevenBlack hosts)",
+  dns_block_malware: "true or false (URLhaus)",
+  dns_block_surveillance: "true or false",
+  dns_custom_blocklist_url: "URL to hosts-format blocklist",
+  // ProtonVPN
+  proton_user: "ProtonVPN username",
+  proton_pass: "ProtonVPN password",
+  // HTTP Proxy
+  http_proxy_enabled: "true or false",
+  http_proxy_port: "Default: 8888",
+  http_proxy_user: "Leave blank for no auth",
+  http_proxy_pass: "Leave blank for no auth",
+  // SOCKS5
+  socks_proxy_enabled: "true or false",
+  socks_proxy_port: "Default: 1080",
+  socks_proxy_user: "Leave blank for no auth",
+  socks_proxy_pass: "Leave blank for no auth",
+  shadowsocks_enabled: "true or false",
+  shadowsocks_password: "Encryption password",
+  shadowsocks_cipher: "aes-256-gcm or chacha20-ietf-poly1305",
 };
 
 /** Fields that take effect immediately without container restart. */
@@ -111,6 +195,9 @@ const HOT_RELOAD_FIELDS = new Set([
   "notify_webhook_url",
   "notify_gotify_url",
   "notify_gotify_token",
+  "dns_block_ads",
+  "dns_block_malware",
+  "dns_block_surveillance",
 ]);
 
 export function SettingsPanel({ onClose }: SettingsPanelProps) {

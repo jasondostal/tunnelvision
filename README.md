@@ -16,7 +16,7 @@ qBittorrent + WireGuard/OpenVPN + killswitch + REST API + dashboard. One contain
 
 Drop your VPN config, `docker compose up`, and you can see everything — what IP you're on, where you're exiting, transfer stats, killswitch state, qBittorrent health. From your Homepage dashboard, from Home Assistant, from Prometheus, from the built-in UI, from `curl`. No guessing. No SSH-ing in.
 
-Works with **any WireGuard or OpenVPN provider**. Native integrations for [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), and [PIA](https://privateinternetaccess.com) (ephemeral key negotiation, port forwarding). Or bring your own config from Proton, AirVPN, Windscribe, or your own server.
+Works with **any WireGuard or OpenVPN provider**. Native integrations for [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), [PIA](https://privateinternetaccess.com), and [ProtonVPN](https://protonvpn.com) (ephemeral key negotiation, port forwarding). Or bring your own config from AirVPN, Windscribe, or your own server. Built-in DNS (DoT, ad-blocking), HTTP CONNECT proxy, and SOCKS5/Shadowsocks proxy.
 
 <p align="center">
   <img src="images/screenshot-dashboard.png" alt="TunnelVision Dashboard" width="700">
@@ -138,7 +138,7 @@ Or use `/api/v1/qbt/status` for torrent-focused widgets:
   <img src="images/screenshot-ha.png" alt="TunnelVision Home Assistant Entities" width="400">
 </p>
 
-Native [HACS integration](https://github.com/jasondostal/tunnelvision-ha). 23 entities, real-time SSE updates, config flow, zero YAML.
+Native [HACS integration](https://github.com/jasondostal/tunnelvision-ha). 30 entities, real-time SSE updates, config flow, zero YAML.
 
 **Install via HACS:**
 1. HACS → Integrations → Three dots → **Custom Repositories**
@@ -147,8 +147,8 @@ Native [HACS integration](https://github.com/jasondostal/tunnelvision-ha). 23 en
 4. **Settings → Integrations → Add → TunnelVision** — enter your host and port
 
 You get:
-- **12 sensors** — VPN state, public IP, location, speeds, transfer stats, torrent counts, provider
-- **4 binary sensors** — VPN connected, killswitch active, healthy, qBittorrent running
+- **16 sensors** — VPN state, public IP, location, speeds, transfer stats, torrent counts, provider, forwarded port, DNS/HTTP proxy/SOCKS proxy state
+- **7 binary sensors** — VPN connected, killswitch active, healthy, qBittorrent running, DNS, HTTP proxy, SOCKS proxy
 - **5 buttons** — Restart VPN, rotate server, restart qBit, pause/resume torrents
 - **2 switches** — VPN on/off, Killswitch on/off (reflect actual state)
 - **3 services** — `tunnelvision.vpn`, `tunnelvision.qbittorrent`, `tunnelvision.killswitch` for automations
@@ -198,6 +198,29 @@ Off by default. Three layers, all optional, all additive:
 
 Set `AUTH_PROXY_HEADER=Remote-User` (or `X-Forwarded-User`, whatever your proxy sends) and users authenticated by your reverse proxy get straight through. Direct users see the login form. API key always works for machine-to-machine.
 
+## Docker Secrets
+
+Any secret field supports file-based injection via `_SECRETFILE` suffix. This works with Docker secrets, Kubernetes secrets, or any file-mounted secret:
+
+```yaml
+services:
+  tunnelvision:
+    secrets:
+      - admin_pass
+      - api_key
+    environment:
+      - ADMIN_PASS_SECRETFILE=/run/secrets/admin_pass
+      - API_KEY_SECRETFILE=/run/secrets/api_key
+
+secrets:
+  admin_pass:
+    file: ./secrets/admin_pass.txt
+  api_key:
+    file: ./secrets/api_key.txt
+```
+
+Precedence: YAML settings > secret file > env var > default.
+
 ## Settings
 
 Configurable from the dashboard UI (gear icon) or by editing `/config/tunnelvision.yml` directly. Settings in the YAML file override environment variables.
@@ -225,7 +248,7 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `AUTH_PROXY_HEADER` | *(empty)* | Trusted header from reverse proxy (e.g. `Remote-User`) |
 | `VPN_ENABLED` | `true` | Enable/disable VPN |
 | `VPN_TYPE` | `auto` | VPN engine: `auto`, `wireguard`, or `openvpn` |
-| `VPN_PROVIDER` | `custom` | VPN provider: `custom`, `mullvad`, `ivpn`, `pia`, or `gluetun` (sidecar mode) |
+| `VPN_PROVIDER` | `custom` | VPN provider: `custom`, `mullvad`, `ivpn`, `pia`, `proton`, or `gluetun` (sidecar mode) |
 | `WIREGUARD_PRIVATE_KEY` | *(empty)* | WireGuard private key for Mullvad/IVPN (base64, 44 chars) |
 | `WIREGUARD_ADDRESSES` | *(empty)* | WireGuard interface address for Mullvad/IVPN (e.g. `10.66.0.1/32`) |
 | `VPN_DNS` | *(from config)* | Override DNS server (default: provider DNS or `10.64.0.1`) |
@@ -247,7 +270,24 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `NOTIFY_WEBHOOK_URL` | *(empty)* | Discord/Slack/generic webhook for notifications |
 | `NOTIFY_GOTIFY_URL` | *(empty)* | Gotify server URL |
 | `NOTIFY_GOTIFY_TOKEN` | *(empty)* | Gotify app token |
-| `PORT_FORWARD_ENABLED` | `false` | Enable port forwarding (PIA) |
+| `PORT_FORWARD_ENABLED` | `false` | Enable port forwarding (PIA, ProtonVPN) |
+| `PROTON_USER` | *(empty)* | ProtonVPN username (OpenVPN/IKEv2 credentials) |
+| `PROTON_PASS` | *(empty)* | ProtonVPN password |
+| `FIREWALL_VPN_INPUT_PORTS` | *(empty)* | Comma-separated ports to accept on VPN interface |
+| `FIREWALL_OUTBOUND_SUBNETS` | *(empty)* | CIDRs that bypass VPN (e.g. `192.168.1.0/24`) |
+| `FIREWALL_CUSTOM_RULES_FILE` | *(empty)* | Path to custom nftables rules file |
+| `DNS_ENABLED` | `false` | Enable built-in DNS (DoT, caching, blocking) |
+| `DNS_UPSTREAM` | `1.1.1.1,1.0.0.1` | Upstream DNS servers |
+| `DNS_DOT_ENABLED` | `true` | Use DNS-over-TLS for upstream queries |
+| `DNS_BLOCK_ADS` | `false` | Block ads via StevenBlack/hosts blocklist |
+| `DNS_BLOCK_MALWARE` | `false` | Block malware domains via URLhaus |
+| `DNS_BLOCK_SURVEILLANCE` | `false` | Block surveillance domains |
+| `HTTP_PROXY_ENABLED` | `false` | Enable HTTP CONNECT proxy |
+| `HTTP_PROXY_PORT` | `8888` | HTTP proxy listen port |
+| `SOCKS_PROXY_ENABLED` | `false` | Enable SOCKS5 proxy |
+| `SOCKS_PROXY_PORT` | `1080` | SOCKS5 proxy listen port |
+| `SHADOWSOCKS_ENABLED` | `false` | Enable Shadowsocks AEAD encryption on SOCKS5 |
+| `SHADOWSOCKS_CIPHER` | `aes-256-gcm` | Shadowsocks cipher (`aes-256-gcm` or `chacha20-ietf-poly1305`) |
 | `PUID` | `1000` | User ID for file permissions |
 | `PGID` | `1000` | Group ID for file permissions |
 | `TZ` | `America/Chicago` | Container timezone |

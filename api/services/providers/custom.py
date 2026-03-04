@@ -7,8 +7,7 @@ that makes TunnelVision's widget work with any WireGuard config.
 
 from datetime import datetime, timezone
 
-import httpx
-
+from api.constants import TIMEOUT_QUICK, http_client
 from api.services.providers.base import VPNProvider, ConnectionCheck
 
 
@@ -60,7 +59,7 @@ class CustomProvider(VPNProvider):
         # Try geo services first — we want country/city for the widget
         for svc in self.GEO_SERVICES:
             try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
+                async with http_client(timeout=TIMEOUT_QUICK) as client:
                     resp = await client.get(svc["url"])
                     if resp.status_code == 200:
                         data = resp.json()
@@ -78,7 +77,7 @@ class CustomProvider(VPNProvider):
         # Fall back to plain IP services
         for url in self.IP_FALLBACKS:
             try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
+                async with http_client(timeout=TIMEOUT_QUICK) as client:
                     resp = await client.get(url)
                     if resp.status_code == 200:
                         return ConnectionCheck(

@@ -46,6 +46,15 @@ if [ "$QBT_ENABLED" = "true" ]; then
     fi
 fi
 
+# --- Check DNS (if enabled) ---
+DNS_ENABLED=${DNS_ENABLED:-false}
+if [ "$DNS_ENABLED" = "true" ]; then
+    if ! dig @127.0.0.1 example.com +short +time=3 +tries=1 &>/dev/null; then
+        echo "UNHEALTHY: DNS server not responding"
+        errors=$((errors + 1))
+    fi
+fi
+
 # --- Check API (if enabled) ---
 if [ "$API_ENABLED" = "true" ]; then
     if ! curl -sf -o /dev/null --max-time 5 "http://localhost:${API_PORT}/api/v1/health"; then

@@ -1,7 +1,7 @@
 """Port forwarding service — PIA port forwarding with keep-alive.
 
 PIA assigns a port via getSignature, which must be bound and refreshed
-every 15 minutes or it expires. This service handles the lifecycle.
+periodically or it expires. This service handles the lifecycle.
 """
 
 import asyncio
@@ -12,8 +12,8 @@ import os
 import ssl
 from pathlib import Path
 
-import httpx
-
+from api.config import Config
+from api.constants import PORT_FORWARD_INTERVAL, http_client
 from api.services.state import StateManager
 
 logger = logging.getLogger(__name__)
@@ -27,12 +27,20 @@ _no_verify.verify_mode = ssl.CERT_NONE
 class PortForwardService:
     """Manages PIA port forwarding lifecycle."""
 
-    def __init__(self, state_mgr: StateManager | None = None):
+    def __init__(self, config: Config | None = None, state_mgr: StateManager | None = None):
+        self._config = config
         self._state = state_mgr or StateManager()
         self._task: asyncio.Task | None = None
         self._port: int | None = None
         self._payload: str | None = None
         self._signature: str | None = None
+
+    @property
+    def _refresh_interval(self) -> int:
+        """Port forward keep-alive interval, configurable via settings."""
+        if self._config:
+            return self._config.port_forward_interval
+        return PORT_FORWARD_INTERVAL
 
     @property
     def port(self) -> int | None:
@@ -58,10 +66,10 @@ class PortForwardService:
         self._state.delete_forwarded_port()
 
     async def _run(self, gateway_ip: str, token: str):
-        """Get signature, bind port, then keep alive every 15 minutes."""
+        """Get signature, bind port, then keep alive on configured interval."""
         try:
             # Step 1: Get signature
-            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            async with http_client(verify=False) as client:
                 resp = await client.get(
                     f"https://{gateway_ip}:19999/getSignature",
                     params={"token": token},
@@ -91,7 +99,7 @@ class PortForwardService:
             # Step 2: Bind and keep alive
             while True:
                 await self._bind_port(gateway_ip)
-                await asyncio.sleep(900)  # 15 minutes
+                await asyncio.sleep(self._refresh_interval)
 
         except asyncio.CancelledError:
             logger.info("Port forwarding: stopped")
@@ -99,9 +107,9 @@ class PortForwardService:
             logger.error(f"Port forwarding error: {e}")
 
     async def _bind_port(self, gateway_ip: str):
-        """Bind the forwarded port (must be called every 15 min)."""
+        """Bind the forwarded port (must be called periodically)."""
         try:
-            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            async with http_client(verify=False) as client:
                 resp = await client.get(
                     f"https://{gateway_ip}:19999/bindPort",
                     params={
@@ -124,8 +132,8 @@ class PortForwardService:
 _service: PortForwardService | None = None
 
 
-def get_port_forward_service() -> PortForwardService:
+def get_port_forward_service(config: Config | None = None) -> PortForwardService:
     global _service
     if _service is None:
-        _service = PortForwardService()
+        _service = PortForwardService(config=config)
     return _service

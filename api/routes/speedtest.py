@@ -2,8 +2,9 @@
 
 import time
 
-import httpx
 from fastapi import APIRouter
+
+from api.constants import TIMEOUT_DOWNLOAD, http_client
 from pydantic import BaseModel, Field
 
 router = APIRouter()
@@ -31,7 +32,7 @@ async def run_speed_test():
     total_bytes = 0
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with http_client(timeout=TIMEOUT_DOWNLOAD) as client:
             async with client.stream("GET", TEST_URL) as resp:
                 resp.raise_for_status()
                 async for chunk in resp.aiter_bytes(chunk_size=65536):

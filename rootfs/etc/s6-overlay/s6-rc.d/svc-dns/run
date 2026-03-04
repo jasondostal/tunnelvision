@@ -1,0 +1,12 @@
+#!/bin/bash
+# TunnelVision DNS Service — only runs if DNS_ENABLED=true
+
+DNS_ENABLED=${DNS_ENABLED:-false}
+
+if [ "$DNS_ENABLED" != "true" ]; then
+    echo "[tunnelvision] DNS service disabled — sleeping"
+    exec sleep infinity
+fi
+
+echo "[tunnelvision] Starting DNS service..."
+exec python3 -m api.services.dns

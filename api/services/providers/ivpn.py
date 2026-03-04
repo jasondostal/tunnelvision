@@ -7,8 +7,7 @@ Endpoints used:
 
 from datetime import datetime, timezone
 
-import httpx
-
+from api.constants import PROVIDER_CACHE_TTL, TIMEOUT_FETCH, http_client
 from api.services.providers.base import (
     VPNProvider,
     ConnectionCheck,
@@ -33,7 +32,7 @@ class IVPNProvider(VPNProvider):
     async def check_connection(self) -> ConnectionCheck:
         """Verify VPN via IVPN geo-lookup — IP, location, isIvpnServer."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with http_client() as client:
                 resp = await client.get(self.GEO_URL)
                 resp.raise_for_status()
                 data = resp.json()
@@ -62,11 +61,11 @@ class IVPNProvider(VPNProvider):
         now = datetime.now(timezone.utc)
         if self._server_cache and self._cache_time:
             age = (now - self._cache_time).total_seconds()
-            if age < 3600:
+            if age < PROVIDER_CACHE_TTL:
                 return self._filter_servers(self._server_cache, country, city)
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with http_client(timeout=TIMEOUT_FETCH) as client:
                 resp = await client.get(self.SERVERS_URL)
                 resp.raise_for_status()
                 data = resp.json()

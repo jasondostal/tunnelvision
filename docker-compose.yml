@@ -17,6 +17,8 @@ services:
     ports:
       - "8080:8080"   # qBittorrent WebUI
       - "8081:8081"   # TunnelVision API
+      # - "8888:8888" # HTTP CONNECT proxy (uncomment if HTTP_PROXY_ENABLED=true)
+      # - "1080:1080" # SOCKS5 proxy (uncomment if SOCKS_PROXY_ENABLED=true)
     volumes:
       - ./config:/config
       - /media/usbdrive/torrents:/downloads
@@ -54,6 +56,34 @@ services:
       # - MQTT_PORT=1883
       # - MQTT_USER=
       # - MQTT_PASS=
+
+      # --- Firewall ---
+      # - FIREWALL_VPN_INPUT_PORTS=   # Comma-separated ports to accept on VPN interface
+      # - FIREWALL_OUTBOUND_SUBNETS=  # CIDRs that bypass VPN (e.g. 192.168.1.0/24)
+
+      # --- DNS ---
+      # - DNS_ENABLED=false           # Built-in DNS with DoT, caching, ad-blocking
+      # - DNS_UPSTREAM=1.1.1.1,1.0.0.1
+      # - DNS_DOT_ENABLED=true
+      # - DNS_BLOCK_ADS=false
+      # - DNS_BLOCK_MALWARE=false
+
+      # --- ProtonVPN ---
+      # - VPN_PROVIDER=proton
+      # - PROTON_USER=
+      # - PROTON_PASS=                # Or use PROTON_PASS_SECRETFILE for Docker secrets
+
+      # --- HTTP Proxy ---
+      # - HTTP_PROXY_ENABLED=false    # HTTP CONNECT proxy for non-Docker clients
+      # - HTTP_PROXY_PORT=8888
+      # - HTTP_PROXY_USER=
+      # - HTTP_PROXY_PASS=
+
+      # --- SOCKS5 Proxy ---
+      # - SOCKS_PROXY_ENABLED=false   # SOCKS5 proxy with optional Shadowsocks
+      # - SOCKS_PROXY_PORT=1080
+      # - SHADOWSOCKS_ENABLED=false
+      # - SHADOWSOCKS_CIPHER=aes-256-gcm
 
       # --- Health ---
       - HEALTH_CHECK_INTERVAL=30

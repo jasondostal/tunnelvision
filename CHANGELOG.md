@@ -1,5 +1,78 @@
 # Changelog
 
+## v2.5.0 — DNS, Proxies, ProtonVPN & DRY Refactor (2026-03-04)
+
+### Docker Secrets Support
+- Every `secret: true` field gains `_SECRETFILE` env var support (e.g. `ADMIN_PASS_SECRETFILE=/run/secrets/admin_pass`)
+- 4-layer precedence: YAML > secret file > env var > default
+- Works with Docker secrets, Kubernetes secrets, or any file-based secret injection
+- 7 existing secret fields upgraded: `ADMIN_PASS`, `API_KEY`, `GLUETUN_API_KEY`, `PIA_PASS`, `WIREGUARD_PRIVATE_KEY`, `MQTT_PASS`, `NOTIFY_GOTIFY_TOKEN`
+
+### Firewall Granularity
+- `FIREWALL_VPN_INPUT_PORTS` — comma-separated ports to accept on VPN interface (TCP+UDP)
+- `FIREWALL_OUTBOUND_SUBNETS` — CIDRs that bypass VPN (routed via host gateway)
+- `FIREWALL_CUSTOM_RULES_FILE` — path to custom nftables rules file (loaded after base killswitch)
+- Killswitch auto-opens ports for DNS, HTTP proxy, SOCKS proxy when those services are enabled
+
+### Built-in DNS Service
+- DNS-over-TLS (DoT) upstream resolution via dnspython
+- Response caching with TTL awareness (LRU, configurable)
+- Ad-blocking via StevenBlack/hosts blocklist
+- Malware blocking via URLhaus blocklist
+- Surveillance blocking via WindowsSpyBlocker blocklist
+- Custom blocklist URL support
+- Runs as s6 longrun service (survives API crashes)
+- Hot-reloadable blocklist settings (toggle ad/malware/surveillance blocking without restart)
+- Prometheus metrics: `tunnelvision_dns_queries_total`, `tunnelvision_dns_cache_hits_total`, `tunnelvision_dns_blocked_total`
+- 8 new settings: `DNS_ENABLED`, `DNS_UPSTREAM`, `DNS_DOT_ENABLED`, `DNS_CACHE_ENABLED`, `DNS_BLOCK_ADS`, `DNS_BLOCK_MALWARE`, `DNS_BLOCK_SURVEILLANCE`, `DNS_CUSTOM_BLOCKLIST_URL`
+
+### ProtonVPN Provider
+- Native ProtonVPN integration with server list from `api.protonvpn.ch`
+- Server filtering by country/city with port-forward capability flags
+- NAT-PMP port forwarding (RFC 6886) — raw UDP, no library needed
+- 45-second keep-alive with 60-second lifetime
+- Port visible in API (`forwarded_port` field) and state file
+- 2 new settings: `PROTON_USER`, `PROTON_PASS`
+- Provider count: custom + Mullvad + IVPN + PIA + Gluetun + **Proton** (6 total)
+
+### HTTP CONNECT Proxy
+- RFC 7231 HTTP CONNECT proxy for routing non-Docker clients through VPN
+- Optional Basic auth (`HTTP_PROXY_USER` + `HTTP_PROXY_PASS`)
+- Bidirectional byte relay with asyncio
+- Runs in FastAPI lifespan (same lifecycle as watchdog/MQTT)
+- 4 new settings: `HTTP_PROXY_ENABLED`, `HTTP_PROXY_PORT`, `HTTP_PROXY_USER`, `HTTP_PROXY_PASS`
+
+### SOCKS5 / Shadowsocks Proxy
+- RFC 1928 SOCKS5 proxy with CONNECT support
+- IPv4, IPv6, and domain name address types
+- Optional RFC 1929 username/password authentication
+- Shadowsocks AEAD encryption layer (AES-256-GCM, ChaCha20-Poly1305)
+- Standard key derivation (EVP_BytesToKey + HKDF-SHA1)
+- 7 new settings: `SOCKS_PROXY_ENABLED`, `SOCKS_PROXY_PORT`, `SOCKS_PROXY_USER`, `SOCKS_PROXY_PASS`, `SHADOWSOCKS_ENABLED`, `SHADOWSOCKS_PASSWORD`, `SHADOWSOCKS_CIPHER`
+
+### Infrastructure
+- 24 new configurable settings (total: 50)
+- Health endpoint includes DNS, HTTP proxy, SOCKS proxy states
+- Prometheus metrics for all new services
+- Settings panel UI: 5 new sections (Firewall, DNS, ProtonVPN, HTTP Proxy, SOCKS5 Proxy)
+- New dependencies: `dnspython`, `cachetools`, `cryptography`
+
+### DRY Refactor
+- `api/constants.py` — single source of truth for all timeouts, ports, paths, state enums, and helpers
+- State enums (`VpnState`, `KillswitchState`, `ServiceState`, `WatchdogState`, `HealthState`) replace raw strings across all routes and services
+- `http_client()` factory replaces ~24 instances of raw `httpx.AsyncClient`
+- `activate_wg_config()` helper replaces 3x duplicated WireGuard symlink logic
+- Four-tier subprocess timeout hierarchy: QUICK(5), DEFAULT(10), LONG(15), VPN(30)
+- Four-tier HTTP timeout hierarchy: QUICK(5), DEFAULT(10), FETCH(15), DOWNLOAD(30)
+- Configurable intervals: `PORT_FORWARD_INTERVAL`, `DNS_BLOCKLIST_REFRESH_INTERVAL`
+
+### Tests
+- 108 new unit tests across 7 test files (secrets, firewall, DNS, ProtonVPN, NAT-PMP, HTTP proxy, SOCKS5/Shadowsocks)
+- 11 DRY guardrail tests (`test_dry.py`) — grep-based architectural tests that scan the codebase for raw httpx usage, hardcoded timeouts, state strings, paths, ports, and settings model drift
+- 157 total tests
+
+---
+
 ## v2.4.0 — Setup Wizard & Dashboard Components (2026-03-04)
 
 The wizard now knows what you're setting up. Pick your provider, enter the right credentials, pick a server — no more pasting configs for providers that have APIs.

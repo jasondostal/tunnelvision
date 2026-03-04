@@ -9,14 +9,14 @@ from pathlib import Path
 from fastapi import APIRouter, Request, UploadFile, File
 from fastapi.responses import StreamingResponse
 
+from api.constants import OPENVPN_DIR, SETTINGS_PATH, WIREGUARD_DIR
+
 router = APIRouter()
 
 BACKUP_PATHS = [
-    "/config/tunnelvision.yml",
+    str(SETTINGS_PATH),
     "/config/qBittorrent/config/qBittorrent.conf",
 ]
-WIREGUARD_DIR = Path("/config/wireguard")
-OPENVPN_DIR = Path("/config/openvpn")
 
 
 @router.get("/backup")

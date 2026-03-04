@@ -38,6 +38,38 @@ class SettingsUpdate(BaseModel):
     notify_webhook_url: str | None = None
     notify_gotify_url: str | None = None
     notify_gotify_token: str | None = None
+    # Firewall
+    firewall_vpn_input_ports: str | None = None
+    firewall_outbound_subnets: str | None = None
+    firewall_custom_rules_file: str | None = None
+    # DNS
+    dns_enabled: str | None = None
+    dns_upstream: str | None = None
+    dns_dot_enabled: str | None = None
+    dns_cache_enabled: str | None = None
+    dns_block_ads: str | None = None
+    dns_block_malware: str | None = None
+    dns_block_surveillance: str | None = None
+    dns_custom_blocklist_url: str | None = None
+    dns_blocklist_refresh_interval: str | None = None
+    # Intervals
+    port_forward_interval: str | None = None
+    # ProtonVPN
+    proton_user: str | None = None
+    proton_pass: str | None = None
+    # HTTP Proxy
+    http_proxy_enabled: str | None = None
+    http_proxy_port: str | None = None
+    http_proxy_user: str | None = None
+    http_proxy_pass: str | None = None
+    # SOCKS5 / Shadowsocks
+    socks_proxy_enabled: str | None = None
+    socks_proxy_port: str | None = None
+    socks_proxy_user: str | None = None
+    socks_proxy_pass: str | None = None
+    shadowsocks_enabled: str | None = None
+    shadowsocks_password: str | None = None
+    shadowsocks_cipher: str | None = None
 
 
 @router.get("/settings")
@@ -74,6 +106,9 @@ async def update_settings(body: SettingsUpdate, request: Request):
         "notify_webhook_url",   # notifications re-read on send
         "notify_gotify_url",    # notifications re-read on send
         "notify_gotify_token",  # notifications re-read on send
+        "dns_block_ads",        # blocklist manager re-reads periodically
+        "dns_block_malware",    # blocklist manager re-reads periodically
+        "dns_block_surveillance",  # blocklist manager re-reads periodically
     }
     needs_restart = bool(set(updates.keys()) - hot_reload_fields)
 

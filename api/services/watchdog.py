@@ -13,34 +13,27 @@ import asyncio
 import logging
 import subprocess
 import time
-from enum import Enum
 from pathlib import Path
 
 from api.config import Config
+from api.constants import (
+    COOLDOWN_SECONDS,
+    GLUETUN_DEFAULT_URL,
+    HANDSHAKE_STALE_SECONDS,
+    OPENVPN_DIR,
+    RECONNECT_THRESHOLD,
+    SUBPROCESS_TIMEOUT_DEFAULT,
+    SUBPROCESS_TIMEOUT_LONG,
+    SUBPROCESS_TIMEOUT_QUICK,
+    SUBPROCESS_TIMEOUT_VPN,
+    TIMEOUT_QUICK,
+    WIREGUARD_DIR,
+    WatchdogState,
+    http_client,
+)
 from api.services.state import StateManager
 
 log = logging.getLogger("tunnelvision.watchdog")
-
-WIREGUARD_DIR = Path("/config/wireguard")
-OPENVPN_DIR = Path("/config/openvpn")
-
-# How long since last WireGuard handshake before we consider it stale
-HANDSHAKE_STALE_SECONDS = 180
-
-# How many consecutive failures before attempting reconnect
-RECONNECT_THRESHOLD = 3
-
-# Cooldown duration after all configs exhausted (seconds)
-COOLDOWN_SECONDS = 300
-
-
-class WatchdogState(str, Enum):
-    IDLE = "idle"
-    MONITORING = "monitoring"
-    DEGRADED = "degraded"
-    RECONNECTING = "reconnecting"
-    FAILING_OVER = "failing_over"
-    COOLDOWN = "cooldown"
 
 
 class WatchdogService:
@@ -110,7 +103,7 @@ class WatchdogService:
 
     def _is_sidecar_mode(self) -> bool:
         """Check if we're running in sidecar mode (gluetun manages VPN)."""
-        return bool(self.config.gluetun_url and self.config.gluetun_url != "http://gluetun:8000") or \
+        return bool(self.config.gluetun_url and self.config.gluetun_url != GLUETUN_DEFAULT_URL) or \
             self.state.read("vpn_mode") == "sidecar"
 
     async def _run(self) -> None:
@@ -185,7 +178,7 @@ class WatchdogService:
         try:
             result = subprocess.run(
                 ["wg", "show", "wg0", "latest-handshakes"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK,
             )
             if result.returncode != 0:
                 return False
@@ -211,7 +204,7 @@ class WatchdogService:
         try:
             result = subprocess.run(
                 ["ip", "link", "show", "tun0"],
-                capture_output=True, timeout=5,
+                capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK,
             )
             return result.returncode == 0
         except Exception:
@@ -220,8 +213,7 @@ class WatchdogService:
     async def _check_sidecar_health(self) -> bool:
         """Sidecar: check gluetun API (read-only, can't reconnect)."""
         try:
-            import httpx
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with http_client(timeout=TIMEOUT_QUICK) as client:
                 headers = {}
                 if self.config.gluetun_api_key:
                     headers["X-API-Key"] = self.config.gluetun_api_key
@@ -386,7 +378,7 @@ class WatchdogService:
                 clean_content = "\n".join(clean_lines)
 
                 # Tear down current
-                subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=10)
+                subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
 
                 # Write new config
                 wg_conf = Path("/etc/wireguard/wg0.conf")
@@ -397,7 +389,7 @@ class WatchdogService:
                 # Bring up
                 result = subprocess.run(
                     ["wg-quick", "up", "wg0"],
-                    capture_output=True, text=True, timeout=15,
+                    capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
                 )
                 if result.returncode != 0:
                     log.error(f"wg-quick up failed: {result.stderr}")
@@ -407,15 +399,15 @@ class WatchdogService:
                 if self.config.killswitch_enabled:
                     subprocess.run(
                         ["/etc/s6-overlay/scripts/init-killswitch.sh"],
-                        capture_output=True, timeout=10,
+                        capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
                     )
 
             elif vpn_type == "openvpn":
-                subprocess.run(["killall", "openvpn"], capture_output=True, timeout=5)
+                subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
                 await asyncio.sleep(2)
                 result = subprocess.run(
                     ["/etc/s6-overlay/scripts/init-wireguard.sh"],
-                    capture_output=True, text=True, timeout=30,
+                    capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
                 )
                 if result.returncode != 0:
                     return False

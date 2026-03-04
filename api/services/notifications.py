@@ -7,9 +7,8 @@ Fires on VPN disconnect, reconnect, and port forwarding changes.
 import logging
 from datetime import datetime, timezone
 
-import httpx
-
 from api.config import Config
+from api.constants import http_client
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ async def notify(event: str, message: str, details: dict | None = None, config: 
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with http_client() as client:
         # Discord / Slack webhook (auto-detect by URL)
         if webhook_url:
             try:

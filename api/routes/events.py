@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
+from api.constants import SSE_KEEPALIVE_INTERVAL
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -46,10 +48,10 @@ async def event_stream(request: Request):
 
             while True:
                 try:
-                    payload = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    payload = await asyncio.wait_for(queue.get(), timeout=SSE_KEEPALIVE_INTERVAL)
                     yield f"event: {payload['event']}\ndata: {json.dumps(payload['data'])}\n\n"
                 except asyncio.TimeoutError:
-                    # Keepalive every 30s to prevent connection drop
+                    # Keepalive to prevent connection drop
                     yield f": keepalive\n\n"
         except asyncio.CancelledError:
             pass

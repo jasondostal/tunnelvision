@@ -7,6 +7,7 @@ import time
 from fastapi import APIRouter, Request
 
 from api import __version__
+from api.constants import SUBPROCESS_TIMEOUT_QUICK
 from api.models import SystemResponse
 
 router = APIRouter()
@@ -14,7 +15,7 @@ router = APIRouter()
 
 def _get_command_output(cmd: list[str], default: str = "") -> str:
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
         return result.stdout.strip() if result.returncode == 0 else default
     except Exception:
         return default

@@ -6,8 +6,7 @@ No more _read_state() helpers scattered across routes.
 
 from pathlib import Path
 
-
-STATE_DIR = Path("/var/run/tunnelvision")
+from api.constants import HealthState, STATE_DIR
 
 
 class StateManager:
@@ -135,11 +134,11 @@ class StateManager:
 
     @property
     def setup_required(self) -> bool:
-        return self.read("setup_required", "false") == "true"
+        return self.read("setup_required", HealthState.FALSE) == HealthState.TRUE
 
     @setup_required.setter
     def setup_required(self, value: bool) -> None:
-        self.write("setup_required", "true" if value else "false")
+        self.write("setup_required", HealthState.TRUE if value else HealthState.FALSE)
 
     @property
     def setup_provider(self) -> str:
@@ -158,6 +157,36 @@ class StateManager:
     @active_config.setter
     def active_config(self, value: str) -> None:
         self.write("active_config", value)
+
+    # --- DNS ---
+
+    @property
+    def dns_state(self) -> str:
+        return self.read("dns_state", "disabled")
+
+    @property
+    def dns_queries_total(self) -> str:
+        return self.read("dns_queries_total", "0")
+
+    @property
+    def dns_cache_hits(self) -> str:
+        return self.read("dns_cache_hits", "0")
+
+    @property
+    def dns_blocked_total(self) -> str:
+        return self.read("dns_blocked_total", "0")
+
+    # --- HTTP Proxy ---
+
+    @property
+    def http_proxy_state(self) -> str:
+        return self.read("http_proxy_state", "disabled")
+
+    # --- SOCKS Proxy ---
+
+    @property
+    def socks_proxy_state(self) -> str:
+        return self.read("socks_proxy_state", "disabled")
 
     # --- Watchdog ---
 
@@ -186,4 +215,10 @@ class StateManager:
             "healthy": self.healthy,
             "watchdog_state": self.watchdog_state,
             "active_config": self.active_config,
+            "dns_state": self.dns_state,
+            "dns_queries_total": self.dns_queries_total,
+            "dns_cache_hits": self.dns_cache_hits,
+            "dns_blocked_total": self.dns_blocked_total,
+            "http_proxy_state": self.http_proxy_state,
+            "socks_proxy_state": self.socks_proxy_state,
         }

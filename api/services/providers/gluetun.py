@@ -11,8 +11,7 @@ Endpoints used:
 
 from datetime import datetime, timezone
 
-import httpx
-
+from api.constants import GLUETUN_DEFAULT_URL, TIMEOUT_QUICK, http_client
 from api.services.providers.base import VPNProvider, ConnectionCheck
 from api.services.providers.custom import CustomProvider
 
@@ -22,7 +21,7 @@ class GluetunProvider(VPNProvider):
 
     def __init__(self, config=None):
         super().__init__(config)
-        self._base_url = config.gluetun_url if config else "http://gluetun:8000"
+        self._base_url = config.gluetun_url if config else GLUETUN_DEFAULT_URL
         self._api_key = config.gluetun_api_key if config else ""
         # Fall back to CustomProvider for geo-IP (gluetun only returns the IP, not location)
         self._geo = CustomProvider(config)
@@ -39,7 +38,7 @@ class GluetunProvider(VPNProvider):
     async def check_connection(self) -> ConnectionCheck:
         """Get VPN status from gluetun, enrich with geo-IP for location."""
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with http_client(timeout=TIMEOUT_QUICK) as client:
                 # Get public IP from gluetun
                 ip_resp = await client.get(
                     f"{self._base_url}/v1/publicip/ip",
@@ -67,7 +66,7 @@ class GluetunProvider(VPNProvider):
     async def get_vpn_status(self) -> str:
         """Get gluetun VPN status: running/stopped."""
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with http_client(timeout=TIMEOUT_QUICK) as client:
                 resp = await client.get(
                     f"{self._base_url}/v1/vpn/status",
                     headers=self._headers(),
@@ -81,7 +80,7 @@ class GluetunProvider(VPNProvider):
     async def get_forwarded_port(self) -> int | None:
         """Get gluetun's forwarded port (if port forwarding is enabled)."""
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with http_client(timeout=TIMEOUT_QUICK) as client:
                 resp = await client.get(
                     f"{self._base_url}/v1/portforward",
                     headers=self._headers(),

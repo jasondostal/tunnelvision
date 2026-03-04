@@ -127,7 +127,7 @@ RUN find /etc/s6-overlay/scripts -type f -exec chmod +x {} + && \
 VOLUME ["/config", "/downloads"]
 
 # Expose ports
-EXPOSE ${WEBUI_PORT} ${API_PORT}
+EXPOSE ${WEBUI_PORT} ${API_PORT} 8888 1080
 
 # Health check
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
