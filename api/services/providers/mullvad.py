@@ -8,8 +8,11 @@ Endpoints used:
 
 from datetime import datetime, timezone
 
-from api.constants import PROVIDER_CACHE_TTL, TIMEOUT_DEFAULT, TIMEOUT_FETCH, http_client
+from api.constants import TIMEOUT_FETCH, http_client
 from api.services.providers.base import (
+    CredentialField,
+    ProviderMeta,
+    SetupType,
     VPNProvider,
     ConnectionCheck,
     ServerInfo,
@@ -24,13 +27,40 @@ class MullvadProvider(VPNProvider):
     RELAYS_URL = "https://api.mullvad.net/www/relays/wireguard/"
     ACCOUNT_URL = "https://api.mullvad.net/public/accounts/v1/{account}/"
 
-    def __init__(self):
-        self._server_cache: list[ServerInfo] | None = None
-        self._cache_time: datetime | None = None
-
     @property
     def name(self) -> str:
         return "mullvad"
+
+    @property
+    def meta(self) -> ProviderMeta:
+        return ProviderMeta(
+            id="mullvad",
+            display_name="Mullvad VPN",
+            description="Privacy-focused VPN. Enter your account number and pick a server.",
+            setup_type=SetupType.ACCOUNT,
+            supports_server_list=True,
+            supports_account_check=True,
+            credentials=[
+                CredentialField(
+                    key="mullvad_account", label="Account Number",
+                    hint="16-digit number from mullvad.net",
+                    env_var="MULLVAD_ACCOUNT",
+                ),
+                CredentialField(
+                    key="private_key", label="WireGuard Private Key",
+                    field_type="password", secret=True,
+                    hint="From Mullvad WireGuard key management",
+                    env_var="WIREGUARD_PRIVATE_KEY",
+                ),
+                CredentialField(
+                    key="addresses", label="WireGuard Address",
+                    hint="e.g. 10.66.0.1/32",
+                    env_var="WIREGUARD_ADDRESSES",
+                ),
+            ],
+            default_dns="10.64.0.1",
+            filter_capabilities=["country", "city", "owned_only"],
+        )
 
     async def check_connection(self) -> ConnectionCheck:
         """Verify VPN via am.i.mullvad.net — IP, location, blacklist status."""
@@ -54,15 +84,6 @@ class MullvadProvider(VPNProvider):
             )
         except Exception:
             return ConnectionCheck(checked_at=datetime.now(timezone.utc))
-
-    async def get_server_info(self, endpoint_ip: str) -> ServerInfo | None:
-        """Match endpoint IP to Mullvad server metadata."""
-        servers = await self.list_servers()
-        for server in servers:
-            # Check if endpoint_ip matches any server's IPv4
-            if hasattr(server, "_ipv4") and server._ipv4 == endpoint_ip:
-                return server
-        return None
 
     async def get_account_info(self) -> AccountInfo | None:
         """Check Mullvad account expiry."""
@@ -92,60 +113,31 @@ class MullvadProvider(VPNProvider):
 
         return None
 
-    async def list_servers(self, country: str | None = None, city: str | None = None) -> list[ServerInfo]:
+    async def _fetch_servers(self) -> list[ServerInfo]:
         """Fetch Mullvad WireGuard server list with full metadata."""
-        # Cache for 1 hour
-        now = datetime.now(timezone.utc)
-        if self._server_cache and self._cache_time:
-            age = (now - self._cache_time).total_seconds()
-            if age < PROVIDER_CACHE_TTL:
-                return self._filter_servers(self._server_cache, country, city)
+        async with http_client(timeout=TIMEOUT_FETCH) as client:
+            resp = await client.get(self.RELAYS_URL)
+            resp.raise_for_status()
+            data = resp.json()
 
-        try:
-            async with http_client(timeout=TIMEOUT_FETCH) as client:
-                resp = await client.get(self.RELAYS_URL)
-                resp.raise_for_status()
-                data = resp.json()
+        servers = []
+        for relay in data:
+            if not relay.get("active", False):
+                continue
 
-            servers = []
-            for relay in data:
-                if not relay.get("active", False):
-                    continue
+            servers.append(ServerInfo(
+                hostname=relay.get("hostname", ""),
+                country=relay.get("country_name", ""),
+                country_code=relay.get("country_code", ""),
+                city=relay.get("city_name", ""),
+                city_code=relay.get("city_code", ""),
+                provider=relay.get("provider", ""),
+                owned=relay.get("owned"),
+                speed_gbps=relay.get("network_port_speed"),
+                server_type=relay.get("type", "wireguard"),
+                fqdn=relay.get("fqdn", ""),
+                ipv4=relay.get("ipv4_addr_in", ""),
+                public_key=relay.get("pubkey", ""),
+            ))
 
-                server = ServerInfo(
-                    hostname=relay.get("hostname", ""),
-                    country=relay.get("country_name", ""),
-                    country_code=relay.get("country_code", ""),
-                    city=relay.get("city_name", ""),
-                    city_code=relay.get("city_code", ""),
-                    provider=relay.get("provider", ""),
-                    owned=relay.get("owned"),
-                    speed_gbps=relay.get("network_port_speed"),
-                    server_type=relay.get("type", "wireguard"),
-                    fqdn=relay.get("fqdn", ""),
-                )
-                # Store IPv4 for endpoint matching (not in the dataclass, just an attr)
-                server._ipv4 = relay.get("ipv4_addr_in", "")
-                servers.append(server)
-
-            self._server_cache = servers
-            self._cache_time = now
-            return self._filter_servers(servers, country, city)
-
-        except Exception:
-            return self._server_cache or []
-
-    @staticmethod
-    def _filter_servers(
-        servers: list[ServerInfo],
-        country: str | None = None,
-        city: str | None = None,
-    ) -> list[ServerInfo]:
-        result = servers
-        if country:
-            country_lower = country.lower()
-            result = [s for s in result if s.country_code == country_lower or s.country.lower() == country_lower]
-        if city:
-            city_lower = city.lower()
-            result = [s for s in result if s.city_code == city_lower or s.city.lower() == city_lower]
-        return result
+        return servers

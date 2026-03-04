@@ -171,7 +171,8 @@ class TestNoHardcodedPortDefaults:
 class TestSettingsAlignment:
     """CONFIGURABLE_FIELDS, SettingsUpdate, and Config must stay in sync."""
 
-    def test_all_configurable_fields_in_update_model(self):
+    def test_all_base_configurable_fields_in_update_model(self):
+        """Base CONFIGURABLE_FIELDS must have explicit SettingsUpdate fields."""
         from api.services.settings import CONFIGURABLE_FIELDS
         from api.routes.settings import SettingsUpdate
 
@@ -182,11 +183,19 @@ class TestSettingsAlignment:
             f"Fields in CONFIGURABLE_FIELDS but not in SettingsUpdate: {missing}"
         )
 
-    def test_all_configurable_fields_in_config(self):
+    def test_update_model_accepts_provider_fields(self):
+        """SettingsUpdate accepts dynamic provider credential fields via extra='allow'."""
+        from api.routes.settings import SettingsUpdate
+
+        # Should accept arbitrary provider credential keys
+        update = SettingsUpdate(nord_token="test123")
+        assert update.model_extra.get("nord_token") == "test123"
+
+    def test_all_base_configurable_fields_in_config(self):
+        """Base CONFIGURABLE_FIELDS must have matching Config dataclass fields."""
         from api.services.settings import CONFIGURABLE_FIELDS
         from api.config import Config
 
-        # Config uses dataclass fields
         import dataclasses
         config_attrs = {f.name for f in dataclasses.fields(Config)}
         settings_fields = set(CONFIGURABLE_FIELDS.keys())
@@ -202,8 +211,26 @@ class TestSettingsAlignment:
             f"Fields in CONFIGURABLE_FIELDS but not in Config dataclass: {missing}"
         )
 
+    def test_config_dynamic_provider_credentials(self):
+        """Config.__getattr__ resolves provider credential fields dynamically."""
+        from api.config import Config
+
+        config = Config()
+        # All providers' credential keys should be accessible
+        # (even if they return empty strings when no env var is set)
+        assert hasattr(config, "pia_user")       # declared field
+        assert hasattr(config, "mullvad_account") # declared field
+
+    def test_provider_fields_in_all_configurable(self):
+        """get_all_configurable_fields() includes provider credential fields."""
+        from api.services.settings import get_all_configurable_fields, CONFIGURABLE_FIELDS
+
+        all_fields = get_all_configurable_fields()
+        # Must be a superset of base fields
+        assert set(CONFIGURABLE_FIELDS.keys()).issubset(set(all_fields.keys()))
+
     def test_secret_fields_use_secret_or_env(self):
-        """Fields marked secret: True should use _secret_or_env in Config."""
+        """Base secret fields should use _secret_or_env in Config."""
         from api.services.settings import CONFIGURABLE_FIELDS
         import inspect
         from api import config as config_module

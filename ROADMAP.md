@@ -4,8 +4,18 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Next
 
+- [ ] **Infrastructure hardening** — firewall-first boot (zero-leak startup), WireGuard userspace fallback (boringtun for LXC/NAS), port forward command hooks, server list auto-updater, richer server filters
+- [ ] **Provider wave 1** — NordVPN, Surfshark, Windscribe, AirVPN, ExpressVPN (single-file drops, auto-discovered)
+- [ ] **Provider wave 2** — Perfect Privacy, CyberGhost, IPVanish, TorGuard, PrivateVPN
+- [ ] **Provider wave 3** — Privado, PureVPN, VPNSecure, VPN Unlimited, VyprVPN, FastestVPN, HideMyAss, SlickVPN, Giganews
+
 ## Future
 
+- [ ] Smart server selection — lowest load, nearest geo, preferred region sticky, failover-aware
+- [ ] Full OpenVPN parity — connect pipeline, server browser, setup wizard for OVPN-only providers
+- [ ] Multi-architecture builds — armv6, armv7, i686, ppc64le
+- [ ] Provider health dashboard — per-provider API reachability, cache freshness, account expiry
+- [ ] Config export/import — encrypted archive for migration
 - [ ] Per-torrent VPN binding (pause individual torrents on VPN drop)
 - [ ] Bandwidth scheduling (speed limits by time of day)
 - [ ] HACS default store listing (pending review)
@@ -13,10 +23,10 @@ What's coming. No promises on timelines — this is built for the love of blinke
 - [ ] WireGuard key generation in setup wizard (no copy-paste needed)
 - [ ] Tailscale exit node support
 - [ ] IPv6 tunnel support (when providers catch up)
-- [ ] Additional providers as APIs become available
 
 ## Done
 
+- [x] Provider framework refactor — metadata protocol, unified connect pipeline, auto-discovery, metadata-driven config, parametrized tests (v2.6.0)
 - [x] Docker Secrets support — `_SECRETFILE` env vars for all secret fields (v2.5.0)
 - [x] Firewall granularity — VPN input ports, outbound subnet bypass, custom nftables rules (v2.5.0)
 - [x] Built-in DNS — DoT upstream, caching, ad/malware/surveillance blocking (v2.5.0)

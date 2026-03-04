@@ -12,8 +12,12 @@ Endpoints used:
 
 from datetime import datetime, timezone
 
-from api.constants import PROVIDER_CACHE_TTL, TIMEOUT_FETCH, http_client
+from api.constants import TIMEOUT_FETCH, http_client
 from api.services.providers.base import (
+    CredentialField,
+    PeerConfig,
+    ProviderMeta,
+    SetupType,
     VPNProvider,
     ConnectionCheck,
     ServerInfo,
@@ -34,14 +38,35 @@ class ProtonProvider(VPNProvider):
     SERVERS_URL = "https://api.protonvpn.ch/vpn/logicals"
     GEO_URL = "https://ipwho.is/"
 
-    def __init__(self, config=None):
-        super().__init__(config)
-        self._server_cache: list[ServerInfo] | None = None
-        self._cache_time: datetime | None = None
-
     @property
     def name(self) -> str:
         return "proton"
+
+    @property
+    def meta(self) -> ProviderMeta:
+        return ProviderMeta(
+            id="proton",
+            display_name="Proton VPN",
+            description="From the Proton team. Download your WireGuard config from account.protonvpn.com.",
+            setup_type=SetupType.PASTE,
+            supports_server_list=True,
+            supports_account_check=True,
+            supports_port_forwarding=True,
+            credentials=[
+                CredentialField(
+                    key="proton_user", label="Proton Username",
+                    hint="e.g. user@proton.me",
+                    env_var="PROTON_USER",
+                ),
+                CredentialField(
+                    key="proton_pass", label="Proton Password",
+                    field_type="password", secret=True,
+                    env_var="PROTON_PASS",
+                ),
+            ],
+            default_dns="10.2.0.1",
+            filter_capabilities=["country", "city", "p2p", "streaming", "port_forward", "secure_core"],
+        )
 
     async def check_connection(self) -> ConnectionCheck:
         """Generic IP check via geo-IP fallback chain."""
@@ -82,74 +107,46 @@ class ProtonProvider(VPNProvider):
         except Exception:
             return None
 
-    async def get_server_info(self, endpoint_ip: str) -> ServerInfo | None:
-        """Match endpoint IP to ProtonVPN server metadata."""
-        servers = await self.list_servers()
-        for server in servers:
-            if hasattr(server, "_ipv4") and server._ipv4 == endpoint_ip:
-                return server
-        return None
+    async def post_connect(self, server: ServerInfo, config, peer: PeerConfig) -> None:
+        """Start NAT-PMP port forwarding if enabled and server supports it."""
+        if config and config.port_forward_enabled and server.port_forward:
+            from api.services.natpmp import get_natpmp_service
+            get_natpmp_service().start(peer.endpoint)
 
-    async def list_servers(self, country: str | None = None, city: str | None = None) -> list[ServerInfo]:
+    async def _fetch_servers(self) -> list[ServerInfo]:
         """Fetch ProtonVPN server list with WireGuard endpoints."""
-        now = datetime.now(timezone.utc)
-        if self._server_cache and self._cache_time:
-            age = (now - self._cache_time).total_seconds()
-            if age < PROVIDER_CACHE_TTL:
-                return self._filter_servers(self._server_cache, country, city)
+        async with http_client(timeout=TIMEOUT_FETCH) as client:
+            resp = await client.get(self.SERVERS_URL)
+            resp.raise_for_status()
+            data = resp.json()
 
-        try:
-            async with http_client(timeout=TIMEOUT_FETCH) as client:
-                resp = await client.get(self.SERVERS_URL)
-                resp.raise_for_status()
-                data = resp.json()
+        servers = []
+        for logical in data.get("LogicalServers", []):
+            server_name = logical.get("Name", "")
+            exit_country = logical.get("ExitCountry", "")
+            city_name = logical.get("City", "")
+            features = logical.get("Features", 0)
+            tier = logical.get("Tier", 0)
+            load = logical.get("Load", 0)
 
-            servers = []
-            for logical in data.get("LogicalServers", []):
-                server_name = logical.get("Name", "")
-                exit_country = logical.get("ExitCountry", "")
-                city_name = logical.get("City", "")
-                features = logical.get("Features", 0)
-                tier = logical.get("Tier", 0)
-                load = logical.get("Load", 0)
+            for physical in logical.get("Servers", []):
+                servers.append(ServerInfo(
+                    hostname=server_name,
+                    country=exit_country,
+                    country_code=exit_country,
+                    city=city_name,
+                    server_type="wireguard",
+                    ipv4=physical.get("EntryIP", ""),
+                    port_forward=bool(features & FEATURE_PORT_FORWARD),
+                    streaming=bool(features & FEATURE_STREAMING),
+                    p2p=bool(features & FEATURE_P2P),
+                    secure_core=bool(features & FEATURE_SECURE_CORE),
+                    tier=tier,
+                    load=load,
+                    extra={
+                        "exit_ip": physical.get("ExitIP", ""),
+                        "features": features,
+                    },
+                ))
 
-                for physical in logical.get("Servers", []):
-                    entry_ip = physical.get("EntryIP", "")
-                    exit_ip = physical.get("ExitIP", "")
-
-                    server = ServerInfo(
-                        hostname=server_name,
-                        country=exit_country,
-                        country_code=exit_country,
-                        city=city_name,
-                        server_type="wireguard",
-                    )
-                    server._ipv4 = entry_ip
-                    server._exit_ip = exit_ip
-                    server._features = features
-                    server._tier = tier
-                    server._load = load
-                    server._port_forward = bool(features & FEATURE_PORT_FORWARD)
-                    servers.append(server)
-
-            self._server_cache = servers
-            self._cache_time = now
-            return self._filter_servers(servers, country, city)
-
-        except Exception:
-            return self._server_cache or []
-
-    @staticmethod
-    def _filter_servers(
-        servers: list[ServerInfo],
-        country: str | None = None,
-        city: str | None = None,
-    ) -> list[ServerInfo]:
-        result = servers
-        if country:
-            country_lower = country.lower()
-            result = [s for s in result if s.country_code.lower() == country_lower or s.country.lower() == country_lower]
-        if city:
-            city_lower = city.lower()
-            result = [s for s in result if s.city.lower() == city_lower]
-        return result
+        return servers

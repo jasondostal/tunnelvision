@@ -83,9 +83,9 @@ class TestProtonProvider:
         assert len(servers) == 2
         assert servers[0].hostname == "CH#1"
         assert servers[0].country_code == "CH"
-        assert servers[0]._port_forward is True
+        assert servers[0].port_forward is True
         assert servers[1].hostname == "US#1"
-        assert servers[1]._port_forward is False
+        assert servers[1].port_forward is False
 
     @pytest.mark.asyncio
     async def test_list_servers_filters_by_country(self):

@@ -94,6 +94,31 @@ CONFIGURABLE_FIELDS = {
 }
 
 
+def get_all_configurable_fields() -> dict[str, dict]:
+    """Base fields + auto-discovered provider credential fields.
+
+    Provider metadata declares credentials via CredentialField. This function
+    merges those into CONFIGURABLE_FIELDS so new providers are automatically
+    configurable without editing this module.
+    """
+    fields = dict(CONFIGURABLE_FIELDS)
+    try:
+        from api.services.vpn import PROVIDERS
+        for provider_cls in PROVIDERS.values():
+            instance = provider_cls.__new__(provider_cls)
+            meta = provider_cls.meta.fget(instance)  # type: ignore[union-attr]
+            for cred in meta.credentials:
+                if cred.key not in fields:
+                    fields[cred.key] = {
+                        "env": cred.env_var or cred.key.upper(),
+                        "default": "",
+                        "secret": cred.secret,
+                    }
+    except Exception:
+        pass
+    return fields
+
+
 def load_settings() -> dict[str, Any]:
     """Load settings: YAML file wins, env var is fallback."""
     file_settings = {}
@@ -104,8 +129,9 @@ def load_settings() -> dict[str, Any]:
         except Exception:
             pass
 
+    all_fields = get_all_configurable_fields()
     result = {}
-    for key, meta in CONFIGURABLE_FIELDS.items():
+    for key, meta in all_fields.items():
         if key in file_settings:
             result[key] = file_settings[key]
         else:
@@ -123,7 +149,8 @@ def load_settings() -> dict[str, Any]:
 def save_settings(updates: dict[str, Any]) -> dict[str, Any]:
     """Save settings to YAML file. Only saves fields that differ from env defaults."""
     current = load_settings()
-    current.update({k: v for k, v in updates.items() if k in CONFIGURABLE_FIELDS})
+    all_fields = get_all_configurable_fields()
+    current.update({k: v for k, v in updates.items() if k in all_fields})
 
     # Write to YAML
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -136,9 +163,10 @@ def save_settings(updates: dict[str, Any]) -> dict[str, Any]:
 def get_public_settings() -> dict[str, Any]:
     """Return settings with secrets masked."""
     settings = load_settings()
+    all_fields = get_all_configurable_fields()
     result = {}
     for key, value in settings.items():
-        meta = CONFIGURABLE_FIELDS.get(key, {})
+        meta = all_fields.get(key, {})
         if meta.get("secret") and value:
             result[key] = "********"
         else:

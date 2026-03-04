@@ -170,48 +170,9 @@ async def setup_status(request: Request):
 
 @router.get("/setup/providers")
 async def list_providers():
-    """Available VPN providers with setup instructions."""
-    return {
-        "providers": [
-            {
-                "id": "mullvad",
-                "name": "Mullvad VPN",
-                "description": "Privacy-focused VPN. Enter your account number and pick a server.",
-                "setup_type": "account",
-                "logo": "https://mullvad.net/favicon.ico",
-            },
-            {
-                "id": "ivpn",
-                "name": "IVPN",
-                "description": "Privacy-focused, open-source. Auto-generates configs, server rotation, connection verification.",
-                "setup_type": "account",
-            },
-            {
-                "id": "pia",
-                "name": "Private Internet Access",
-                "description": "Port forwarding support. Authenticates with username/password, auto-negotiates WireGuard keys.",
-                "setup_type": "account",
-            },
-            {
-                "id": "proton",
-                "name": "Proton VPN",
-                "description": "From the Proton team. Download your WireGuard config from account.protonvpn.com.",
-                "setup_type": "paste",
-            },
-            {
-                "id": "gluetun",
-                "name": "Gluetun (Sidecar)",
-                "description": "Already running gluetun? TunnelVision adds the dashboard, HA integration, and observability layer on top.",
-                "setup_type": "sidecar",
-            },
-            {
-                "id": "custom",
-                "name": "Custom / Other",
-                "description": "Any WireGuard or OpenVPN provider. Paste your config or drop files in the config directory.",
-                "setup_type": "paste",
-            },
-        ]
-    }
+    """Available VPN providers — auto-discovered from provider metadata."""
+    from api.services.vpn import get_all_provider_meta
+    return {"providers": get_all_provider_meta()}
 
 
 @router.post("/setup/provider")

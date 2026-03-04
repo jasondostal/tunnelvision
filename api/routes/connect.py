@@ -22,8 +22,8 @@ from api.constants import (
     WG_CONF_PATH,
     WIREGUARD_DIR,
     activate_wg_config,
-    http_client,
 )
+from api.services.providers.base import ConnectError
 from api.services.state import StateManager
 from api.services.vpn import get_provider
 from api.services.history import log_event
@@ -70,15 +70,9 @@ async def connect_to_server(body: ConnectRequest, request: Request):
     state_mgr: StateManager = request.app.state.state
     provider = get_provider(config.vpn_provider, config)
 
-    # --- API-capable providers ---
-    if provider.name == "mullvad":
-        return await _connect_mullvad(body, provider, state_mgr, config)
-    if provider.name == "ivpn":
-        return await _connect_ivpn(body, provider, state_mgr, config)
-    if provider.name == "pia":
-        return await _connect_pia(body, provider, config, state_mgr)
-    if provider.name == "proton":
-        return await _connect_proton(body, provider, state_mgr, config)
+    # --- API-capable providers: unified connect pipeline ---
+    if provider.meta.supports_server_list:
+        return await _connect_provider(body, provider, state_mgr, config)
 
     # --- Config-file rotation (custom/other providers) ---
     configs = _list_config_files()
@@ -216,8 +210,16 @@ async def activate_config(name: str, request: Request):
         return ConnectResponse(success=False, error=str(e))
 
 
-async def _connect_mullvad(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:
-    """Generate wg0.conf for a Mullvad server and connect."""
+async def _connect_provider(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:
+    """Unified connect pipeline for all API-capable providers.
+
+    1. List & filter servers (prefer port-forward capable if enabled)
+    2. Pick server (by hostname or random)
+    3. Resolve credentials + peer config (provider-specific)
+    4. Write wg0.conf
+    5. Reconnect VPN
+    6. Post-connect hooks (port forwarding, etc.)
+    """
     servers = await provider.list_servers(country=body.country, city=body.city)
 
     if not servers:
@@ -228,6 +230,12 @@ async def _connect_mullvad(body: ConnectRequest, provider, state_mgr: StateManag
             desc += f" city={body.city}"
         return ConnectResponse(success=False, error=f"No servers found{desc}")
 
+    # Prefer port-forward-capable servers if port forwarding is enabled
+    if config and config.port_forward_enabled:
+        pf_servers = [s for s in servers if s.port_forward]
+        if pf_servers:
+            servers = pf_servers
+
     # Pick server
     if body.hostname:
         matching = [s for s in servers if s.hostname == body.hostname]
@@ -237,212 +245,22 @@ async def _connect_mullvad(body: ConnectRequest, provider, state_mgr: StateManag
     else:
         server = random.choice(servers)
 
-    # Get private key from existing config or env
-    private_key = config.wireguard_private_key if config else ""
-    address = config.wireguard_addresses if config else ""
-    dns = (config.wireguard_dns if config and config.wireguard_dns else "") or "10.64.0.1"
-
-    if not private_key and WG_CONF_PATH.exists():
-        for line in WG_CONF_PATH.read_text().splitlines():
-            stripped = line.strip()
-            if stripped.startswith("PrivateKey"):
-                private_key = stripped.split("=", 1)[1].strip()
-            elif stripped.startswith("Address") and not address:
-                address = stripped.split("=", 1)[1].strip()
-            elif stripped.startswith("DNS") and dns == "10.64.0.1":
-                dns = stripped.split("=", 1)[1].strip()
-
-    if not private_key:
-        return ConnectResponse(
-            success=False,
-            error="No WireGuard private key. Set WIREGUARD_PRIVATE_KEY env or have an existing wg0.conf.",
-        )
-    if not address:
-        return ConnectResponse(success=False, error="No WireGuard address. Set WIREGUARD_ADDRESSES env.")
-
-    # Fetch server pubkey + IP
-    pubkey = ""
-    ipv4 = ""
+    # Resolve credentials + peer config (provider handles key exchange if needed)
     try:
-        async with http_client() as client:
-            resp = await client.get("https://api.mullvad.net/www/relays/wireguard/")
-            for relay in resp.json():
-                if relay.get("hostname") == server.hostname:
-                    pubkey = relay.get("pubkey", "")
-                    ipv4 = relay.get("ipv4_addr_in", "")
-                    break
-    except Exception:
-        pass
-
-    if not pubkey or not ipv4:
-        return ConnectResponse(success=False, error=f"Couldn't get details for {server.hostname}")
+        peer = await provider.resolve_connect(server, config)
+    except ConnectError as e:
+        return ConnectResponse(success=False, error=str(e))
 
     # Write wg0.conf
     WIREGUARD_DIR.mkdir(parents=True, exist_ok=True)
     WG_CONF_PATH.write_text(
         f"[Interface]\n"
-        f"PrivateKey = {private_key}\n"
-        f"Address = {address}\n"
-        f"DNS = {dns}\n\n"
+        f"PrivateKey = {peer.private_key}\n"
+        f"Address = {peer.address}\n"
+        f"DNS = {peer.dns}\n\n"
         f"[Peer]\n"
-        f"PublicKey = {pubkey}\n"
-        f"Endpoint = {ipv4}:51820\n"
-        f"AllowedIPs = 0.0.0.0/0\n"
-    )
-    os.chmod(WG_CONF_PATH, 0o600)
-
-    state_mgr.vpn_type = "wireguard"
-    state_mgr.vpn_server_hostname = server.hostname
-    state_mgr.active_config = "wg0.conf"
-
-    result = await _reconnect_vpn("wireguard")
-    result.hostname = server.hostname
-    result.country = server.country
-    result.city = server.city
-    return result
-
-
-async def _connect_ivpn(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:
-    """Pick an IVPN server and generate wg0.conf with its public key."""
-    servers = await provider.list_servers(country=body.country, city=body.city)
-
-    if not servers:
-        desc = ""
-        if body.country:
-            desc += f" country={body.country}"
-        if body.city:
-            desc += f" city={body.city}"
-        return ConnectResponse(success=False, error=f"No IVPN servers found{desc}")
-
-    if body.hostname:
-        matching = [s for s in servers if s.hostname == body.hostname]
-        if not matching:
-            return ConnectResponse(success=False, error=f"Server {body.hostname} not found")
-        server = matching[0]
-    else:
-        server = random.choice(servers)
-
-    private_key = config.wireguard_private_key if config else ""
-    address = config.wireguard_addresses if config else ""
-    dns = (config.wireguard_dns if config and config.wireguard_dns else "") or "172.16.0.1"  # IVPN default DNS
-
-    if not private_key and WG_CONF_PATH.exists():
-        for line in WG_CONF_PATH.read_text().splitlines():
-            stripped = line.strip()
-            if stripped.startswith("PrivateKey"):
-                private_key = stripped.split("=", 1)[1].strip()
-            elif stripped.startswith("Address") and not address:
-                address = stripped.split("=", 1)[1].strip()
-            elif stripped.startswith("DNS") and dns == "172.16.0.1":
-                dns = stripped.split("=", 1)[1].strip()
-
-    if not private_key:
-        return ConnectResponse(success=False, error="No WireGuard private key. Set WIREGUARD_PRIVATE_KEY or have an existing wg0.conf.")
-    if not address:
-        return ConnectResponse(success=False, error="No WireGuard address. Set WIREGUARD_ADDRESSES env.")
-
-    pubkey = getattr(server, "_pubkey", "")
-    ipv4 = getattr(server, "_ipv4", "")
-    port = getattr(server, "_port", 2049)
-
-    if not pubkey or not ipv4:
-        return ConnectResponse(success=False, error=f"Missing pubkey/IP for {server.hostname}")
-
-    WIREGUARD_DIR.mkdir(parents=True, exist_ok=True)
-    WG_CONF_PATH.write_text(
-        f"[Interface]\n"
-        f"PrivateKey = {private_key}\n"
-        f"Address = {address}\n"
-        f"DNS = {dns}\n\n"
-        f"[Peer]\n"
-        f"PublicKey = {pubkey}\n"
-        f"Endpoint = {ipv4}:{port}\n"
-        f"AllowedIPs = 0.0.0.0/0\n"
-    )
-    os.chmod(WG_CONF_PATH, 0o600)
-
-    state_mgr.vpn_type = "wireguard"
-    state_mgr.vpn_server_hostname = server.hostname
-    state_mgr.active_config = "wg0.conf"
-
-    result = await _reconnect_vpn("wireguard")
-    result.hostname = server.hostname
-    result.country = server.country
-    result.city = server.city
-    return result
-
-
-async def _connect_pia(body: ConnectRequest, provider, config, state_mgr: StateManager) -> ConnectResponse:
-    """Authenticate with PIA, negotiate WireGuard keys, and connect."""
-    import subprocess as _sp
-
-    servers = await provider.list_servers(country=body.country, city=body.city)
-    if not servers:
-        return ConnectResponse(success=False, error="No PIA servers found")
-
-    # Prefer port-forward-capable servers if port forwarding is enabled
-    if config.port_forward_enabled:
-        pf_servers = [s for s in servers if getattr(s, "_port_forward", False)]
-        if pf_servers:
-            servers = pf_servers
-
-    if body.hostname:
-        matching = [s for s in servers if s.hostname == body.hostname]
-        if not matching:
-            return ConnectResponse(success=False, error=f"Server {body.hostname} not found")
-        server = matching[0]
-    else:
-        server = random.choice(servers)
-
-    server_ip = getattr(server, "_ipv4", "")
-    if not server_ip:
-        return ConnectResponse(success=False, error="No IP for selected server")
-
-    # Get auth token
-    token = await provider.get_token()
-    if not token:
-        return ConnectResponse(success=False, error="PIA auth failed. Check PIA_USER and PIA_PASS.")
-
-    # Generate ephemeral WireGuard keypair
-    try:
-        privkey_result = _sp.run(["wg", "genkey"], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
-        private_key = privkey_result.stdout.strip()
-        pubkey_result = _sp.run(["wg", "pubkey"], input=private_key, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
-        public_key = pubkey_result.stdout.strip()
-    except Exception as e:
-        return ConnectResponse(success=False, error=f"Key generation failed: {e}")
-
-    # Exchange keys with PIA server
-    try:
-        async with http_client(verify=False) as client:
-            resp = await client.get(
-                f"https://{server_ip}:1337/addKey",
-                params={"pt": token, "pubkey": public_key},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-    except Exception as e:
-        return ConnectResponse(success=False, error=f"PIA key exchange failed: {e}")
-
-    server_pubkey = data.get("server_key", "")
-    our_ip = data.get("peer_ip", "")
-    server_port = data.get("server_port", 1337)
-    dns_servers = data.get("dns_servers", ["10.0.0.243"])
-
-    if not server_pubkey or not our_ip:
-        return ConnectResponse(success=False, error="PIA key exchange returned incomplete data")
-
-    dns = dns_servers[0] if dns_servers else "10.0.0.243"
-
-    WIREGUARD_DIR.mkdir(parents=True, exist_ok=True)
-    WG_CONF_PATH.write_text(
-        f"[Interface]\n"
-        f"PrivateKey = {private_key}\n"
-        f"Address = {our_ip}\n"
-        f"DNS = {dns}\n\n"
-        f"[Peer]\n"
-        f"PublicKey = {server_pubkey}\n"
-        f"Endpoint = {server_ip}:{server_port}\n"
+        f"PublicKey = {peer.public_key}\n"
+        f"Endpoint = {peer.endpoint}:{peer.port}\n"
         f"AllowedIPs = 0.0.0.0/0\n"
     )
     os.chmod(WG_CONF_PATH, 0o600)
@@ -456,96 +274,9 @@ async def _connect_pia(body: ConnectRequest, provider, config, state_mgr: StateM
     result.country = server.country
     result.city = server.city
 
-    # Start port forwarding if enabled
-    if result.success and config.port_forward_enabled and getattr(server, "_port_forward", False):
-        from api.services.port_forward import get_port_forward_service
-        pf = get_port_forward_service()
-        gateway_ip = data.get("server_vip", server_ip)
-        pf.start(gateway_ip, token)
-
-    return result
-
-
-async def _connect_proton(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:
-    """Connect to a ProtonVPN server. Uses same pattern as Mullvad — pick server, generate config."""
-    servers = await provider.list_servers(country=body.country, city=body.city)
-
-    if not servers:
-        desc = ""
-        if body.country:
-            desc += f" country={body.country}"
-        if body.city:
-            desc += f" city={body.city}"
-        return ConnectResponse(success=False, error=f"No ProtonVPN servers found{desc}")
-
-    # Prefer port-forward capable servers if port forwarding is enabled
-    if config and config.port_forward_enabled:
-        pf_servers = [s for s in servers if getattr(s, "_port_forward", False)]
-        if pf_servers:
-            servers = pf_servers
-
-    if body.hostname:
-        matching = [s for s in servers if s.hostname == body.hostname]
-        if not matching:
-            return ConnectResponse(success=False, error=f"Server {body.hostname} not found")
-        server = matching[0]
-    else:
-        server = random.choice(servers)
-
-    # ProtonVPN config uses pre-existing WireGuard key (generated on protonvpn.com)
-    private_key = config.wireguard_private_key if config else ""
-    address = config.wireguard_addresses if config else ""
-    dns = (config.wireguard_dns if config and config.wireguard_dns else "") or "10.2.0.1"
-
-    if not private_key and WG_CONF_PATH.exists():
-        for line in WG_CONF_PATH.read_text().splitlines():
-            stripped = line.strip()
-            if stripped.startswith("PrivateKey"):
-                private_key = stripped.split("=", 1)[1].strip()
-            elif stripped.startswith("Address") and not address:
-                address = stripped.split("=", 1)[1].strip()
-            elif stripped.startswith("DNS") and dns == "10.2.0.1":
-                dns = stripped.split("=", 1)[1].strip()
-
-    if not private_key:
-        return ConnectResponse(
-            success=False,
-            error="No WireGuard private key. Set WIREGUARD_PRIVATE_KEY env or use the setup wizard to paste your ProtonVPN config.",
-        )
-    if not address:
-        return ConnectResponse(success=False, error="No WireGuard address. Set WIREGUARD_ADDRESSES env.")
-
-    server_ip = getattr(server, "_ipv4", "")
-    if not server_ip:
-        return ConnectResponse(success=False, error=f"No IP for {server.hostname}")
-
-    WIREGUARD_DIR.mkdir(parents=True, exist_ok=True)
-    WG_CONF_PATH.write_text(
-        f"[Interface]\n"
-        f"PrivateKey = {private_key}\n"
-        f"Address = {address}\n"
-        f"DNS = {dns}\n\n"
-        f"[Peer]\n"
-        f"PublicKey = \n"  # ProtonVPN pubkey comes from server list or config
-        f"Endpoint = {server_ip}:51820\n"
-        f"AllowedIPs = 0.0.0.0/0\n"
-    )
-    os.chmod(WG_CONF_PATH, 0o600)
-
-    state_mgr.vpn_type = "wireguard"
-    state_mgr.vpn_server_hostname = server.hostname
-    state_mgr.active_config = "wg0.conf"
-
-    result = await _reconnect_vpn("wireguard")
-    result.hostname = server.hostname
-    result.country = server.country
-    result.city = server.city
-
-    # Start NAT-PMP port forwarding if enabled
-    if result.success and config and config.port_forward_enabled and getattr(server, "_port_forward", False):
-        from api.services.natpmp import get_natpmp_service
-        gateway = server_ip  # NAT-PMP gateway is the server
-        get_natpmp_service().start(gateway)
+    # Post-connect hooks (port forwarding, etc.)
+    if result.success:
+        await provider.post_connect(server, config, peer)
 
     return result
 

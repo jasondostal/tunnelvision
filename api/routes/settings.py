@@ -2,15 +2,21 @@
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
-from api.services.settings import get_public_settings, save_settings, load_settings, CONFIGURABLE_FIELDS
+from api.services.settings import get_public_settings, save_settings, load_settings, CONFIGURABLE_FIELDS, get_all_configurable_fields
 
 router = APIRouter()
 
 
 class SettingsUpdate(BaseModel):
-    """Partial settings update — only include fields you want to change."""
+    """Partial settings update — only include fields you want to change.
+
+    Declared fields cover core settings. Provider-specific credentials
+    are accepted via extra="allow" — provider metadata drives validation.
+    """
+    model_config = ConfigDict(extra="allow")
+
     admin_user: str | None = None
     admin_pass: str | None = None
     auth_proxy_header: str | None = None
@@ -75,11 +81,12 @@ class SettingsUpdate(BaseModel):
 @router.get("/settings")
 async def get_settings(request: Request):
     """Get current settings (secrets masked)."""
+    all_fields = get_all_configurable_fields()
     return {
         "settings": get_public_settings(),
         "fields": {
             k: {"secret": v["secret"], "env": v["env"]}
-            for k, v in CONFIGURABLE_FIELDS.items()
+            for k, v in all_fields.items()
         },
     }
 

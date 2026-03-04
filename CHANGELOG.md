@@ -1,5 +1,53 @@
 # Changelog
 
+## v2.6.0 — Provider Framework Refactor (2026-03-04)
+
+The foundation for scaling from 6 to 23+ native providers. Zero new user-facing features — all internal architecture. Every provider is now a single file, auto-discovered, auto-configured, and auto-tested.
+
+### Provider Metadata Protocol
+- `ProviderMeta` dataclass — single source of truth for each provider's identity, capabilities, setup type, and credential schema
+- `CredentialField` dataclass — declarative credential definitions (key, label, type, secret flag, env var mapping, hints)
+- Setup wizard, settings UI, and config system all read from provider metadata — no hardcoded field lists
+
+### Unified Connect Pipeline
+- Four near-identical `_connect_{mullvad,ivpn,pia,proton}` functions (320 lines) replaced by one generic `_connect_provider()` (60 lines)
+- Pipeline: list servers → filter → pick server → `resolve_connect()` → write wg0.conf → reconnect → `post_connect()`
+- `PeerConfig` dataclass — everything needed to write wg0.conf, returned by each provider's `resolve_connect()`
+- Providers override `resolve_connect()` for custom auth (PIA key exchange) and `post_connect()` for hooks (port forwarding)
+- `connect.py` reduced from 568 to 308 lines
+
+### Shared Server Infrastructure
+- Typed `ServerInfo` fields (`ipv4`, `public_key`, `port`, `port_forward`, `streaming`, `p2p`, `multihop`, `secure_core`, `tier`, `load`, `extra`) replace dynamic attribute hacking
+- Server caching moved to base class with configurable TTL — providers override `_fetch_servers()`, not `list_servers()`
+- Server filtering (`_filter_servers()`) deduplicated from 4 provider copies into one base class method
+- Default `get_server_info()` searches by ipv4 match — providers only override if they need custom logic
+
+### Self-Registering Provider Discovery
+- `pkgutil`-based auto-discovery replaces hardcoded `PROVIDERS` dict
+- Drop a file in `api/services/providers/`, it's registered everywhere — setup wizard, config, settings, connect pipeline
+- `get_all_provider_meta()` generates setup wizard JSON from live provider metadata
+
+### Metadata-Driven Config System
+- `Config.__getattr__` dynamically resolves provider credentials from env vars and secret files — new providers don't need Config dataclass edits
+- `get_all_configurable_fields()` merges base settings with provider credential fields — new providers are automatically configurable via settings UI
+- `SettingsUpdate` accepts dynamic provider fields via Pydantic `extra="allow"`
+- Backwards compatible — existing env vars, YAML settings, and Docker secrets continue to work unchanged
+
+### Tests
+- 94 new parametrized provider tests covering metadata completeness, interface compliance, API metadata, ServerInfo/PeerConfig integrity
+- Cross-provider assertions: every provider gets the same validation (meta.id matches name, credentials use correct field types, secret fields use password type, filter capabilities are valid)
+- DRY guardrails: `get_all_configurable_fields()` superset check, dynamic Config credential resolution, SettingsUpdate extra field acceptance
+- 254 total tests (up from 157)
+
+### Adding a New Provider
+After this release, adding a provider is a single-file operation:
+1. Create `api/services/providers/<name>.py`
+2. Implement `name`, `meta`, `check_connection()`, `_fetch_servers()`
+3. Optionally override `resolve_connect()` / `post_connect()` for custom auth
+4. Auto-discovered, auto-configured, auto-tested — no other files need editing
+
+---
+
 ## v2.5.0 — DNS, Proxies, ProtonVPN & DRY Refactor (2026-03-04)
 
 ### Docker Secrets Support

@@ -1,39 +1,107 @@
 """VPN service — provider-aware VPN management layer."""
 
+import importlib
+import logging
+import pkgutil
+
 from api.config import Config
 from api.services.providers.base import VPNProvider, ConnectionCheck, ServerInfo, AccountInfo
 from api.services.providers.custom import CustomProvider
-from api.services.providers.mullvad import MullvadProvider
-from api.services.providers.ivpn import IVPNProvider
-from api.services.providers.pia import PIAProvider
-from api.services.providers.gluetun import GluetunProvider
-from api.services.providers.proton import ProtonProvider
+
+log = logging.getLogger(__name__)
 
 
-# Provider registry — add new providers here
-PROVIDERS: dict[str, type[VPNProvider]] = {
-    "custom": CustomProvider,
-    "mullvad": MullvadProvider,
-    "ivpn": IVPNProvider,
-    "pia": PIAProvider,
-    "gluetun": GluetunProvider,
-    "proton": ProtonProvider,
-}
+def _discover_providers() -> dict[str, type[VPNProvider]]:
+    """Auto-discover provider classes from api/services/providers/*.py.
+
+    Any VPNProvider subclass with a `meta` property gets registered
+    by its meta.id. Drop a new file in the package, it appears everywhere.
+    """
+    providers: dict[str, type[VPNProvider]] = {}
+    package = importlib.import_module("api.services.providers")
+
+    for _, module_name, _ in pkgutil.iter_modules(package.__path__):
+        if module_name == "base":
+            continue
+        try:
+            mod = importlib.import_module(f"api.services.providers.{module_name}")
+        except Exception:
+            log.warning("Failed to import provider module: %s", module_name, exc_info=True)
+            continue
+
+        for attr_name in dir(mod):
+            cls = getattr(mod, attr_name)
+            if (
+                isinstance(cls, type)
+                and issubclass(cls, VPNProvider)
+                and cls is not VPNProvider
+                and hasattr(cls, "meta")
+            ):
+                try:
+                    # Instantiate temporarily to read meta.id
+                    instance = cls.__new__(cls)
+                    meta = cls.meta.fget(instance)  # type: ignore[union-attr]
+                    providers[meta.id] = cls
+                except Exception:
+                    log.warning("Failed to read meta from %s", cls.__name__, exc_info=True)
+
+    return providers
+
+
+# Provider registry — auto-discovered at import time
+PROVIDERS: dict[str, type[VPNProvider]] = _discover_providers()
+
+# Singleton instances — cache persists across requests
+_instances: dict[str, VPNProvider] = {}
 
 
 def get_provider(provider_name: str | None = None, config: Config | None = None) -> VPNProvider:
     """Get the configured VPN provider instance.
 
-    Args:
-        provider_name: Override provider name. Defaults to config.vpn_provider.
-        config: Config object. Passed through to the provider.
-
-    Returns:
-        VPNProvider instance. Falls back to CustomProvider if unknown.
+    Returns a cached singleton per provider name so server list caches
+    persist across requests.
     """
     name = (provider_name or (config.vpn_provider if config else "custom")).lower()
     provider_cls = PROVIDERS.get(name, CustomProvider)
-    return provider_cls(config)
+
+    if name not in _instances or type(_instances[name]) is not provider_cls:
+        _instances[name] = provider_cls(config)
+    return _instances[name]
+
+
+def get_all_provider_meta() -> list[dict]:
+    """Get metadata for all registered providers (for setup wizard, UI, etc.)."""
+    result = []
+    for provider_cls in PROVIDERS.values():
+        try:
+            instance = provider_cls.__new__(provider_cls)
+            meta = provider_cls.meta.fget(instance)  # type: ignore[union-attr]
+            result.append({
+                "id": meta.id,
+                "name": meta.display_name,
+                "description": meta.description,
+                "setup_type": meta.setup_type.value,
+                "supports_server_list": meta.supports_server_list,
+                "supports_account_check": meta.supports_account_check,
+                "supports_port_forwarding": meta.supports_port_forwarding,
+                "supports_wireguard": meta.supports_wireguard,
+                "supports_openvpn": meta.supports_openvpn,
+                "credentials": [
+                    {
+                        "key": c.key,
+                        "label": c.label,
+                        "field_type": c.field_type,
+                        "required": c.required,
+                        "secret": c.secret,
+                        "hint": c.hint,
+                    }
+                    for c in meta.credentials
+                ],
+                "filter_capabilities": meta.filter_capabilities,
+            })
+        except Exception:
+            log.warning("Failed to read meta for provider class", exc_info=True)
+    return result
 
 
 async def check_connection(config: Config | None = None, provider: VPNProvider | None = None) -> ConnectionCheck:

@@ -17,8 +17,13 @@ Endpoints used:
 import ssl
 from datetime import datetime, timezone
 
-from api.constants import PIA_TOKEN_CACHE_TTL, PROVIDER_CACHE_TTL, TIMEOUT_FETCH, http_client
+from api.constants import PIA_TOKEN_CACHE_TTL, TIMEOUT_FETCH, http_client
 from api.services.providers.base import (
+    ConnectError,
+    CredentialField,
+    PeerConfig,
+    ProviderMeta,
+    SetupType,
     VPNProvider,
     ConnectionCheck,
     ServerInfo,
@@ -37,15 +42,39 @@ class PIAProvider(VPNProvider):
     TOKEN_URL = "https://www.privateinternetaccess.com/api/client/v2/token"
     WG_PORT = 1337
 
-    def __init__(self):
-        self._server_cache: list[ServerInfo] | None = None
-        self._cache_time: datetime | None = None
+    def __init__(self, config=None):
+        super().__init__(config)
         self._token: str | None = None
         self._token_time: datetime | None = None
 
     @property
     def name(self) -> str:
         return "pia"
+
+    @property
+    def meta(self) -> ProviderMeta:
+        return ProviderMeta(
+            id="pia",
+            display_name="Private Internet Access",
+            description="Port forwarding support. Authenticates with username/password, auto-negotiates WireGuard keys.",
+            setup_type=SetupType.ACCOUNT,
+            supports_server_list=True,
+            supports_port_forwarding=True,
+            credentials=[
+                CredentialField(
+                    key="pia_user", label="PIA Username",
+                    hint="Your PIA username (not email)",
+                    env_var="PIA_USER",
+                ),
+                CredentialField(
+                    key="pia_pass", label="PIA Password",
+                    field_type="password", secret=True,
+                    env_var="PIA_PASS",
+                ),
+            ],
+            default_dns="10.0.0.243",
+            filter_capabilities=["country", "city", "port_forward"],
+        )
 
     async def check_connection(self) -> ConnectionCheck:
         """Generic IP check — PIA has no branded check endpoint."""
@@ -66,53 +95,92 @@ class PIAProvider(VPNProvider):
         except Exception:
             return ConnectionCheck(checked_at=datetime.now(timezone.utc))
 
-    async def get_server_info(self, endpoint_ip: str) -> ServerInfo | None:
-        """Match endpoint IP to PIA server metadata."""
-        servers = await self.list_servers()
-        for server in servers:
-            if hasattr(server, "_ipv4") and server._ipv4 == endpoint_ip:
-                return server
-        return None
-
-    async def list_servers(self, country: str | None = None, city: str | None = None) -> list[ServerInfo]:
+    async def _fetch_servers(self) -> list[ServerInfo]:
         """Fetch PIA server list with WireGuard endpoints and port-forward flags."""
-        now = datetime.now(timezone.utc)
-        if self._server_cache and self._cache_time:
-            age = (now - self._cache_time).total_seconds()
-            if age < PROVIDER_CACHE_TTL:
-                return self._filter_servers(self._server_cache, country, city)
+        async with http_client(timeout=TIMEOUT_FETCH) as client:
+            resp = await client.get(self.SERVERS_URL)
+            resp.raise_for_status()
+            data = resp.json()
 
+        servers = []
+        for region in data.get("regions", []):
+            region_name = region.get("name", "")
+            country_name = region.get("country", region_name)
+            has_port_forward = region.get("port_forward", False)
+
+            for wg_server in region.get("servers", {}).get("wg", []):
+                servers.append(ServerInfo(
+                    hostname=wg_server.get("cn", ""),
+                    country=country_name,
+                    country_code=region.get("id", "")[:2].upper(),
+                    city=region_name,
+                    server_type="wireguard",
+                    ipv4=wg_server.get("ip", ""),
+                    port_forward=has_port_forward,
+                    extra={"region_id": region.get("id", "")},
+                ))
+
+        return servers
+
+    async def resolve_connect(self, server: ServerInfo, config) -> PeerConfig:
+        """PIA: authenticate, generate ephemeral WG keys, exchange with server."""
+        import subprocess as _sp
+        from api.constants import SUBPROCESS_TIMEOUT_QUICK
+
+        token = await self.get_token()
+        if not token:
+            raise ConnectError("PIA auth failed. Check PIA_USER and PIA_PASS.")
+
+        server_ip = server.ipv4
+        if not server_ip:
+            raise ConnectError("No IP for selected server")
+
+        # Generate ephemeral WireGuard keypair
         try:
-            async with http_client(timeout=TIMEOUT_FETCH) as client:
-                resp = await client.get(self.SERVERS_URL)
+            privkey_result = _sp.run(["wg", "genkey"], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
+            private_key = privkey_result.stdout.strip()
+            pubkey_result = _sp.run(["wg", "pubkey"], input=private_key, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
+            public_key = pubkey_result.stdout.strip()
+        except Exception as e:
+            raise ConnectError(f"Key generation failed: {e}")
+
+        # Exchange keys with PIA server
+        try:
+            async with http_client(verify=False) as client:
+                resp = await client.get(
+                    f"https://{server_ip}:1337/addKey",
+                    params={"pt": token, "pubkey": public_key},
+                )
                 resp.raise_for_status()
                 data = resp.json()
+        except Exception as e:
+            raise ConnectError(f"PIA key exchange failed: {e}")
 
-            servers = []
-            for region in data.get("regions", []):
-                region_name = region.get("name", "")
-                country_name = region.get("country", region_name)
-                port_forward = region.get("port_forward", False)
+        server_pubkey = data.get("server_key", "")
+        our_ip = data.get("peer_ip", "")
+        server_port = data.get("server_port", 1337)
+        dns_servers = data.get("dns_servers", ["10.0.0.243"])
 
-                for wg_server in region.get("servers", {}).get("wg", []):
-                    server = ServerInfo(
-                        hostname=wg_server.get("cn", ""),
-                        country=country_name,
-                        country_code=region.get("id", "")[:2].upper(),
-                        city=region_name,
-                        server_type="wireguard",
-                    )
-                    server._ipv4 = wg_server.get("ip", "")
-                    server._port_forward = port_forward
-                    server._region_id = region.get("id", "")
-                    servers.append(server)
+        if not server_pubkey or not our_ip:
+            raise ConnectError("PIA key exchange returned incomplete data")
 
-            self._server_cache = servers
-            self._cache_time = now
-            return self._filter_servers(servers, country, city)
+        return PeerConfig(
+            private_key=private_key,
+            address=our_ip,
+            dns=dns_servers[0] if dns_servers else "10.0.0.243",
+            public_key=server_pubkey,
+            endpoint=server_ip,
+            port=server_port,
+            extra={"token": token, "server_vip": data.get("server_vip", server_ip)},
+        )
 
-        except Exception:
-            return self._server_cache or []
+    async def post_connect(self, server: ServerInfo, config, peer: PeerConfig) -> None:
+        """Start PIA port forwarding if enabled."""
+        if config and config.port_forward_enabled and server.port_forward:
+            from api.services.port_forward import get_port_forward_service
+            pf = get_port_forward_service()
+            gateway_ip = peer.extra.get("server_vip", peer.endpoint)
+            pf.start(gateway_ip, peer.extra.get("token", ""))
 
     async def get_token(self) -> str | None:
         """Authenticate with PIA and get a connection token."""
@@ -142,18 +210,3 @@ class PIAProvider(VPNProvider):
             return self._token
         except Exception:
             return None
-
-    @staticmethod
-    def _filter_servers(
-        servers: list[ServerInfo],
-        country: str | None = None,
-        city: str | None = None,
-    ) -> list[ServerInfo]:
-        result = servers
-        if country:
-            country_lower = country.lower()
-            result = [s for s in result if s.country_code.lower() == country_lower or s.country.lower() == country_lower]
-        if city:
-            city_lower = city.lower()
-            result = [s for s in result if s.city.lower() == city_lower]
-        return result

@@ -137,6 +137,28 @@ class Config:
     shadowsocks_password: str = field(default_factory=lambda: _secret_or_env("SHADOWSOCKS_PASSWORD"))
     shadowsocks_cipher: str = field(default_factory=lambda: os.getenv("SHADOWSOCKS_CIPHER", "aes-256-gcm"))
 
+    def __getattr__(self, name: str) -> str:
+        """Dynamic lookup for provider credentials declared in ProviderMeta.
+
+        When a new provider is added, its credentials are accessible via
+        config.<key> without editing this dataclass — the provider's
+        CredentialField declarations drive the lookup.
+        """
+        try:
+            from api.services.vpn import PROVIDERS
+            for provider_cls in PROVIDERS.values():
+                instance = provider_cls.__new__(provider_cls)
+                meta = provider_cls.meta.fget(instance)  # type: ignore[union-attr]
+                for cred in meta.credentials:
+                    if cred.key == name:
+                        env_var = cred.env_var or name.upper()
+                        if cred.secret:
+                            return _secret_or_env(env_var)
+                        return os.getenv(env_var, "")
+        except Exception:
+            pass
+        raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
+
     @property
     def api_auth_required(self) -> bool:
         return bool(self.api_key)

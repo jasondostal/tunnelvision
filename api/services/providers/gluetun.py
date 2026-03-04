@@ -12,7 +12,13 @@ Endpoints used:
 from datetime import datetime, timezone
 
 from api.constants import GLUETUN_DEFAULT_URL, TIMEOUT_QUICK, http_client
-from api.services.providers.base import VPNProvider, ConnectionCheck
+from api.services.providers.base import (
+    CredentialField,
+    ProviderMeta,
+    SetupType,
+    VPNProvider,
+    ConnectionCheck,
+)
 from api.services.providers.custom import CustomProvider
 
 
@@ -29,6 +35,29 @@ class GluetunProvider(VPNProvider):
     @property
     def name(self) -> str:
         return "gluetun"
+
+    @property
+    def meta(self) -> ProviderMeta:
+        return ProviderMeta(
+            id="gluetun",
+            display_name="Gluetun (Sidecar)",
+            description="Already running gluetun? TunnelVision adds the dashboard, HA integration, and observability layer on top.",
+            setup_type=SetupType.SIDECAR,
+            credentials=[
+                CredentialField(
+                    key="gluetun_url", label="Gluetun URL",
+                    required=False,
+                    hint=f"Default: {GLUETUN_DEFAULT_URL}",
+                    env_var="GLUETUN_URL",
+                ),
+                CredentialField(
+                    key="gluetun_api_key", label="API Key",
+                    field_type="password", secret=True, required=False,
+                    hint="Optional — only if gluetun has auth enabled",
+                    env_var="GLUETUN_API_KEY",
+                ),
+            ],
+        )
 
     def _headers(self) -> dict:
         if self._api_key:

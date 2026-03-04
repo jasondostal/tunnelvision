@@ -16,7 +16,7 @@ qBittorrent + WireGuard/OpenVPN + killswitch + REST API + dashboard. One contain
 
 Drop your VPN config, `docker compose up`, and you can see everything — what IP you're on, where you're exiting, transfer stats, killswitch state, qBittorrent health. From your Homepage dashboard, from Home Assistant, from Prometheus, from the built-in UI, from `curl`. No guessing. No SSH-ing in.
 
-Works with **any WireGuard or OpenVPN provider**. Native integrations for [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), [PIA](https://privateinternetaccess.com), and [ProtonVPN](https://protonvpn.com) (ephemeral key negotiation, port forwarding). Or bring your own config from AirVPN, Windscribe, or your own server. Built-in DNS (DoT, ad-blocking), HTTP CONNECT proxy, and SOCKS5/Shadowsocks proxy.
+Works with **any WireGuard or OpenVPN provider**. Native integrations for [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), [PIA](https://privateinternetaccess.com), and [ProtonVPN](https://protonvpn.com) — auto-generated configs, server rotation, ephemeral key negotiation, port forwarding. More providers coming. Or bring your own config from any provider. Built-in DNS (DoT, ad-blocking), HTTP CONNECT proxy, and SOCKS5/Shadowsocks proxy.
 
 <p align="center">
   <img src="images/screenshot-dashboard.png" alt="TunnelVision Dashboard" width="700">
@@ -249,8 +249,11 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `VPN_ENABLED` | `true` | Enable/disable VPN |
 | `VPN_TYPE` | `auto` | VPN engine: `auto`, `wireguard`, or `openvpn` |
 | `VPN_PROVIDER` | `custom` | VPN provider: `custom`, `mullvad`, `ivpn`, `pia`, `proton`, or `gluetun` (sidecar mode) |
-| `WIREGUARD_PRIVATE_KEY` | *(empty)* | WireGuard private key for Mullvad/IVPN (base64, 44 chars) |
-| `WIREGUARD_ADDRESSES` | *(empty)* | WireGuard interface address for Mullvad/IVPN (e.g. `10.66.0.1/32`) |
+| `MULLVAD_ACCOUNT` | *(empty)* | Mullvad account number (16-digit) |
+| `PIA_USER` | *(empty)* | PIA username |
+| `PIA_PASS` | *(empty)* | PIA password |
+| `WIREGUARD_PRIVATE_KEY` | *(empty)* | WireGuard private key for Mullvad/IVPN/Proton (base64, 44 chars) |
+| `WIREGUARD_ADDRESSES` | *(empty)* | WireGuard interface address (e.g. `10.66.0.1/32`) |
 | `VPN_DNS` | *(from config)* | Override DNS server (default: provider DNS or `10.64.0.1`) |
 | `VPN_COUNTRY` | *(empty)* | Filter server rotation by country (e.g. `ch`, `us`) |
 | `VPN_CITY` | *(empty)* | Filter server rotation by city (e.g. `zurich`) |

@@ -8,7 +8,12 @@ that makes TunnelVision's widget work with any WireGuard config.
 from datetime import datetime, timezone
 
 from api.constants import TIMEOUT_QUICK, http_client
-from api.services.providers.base import VPNProvider, ConnectionCheck
+from api.services.providers.base import (
+    ProviderMeta,
+    SetupType,
+    VPNProvider,
+    ConnectionCheck,
+)
 
 
 class CustomProvider(VPNProvider):
@@ -53,6 +58,16 @@ class CustomProvider(VPNProvider):
     @property
     def name(self) -> str:
         return "custom"
+
+    @property
+    def meta(self) -> ProviderMeta:
+        return ProviderMeta(
+            id="custom",
+            display_name="Custom / Other",
+            description="Any WireGuard or OpenVPN provider. Paste your config or drop files in the config directory.",
+            setup_type=SetupType.PASTE,
+            supports_openvpn=True,
+        )
 
     async def check_connection(self) -> ConnectionCheck:
         """Get public IP + location via geo-aware services."""
