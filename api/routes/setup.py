@@ -12,6 +12,9 @@ from pydantic import BaseModel
 
 from api.constants import (
     GLUETUN_DEFAULT_URL,
+    OPENVPN_CONF_PATH,
+    OPENVPN_CREDS_PATH,
+    OPENVPN_DIR,
     SUBPROCESS_TIMEOUT_DEFAULT,
     SUBPROCESS_TIMEOUT_LONG,
     SUBPROCESS_TIMEOUT_QUICK,
@@ -44,6 +47,12 @@ class ProviderInfo(BaseModel):
 
 class WireGuardConfigRequest(BaseModel):
     config: str  # wg0.conf content
+
+
+class OpenVPNConfigRequest(BaseModel):
+    config: str      # .ovpn file content
+    username: str = ""
+    password: str = ""
 
 
 class ProviderSelectRequest(BaseModel):
@@ -146,7 +155,7 @@ async def setup_status(request: Request):
     """Current setup state — drives the wizard UI."""
     state_mgr: StateManager = request.app.state.state
     required = state_mgr.setup_required
-    has_config = WG_CONF_PATH.exists()
+    has_config = WG_CONF_PATH.exists() or OPENVPN_CONF_PATH.exists()
 
     # Determine current step
     provider = state_mgr.setup_provider or None
@@ -203,17 +212,59 @@ async def upload_wireguard_config(body: WireGuardConfigRequest):
     return {"success": True, "path": str(WG_CONF_PATH), "next": "needs_verify"}
 
 
+def _geo_ip_check() -> tuple[str, str, str]:
+    """Run a geo-IP check and return (public_ip, country, city). Empty strings on failure."""
+    ip_result = subprocess.run(
+        ["curl", "-sf", "--max-time", "8", "https://ipwho.is/"],
+        capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
+    )
+    if ip_result.returncode == 0:
+        try:
+            data = json.loads(ip_result.stdout)
+            return data.get("ip", ""), data.get("country", ""), data.get("city", "")
+        except json.JSONDecodeError:
+            pass
+    return "", "", ""
+
+
+@router.post("/setup/openvpn")
+async def upload_openvpn_config(body: OpenVPNConfigRequest):
+    """Accept OpenVPN config content and write to /config/openvpn/provider.ovpn."""
+    config_text = body.config.strip()
+
+    # Reject WireGuard configs
+    if "[Interface]" in config_text:
+        return {"success": False, "error": "This looks like a WireGuard config — use the WireGuard paste flow instead"}
+
+    # Require at least one OpenVPN directive
+    if "remote " not in config_text and "client" not in config_text:
+        return {"success": False, "error": "Invalid OpenVPN config — missing 'remote' or 'client' directive"}
+
+    OPENVPN_DIR.mkdir(parents=True, exist_ok=True)
+    OPENVPN_CONF_PATH.write_text(config_text + "\n")
+    os.chmod(OPENVPN_CONF_PATH, 0o600)
+
+    if body.username and body.password:
+        OPENVPN_CREDS_PATH.write_text(f"{body.username}\n{body.password}\n")
+        os.chmod(OPENVPN_CREDS_PATH, 0o600)
+
+    return {"success": True, "path": str(OPENVPN_CONF_PATH), "next": "needs_verify"}
+
+
 @router.post("/setup/verify", response_model=VerifyResponse)
 async def verify_connection():
-    """Bring up WireGuard temporarily and verify connectivity."""
-    if not WG_CONF_PATH.exists():
-        return VerifyResponse(success=False, error="No WireGuard config found")
+    """Bring up the VPN temporarily and verify connectivity. Supports WireGuard and OpenVPN."""
+    if WG_CONF_PATH.exists():
+        return await _verify_wireguard()
+    elif OPENVPN_CONF_PATH.exists():
+        return await _verify_openvpn()
+    return VerifyResponse(success=False, error="No VPN config found — upload a WireGuard or OpenVPN config first")
 
+
+async def _verify_wireguard() -> VerifyResponse:
     try:
-        # Symlink for wg-quick
         activate_wg_config(WG_CONF_PATH)
 
-        # Bring up tunnel
         result = subprocess.run(
             ["wg-quick", "up", "wg0"],
             capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
@@ -224,46 +275,80 @@ async def verify_connection():
                 error=f"WireGuard failed to start: {result.stderr.strip()}"
             )
 
-        # Check connectivity via geo-IP
-        ip_result = subprocess.run(
-            ["curl", "-sf", "--max-time", "8", "https://ipwho.is/"],
-            capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
-        )
-
-        public_ip = ""
-        country = ""
-        city = ""
-
-        if ip_result.returncode == 0:
-            try:
-                data = json.loads(ip_result.stdout)
-                public_ip = data.get("ip", "")
-                country = data.get("country", "")
-                city = data.get("city", "")
-            except json.JSONDecodeError:
-                pass
+        public_ip, country, city = _geo_ip_check()
 
         # Always tear down — setup/complete will bring it up for real
         subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
 
         if not public_ip:
-            return VerifyResponse(
-                success=False,
-                error="VPN connected but couldn't verify public IP"
-            )
-
-        return VerifyResponse(
-            success=True,
-            public_ip=public_ip,
-            country=country,
-            city=city,
-        )
+            return VerifyResponse(success=False, error="VPN connected but couldn't verify public IP")
+        return VerifyResponse(success=True, public_ip=public_ip, country=country, city=city)
 
     except subprocess.TimeoutExpired:
         subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
         return VerifyResponse(success=False, error="Connection timed out")
     except Exception as e:
         subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
+        return VerifyResponse(success=False, error=str(e))
+
+
+async def _verify_openvpn() -> VerifyResponse:
+    pid_file = Path("/tmp/ovpn-verify.pid")
+    log_file = Path("/tmp/ovpn-verify.log")
+
+    def _teardown() -> None:
+        if pid_file.exists():
+            try:
+                pid = int(pid_file.read_text().strip())
+                subprocess.run(["kill", str(pid)], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
+            except Exception:
+                pass
+        subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
+
+    try:
+        # Clean up any lingering process
+        _teardown()
+
+        cmd = [
+            "openvpn", "--config", str(OPENVPN_CONF_PATH),
+            "--daemon",
+            "--log", str(log_file),
+            "--writepid", str(pid_file),
+        ]
+        if OPENVPN_CREDS_PATH.exists():
+            cmd += ["--auth-user-pass", str(OPENVPN_CREDS_PATH)]
+
+        subprocess.run(cmd, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG)
+
+        # Poll for tun0 (up to 30s)
+        import asyncio
+        tun_up = False
+        for _ in range(30):
+            check = subprocess.run(["ip", "link", "show", "tun0"], capture_output=True)
+            if check.returncode == 0:
+                tun_up = True
+                break
+            await asyncio.sleep(1)
+
+        if not tun_up:
+            _teardown()
+            return VerifyResponse(
+                success=False,
+                error="OpenVPN started but tun0 interface never appeared — check your config",
+            )
+
+        public_ip, country, city = _geo_ip_check()
+        _teardown()
+
+        if not public_ip:
+            return VerifyResponse(success=False, error="VPN connected but couldn't verify public IP")
+        return VerifyResponse(success=True, public_ip=public_ip, country=country, city=city)
+
+    except subprocess.TimeoutExpired:
+        _teardown()
+        return VerifyResponse(success=False, error="OpenVPN connection timed out")
+    except Exception as e:
+        _teardown()
         return VerifyResponse(success=False, error=str(e))
 
 
@@ -333,12 +418,17 @@ async def complete_setup(request: Request):
     state_mgr: StateManager = request.app.state.state
     provider = state_mgr.setup_provider or "custom"
 
-    # Gluetun manages VPN externally — no WG config needed
-    if provider != "gluetun" and not WG_CONF_PATH.exists():
-        return {"success": False, "error": "No WireGuard config — run /setup/wireguard first"}
+    # Gluetun manages VPN externally — no local config needed
+    has_wg = WG_CONF_PATH.exists()
+    has_ovpn = OPENVPN_CONF_PATH.exists()
+    if provider != "gluetun" and not has_wg and not has_ovpn:
+        return {"success": False, "error": "No VPN config found — run /setup/wireguard or /setup/openvpn first"}
 
-    # Persist provider to settings YAML so it survives container restarts
-    save_settings({"vpn_provider": provider})
+    # Persist provider + vpn_type so it survives container restarts
+    settings: dict = {"vpn_provider": provider}
+    if has_ovpn and not has_wg:
+        settings["vpn_type"] = "openvpn"
+    save_settings(settings)
 
     # Mark setup complete
     state_mgr.setup_required = False

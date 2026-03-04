@@ -5,7 +5,6 @@ What's coming. No promises on timelines — this is built for the love of blinke
 ## Next
 
 - [ ] Smart server selection — lowest load, nearest geo, preferred region sticky, failover-aware
-- [ ] Full OpenVPN parity — connect pipeline, server browser, setup wizard for OVPN-only providers
 
 ## Future
 
@@ -22,6 +21,7 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
+- [x] Full OpenVPN parity — setup wizard, verify step, and config pipeline for OpenVPN-only providers (v3.1.0)
 - [x] Provider wave 3 — Privado, PureVPN, VPNSecure, VPN Unlimited, VyprVPN, FastestVPN, HideMyAss, SlickVPN, Giganews (v3.0.0)
 - [x] Provider wave 2 — IPVanish, TorGuard, PrivateVPN, Perfect Privacy, CyberGhost (v2.9.0)
 - [x] Provider wave 1 — NordVPN (full rotation), Windscribe, AirVPN, Surfshark, ExpressVPN (v2.8.0)

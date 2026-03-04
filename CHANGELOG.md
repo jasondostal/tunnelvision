@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.1.0 — Full OpenVPN Parity (2026-03-04)
+
+Setup wizard now fully supports OpenVPN-only providers. Previously, providers like HideMyAss,
+VyprVPN, VPNSecure, CyberGhost, Perfect Privacy, and Giganews would drop users into a dead-end
+credentials step. Now they get a proper config paste flow, optional credential fields, and a live
+verify step — same first-class experience as WireGuard.
+
+### Setup wizard
+- OpenVPN-only providers now route to an OpenVPN config paste step instead of a credentials dead-end
+- New `.ovpn` textarea with OpenVPN-appropriate placeholder and provider-specific instructions
+- Optional username/password fields for providers that require credentials alongside the config
+- Verify step now supports OpenVPN: starts the daemon, waits for `tun0`, runs geo-IP check, tears down cleanly
+
+### Backend
+- New `POST /setup/openvpn` endpoint — validates, writes `/config/openvpn/provider.ovpn`, optionally writes `credentials.txt`
+- `POST /setup/verify` now auto-detects WireGuard vs. OpenVPN config and branches accordingly
+- `POST /setup/complete` accepts OpenVPN config as valid; writes `vpn_type=openvpn` to settings when appropriate
+- `GET /setup/status` now returns `has_config: true` when an OpenVPN config is present
+- New constants: `OPENVPN_CONF_PATH`, `OPENVPN_CREDS_PATH` in `api/constants.py`
+
+### Tests
+- 681 total tests (up from 673)
+
+---
+
 ## v3.0.0 — Provider Wave 3 (2026-03-04)
 
 Nine more provider integrations — brings the total to 25 supported VPN providers.

@@ -22,6 +22,8 @@ interface Provider {
   description: string;
   setup_type: string;
   logo?: string;
+  supports_wireguard?: boolean;
+  supports_openvpn?: boolean;
 }
 
 interface VerifyResult {
@@ -83,8 +85,11 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   const [error, setError] = useState("");
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
 
-  // Config paste (custom/proton)
+  // Config paste (custom/proton/openvpn providers)
   const [configText, setConfigText] = useState("");
+  const [isOpenvpnProvider, setIsOpenvpnProvider] = useState(false);
+  const [ovpnUser, setOvpnUser] = useState("");
+  const [ovpnPass, setOvpnPass] = useState("");
 
   // WG credentials (mullvad/ivpn)
   const [privateKey, setPrivateKey] = useState("");
@@ -126,7 +131,10 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider: id }),
       });
-      if (id === "custom" || id === "proton") {
+      const meta = providers.find((p) => p.id === id);
+      const isOvpn = meta?.supports_wireguard === false && meta?.supports_openvpn === true;
+      setIsOpenvpnProvider(isOvpn);
+      if (id === "custom" || id === "proton" || isOvpn) {
         setStep("config");
       } else {
         setStep("credentials");
@@ -134,7 +142,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
     } catch {
       setError("Failed to select provider");
     }
-  }, []);
+  }, [providers]);
 
   const doVerify = useCallback(async () => {
     setLoading(true);
@@ -205,16 +213,20 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
 
   const submitConfig = useCallback(async () => {
     if (!configText.trim()) {
-      setError("Paste your WireGuard configuration");
+      setError(isOpenvpnProvider ? "Paste your OpenVPN configuration" : "Paste your WireGuard configuration");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const resp = await fetch("/api/v1/setup/wireguard", {
+      const url = isOpenvpnProvider ? "/api/v1/setup/openvpn" : "/api/v1/setup/wireguard";
+      const body = isOpenvpnProvider
+        ? { config: configText, username: ovpnUser, password: ovpnPass }
+        : { config: configText };
+      const resp = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config: configText }),
+        body: JSON.stringify(body),
       });
       const data = await resp.json();
       if (!data.success) {
@@ -226,7 +238,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [configText, doVerify]);
+  }, [configText, isOpenvpnProvider, ovpnUser, ovpnPass, doVerify]);
 
   // Load servers when entering server step
   useEffect(() => {
@@ -592,8 +604,8 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
         </div>
       )}
 
-      {/* Config Input (custom/proton — paste textarea) */}
-      {step === "config" && (
+      {/* Config Input (WireGuard — custom/proton) */}
+      {step === "config" && !isOpenvpnProvider && (
         <div>
           <h2 className="mb-2 text-xl font-bold text-text-primary">
             Paste your WireGuard config
@@ -616,6 +628,76 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
               className="w-full rounded-xl border border-surface-border bg-surface-card p-3 pl-10 font-mono text-sm text-text-primary placeholder:text-text-muted/50 focus:border-amber-500/50 focus:outline-none"
               rows={10}
             />
+          </div>
+
+          <WizardError message={error} />
+
+          <div className="mt-4 flex gap-3">
+            <button onClick={goBackToProvider} className={backBtnClass}>
+              Back
+            </button>
+            <button onClick={submitConfig} disabled={loading} className={primaryBtnClass}>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Verify Connection
+                  <ChevronRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Config Input (OpenVPN — providers without WireGuard support) */}
+      {step === "config" && isOpenvpnProvider && (
+        <div>
+          <h2 className="mb-2 text-xl font-bold text-text-primary">
+            Paste your OpenVPN config
+          </h2>
+          <p className="mb-1 text-sm text-text-secondary">
+            Download an <span className="font-medium">.ovpn</span> file from your provider's account page and paste it below.
+          </p>
+          <p className="mb-4 text-xs text-text-muted">
+            Your config stays on this device — never sent anywhere except your VPN provider.
+          </p>
+
+          <div className="relative">
+            <FileText className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
+            <textarea
+              value={configText}
+              onChange={(e) => setConfigText(e.target.value)}
+              placeholder={`client\ndev tun\nproto udp\nremote your-server.example.com 1194\n...`}
+              className="w-full rounded-xl border border-surface-border bg-surface-card p-3 pl-10 font-mono text-sm text-text-primary placeholder:text-text-muted/50 focus:border-amber-500/50 focus:outline-none"
+              rows={8}
+            />
+          </div>
+
+          <div className="mt-3 space-y-2">
+            <p className="text-xs text-text-muted">
+              Credentials <span className="text-text-muted/60">(optional — only if your .ovpn requires a username and password)</span>
+            </p>
+            <div className="relative">
+              <User className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+              <input
+                type="text"
+                value={ovpnUser}
+                onChange={(e) => setOvpnUser(e.target.value)}
+                placeholder="Username"
+                className={inputClass}
+              />
+            </div>
+            <div className="relative">
+              <Key className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+              <input
+                type="password"
+                value={ovpnPass}
+                onChange={(e) => setOvpnPass(e.target.value)}
+                placeholder="Password"
+                className={inputClass}
+              />
+            </div>
           </div>
 
           <WizardError message={error} />
@@ -746,7 +828,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                 Testing your connection...
               </h2>
               <p className="text-sm text-text-secondary">
-                Bringing up WireGuard and verifying your IP
+                Bringing up the VPN tunnel and verifying your IP
               </p>
             </>
           )}
