@@ -1,5 +1,49 @@
 # Changelog
 
+## v2.7.0 — Infrastructure Hardening (2026-03-04)
+
+Security, resilience, and observability upgrades across the boot chain, VPN engine, port forwarding, and server management layers.
+
+### Firewall-First Boot
+- Pre-VPN firewall phase (`init-firewall-pre`) runs before the WireGuard tunnel comes up, eliminating the startup leak window
+- Parses the VPN endpoint from the active config (WireGuard or OpenVPN), resolves hostnames, and locks down all traffic to that endpoint + loopback + LAN API before any packets flow
+- Setup mode (no config yet) skips gracefully — the lock applies only when a config is present
+- Boot chain: `init-environment → init-firewall-pre → init-wireguard → init-killswitch`
+
+### Userspace WireGuard Fallback
+- `WG_USERSPACE=auto|kernel|userspace` — automatic detection of kernel WireGuard support at startup
+- In `auto` mode (default): probes for the `wireguard` kernel module and falls back to `wireguard-go` if unavailable
+- Works in LXC containers, NAS devices, and any environment without kernel module access
+- `WG_USERSPACE=kernel` forces kernel mode and logs an error if unavailable; `WG_USERSPACE=userspace` forces wireguard-go unconditionally
+- Implementation written to state file (`/var/run/tunnelvision/wg_implementation`) for observability
+
+### Port Forward Hooks
+- `PORT_FORWARD_HOOK` — path to a script or command called with the assigned port number on every port change
+- Called with `0` when the port is released (tunnel teardown, rotation, stop)
+- Fires from both the WireGuard port forward service (PIA) and the NAT-PMP service (ProtonVPN)
+- Non-blocking, failure-tolerant: hook errors are logged but never propagate to the VPN lifecycle
+- Enables external automation: update qBittorrent, update *arr configs, ping a webhook, anything
+
+### Server List Auto-Updater
+- Background service refreshes provider server caches on a configurable interval
+- `SERVER_LIST_AUTO_UPDATE=true` (default) / `SERVER_LIST_UPDATE_INTERVAL=<seconds>` (default: `PROVIDER_CACHE_TTL`)
+- Only refreshes providers with active instances — no wasted API calls for providers you're not using
+- Starts and stops cleanly with the application lifecycle
+
+### Richer Server Filters
+- `ServerFilter` dataclass replaces loose `country/city` kwargs across the provider layer
+- New filter dimensions: `owned_only`, `p2p`, `streaming`, `port_forward`, `secure_core`, `multihop`, `max_load`
+- Filters compose with AND logic — combine any number of dimensions
+- `GET /api/v1/vpn/servers` exposes all filter dimensions as query params
+- `POST /api/v1/vpn/connect` accepts filter fields in the request body
+- Response expanded: `city_code`, `load`, `port_forward`, `p2p`, `streaming`, `secure_core`, `multihop`
+
+### Tests
+- 65 new tests covering pre-VPN firewall script parsing, userspace WireGuard detection, port forward hook execution, server filter logic, auto-updater settings and lifecycle
+- 319 total tests (up from 254)
+
+---
+
 ## v2.6.0 — Provider Framework Refactor (2026-03-04)
 
 The foundation for scaling from 6 to 23+ native providers. Zero new user-facing features — all internal architecture. Every provider is now a single file, auto-discovered, auto-configured, and auto-tested.

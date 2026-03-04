@@ -258,6 +258,7 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `VPN_COUNTRY` | *(empty)* | Filter server rotation by country (e.g. `ch`, `us`) |
 | `VPN_CITY` | *(empty)* | Filter server rotation by city (e.g. `zurich`) |
 | `KILLSWITCH_ENABLED` | `true` | Enable nftables killswitch |
+| `WG_USERSPACE` | `auto` | WireGuard engine: `auto` (detect kernel support), `kernel`, or `userspace` (wireguard-go, for LXC/NAS) |
 | `WEBUI_PORT` | `8080` | qBittorrent WebUI port |
 | `API_PORT` | `8081` | TunnelVision API port |
 | `API_KEY` | *(empty)* | Set to require `X-API-Key` header on API calls |
@@ -274,6 +275,7 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `NOTIFY_GOTIFY_URL` | *(empty)* | Gotify server URL |
 | `NOTIFY_GOTIFY_TOKEN` | *(empty)* | Gotify app token |
 | `PORT_FORWARD_ENABLED` | `false` | Enable port forwarding (PIA, ProtonVPN) |
+| `PORT_FORWARD_HOOK` | *(empty)* | Script/command called with the assigned port number on each port change; called with `0` on release |
 | `PROTON_USER` | *(empty)* | ProtonVPN username (OpenVPN/IKEv2 credentials) |
 | `PROTON_PASS` | *(empty)* | ProtonVPN password |
 | `FIREWALL_VPN_INPUT_PORTS` | *(empty)* | Comma-separated ports to accept on VPN interface |
@@ -295,6 +297,8 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `PGID` | `1000` | Group ID for file permissions |
 | `TZ` | `America/Chicago` | Container timezone |
 | `HEALTH_CHECK_INTERVAL` | `30` | Seconds between health checks |
+| `SERVER_LIST_AUTO_UPDATE` | `true` | Automatically refresh provider server lists in the background |
+| `SERVER_LIST_UPDATE_INTERVAL` | `3600` | Seconds between server list refreshes |
 
 </details>
 
