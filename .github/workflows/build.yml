@@ -66,6 +66,7 @@ jobs:
             type=sha,prefix=
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -75,3 +76,78 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    permissions:
+      packages: read
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start container
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_SHA:0:7}"
+          docker run -d \
+            --name tunnelvision-smoke \
+            -e VPN_ENABLED=false \
+            -e QBT_ENABLED=false \
+            -p 8081:8081 \
+            "$IMAGE"
+
+      - name: Wait for API
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8081/api/v1/health > /dev/null 2>&1; then
+              echo "API ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not become ready within 60s"
+          docker logs tunnelvision-smoke
+          exit 1
+
+      - name: Assert /health
+        run: |
+          RESP=$(curl -sf http://localhost:8081/api/v1/health)
+          echo "$RESP"
+          echo "$RESP" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          for key in ('healthy', 'vpn', 'killswitch', 'api', 'checked_at'):
+              assert key in d, f'Missing key {key!r}: {d}'
+          assert d['api'] == 'running', f\"Expected api=running, got: {d['api']}\"
+          print('health: OK')
+          "
+
+      - name: Assert /system
+        run: |
+          RESP=$(curl -sf http://localhost:8081/api/v1/system)
+          echo "$RESP"
+          echo "$RESP" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert 'version' in d, f'Missing version field: {d}'
+          print(f\"version {d['version']}: OK\")
+          "
+
+      - name: Assert UI is served
+        run: |
+          curl -sf http://localhost:8081/ > /dev/null
+          echo "UI: OK"
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker logs tunnelvision-smoke
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f tunnelvision-smoke || true
