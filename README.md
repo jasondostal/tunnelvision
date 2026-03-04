@@ -16,7 +16,7 @@ qBittorrent + WireGuard/OpenVPN + killswitch + REST API + dashboard. One contain
 
 Drop your VPN config, `docker compose up`, and you can see everything — what IP you're on, where you're exiting, transfer stats, killswitch state, qBittorrent health. From your Homepage dashboard, from Home Assistant, from Prometheus, from the built-in UI, from `curl`. No guessing. No SSH-ing in.
 
-Works with **any WireGuard or OpenVPN provider**. Native integrations for [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), [PIA](https://privateinternetaccess.com), [ProtonVPN](https://protonvpn.com), [NordVPN](https://nordvpn.com), [Windscribe](https://windscribe.com), [AirVPN](https://airvpn.org), [Surfshark](https://surfshark.com), and [ExpressVPN](https://expressvpn.com) — server browsing, rotation, port forwarding. Or bring your own config from any provider. Built-in DNS (DoT, ad-blocking), HTTP CONNECT proxy, and SOCKS5/Shadowsocks proxy.
+Works with **any WireGuard or OpenVPN provider**. Native integrations for [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), [PIA](https://privateinternetaccess.com), [ProtonVPN](https://protonvpn.com), [NordVPN](https://nordvpn.com), [Windscribe](https://windscribe.com), [AirVPN](https://airvpn.org), [Surfshark](https://surfshark.com), [ExpressVPN](https://expressvpn.com), and [19 more](CHANGELOG.md) — server browsing, rotation, port forwarding, connection monitoring. Or bring your own config from any provider. Built-in DNS (DoT, ad-blocking), HTTP CONNECT proxy, and SOCKS5/Shadowsocks proxy.
 
 <p align="center">
   <img src="images/screenshot-dashboard.png" alt="TunnelVision Dashboard" width="700">

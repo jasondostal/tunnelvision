@@ -1,5 +1,50 @@
 # Changelog
 
+## v3.0.0 — Provider Wave 3 (2026-03-04)
+
+Nine more provider integrations — brings the total to 25 supported VPN providers.
+
+### Privado
+- Connection monitoring via geo-IP
+- Setup: log into your Privado account → Apps → Manual → WireGuard. Download config and place in `/config/wireguard/wg0.conf`.
+
+### PureVPN
+- Connection monitoring via geo-IP
+- Setup: purevpn.com → Members Area → Manually configure → WireGuard. Note: configs expire after 30 minutes — regenerate as needed.
+
+### VPNSecure
+- Connection monitoring via geo-IP
+- WireGuard not supported (OpenVPN only). Setup: vpnsecure.me account → Manual OpenVPN configs. Set `VPN_TYPE=openvpn`.
+
+### VPN Unlimited
+- Connection monitoring via geo-IP
+- Setup: my.keepsolid.com → Manage Devices → Manual Config → WireGuard.
+
+### VyprVPN
+- Connection monitoring via geo-IP
+- WireGuard is app-only — no manual config export available. Requires OpenVPN for container deployments — set `VPN_TYPE=openvpn`.
+
+### FastestVPN
+- Connection monitoring via geo-IP
+- Setup: contact FastestVPN support (support@fastestvpn.com) to request WireGuard config files.
+
+### HideMyAss
+- Connection monitoring via geo-IP
+- WireGuard is app-only (Windows). Requires OpenVPN — log into HMA account → Servers → Manual setup → OpenVPN. Set `VPN_TYPE=openvpn`.
+
+### SlickVPN
+- Connection monitoring via geo-IP
+- Note: SlickVPN is no longer accepting new subscriptions. Existing subscribers: download config from your SlickVPN dashboard.
+
+### Giganews
+- Connection monitoring via geo-IP
+- Giganews bundles VyprVPN. WireGuard is app-only — manual config export not available. Requires OpenVPN — set `VPN_TYPE=openvpn`.
+
+### Tests
+- 673 total tests (up from 513)
+
+---
+
 ## v2.9.0 — Provider Wave 2 (2026-03-04)
 
 Five more provider integrations. Reality check included — not every provider has a clean API.

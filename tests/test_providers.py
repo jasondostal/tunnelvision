@@ -37,6 +37,8 @@ class TestProviderDiscovery:
             "mullvad", "ivpn", "pia", "proton", "custom", "gluetun",
             "nordvpn", "windscribe", "airvpn", "surfshark", "expressvpn",
             "ipvanish", "torguard", "privatevpn", "perfectprivacy", "cyberghost",
+            "privado", "purevpn", "vpnsecure", "vpnunlimited", "vyprvpn",
+            "fastestvpn", "hidemyass", "slickvpn", "giganews",
         }
         assert expected == set(PROVIDER_IDS)
 

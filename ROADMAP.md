@@ -4,12 +4,11 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Next
 
-- [ ] **Provider wave 3** — Privado, PureVPN, VPNSecure, VPN Unlimited, VyprVPN, FastestVPN, HideMyAss, SlickVPN, Giganews
+- [ ] Smart server selection — lowest load, nearest geo, preferred region sticky, failover-aware
+- [ ] Full OpenVPN parity — connect pipeline, server browser, setup wizard for OVPN-only providers
 
 ## Future
 
-- [ ] Smart server selection — lowest load, nearest geo, preferred region sticky, failover-aware
-- [ ] Full OpenVPN parity — connect pipeline, server browser, setup wizard for OVPN-only providers
 - [ ] Multi-architecture builds — armv6, armv7, i686, ppc64le
 - [ ] Provider health dashboard — per-provider API reachability, cache freshness, account expiry
 - [ ] Config export/import — encrypted archive for migration
@@ -23,6 +22,7 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
+- [x] Provider wave 3 — Privado, PureVPN, VPNSecure, VPN Unlimited, VyprVPN, FastestVPN, HideMyAss, SlickVPN, Giganews (v3.0.0)
 - [x] Provider wave 2 — IPVanish, TorGuard, PrivateVPN, Perfect Privacy, CyberGhost (v2.9.0)
 - [x] Provider wave 1 — NordVPN (full rotation), Windscribe, AirVPN, Surfshark, ExpressVPN (v2.8.0)
 - [x] Infrastructure hardening — firewall-first boot, userspace WireGuard fallback (wireguard-go), port forward hooks, server auto-updater, richer server filters (v2.7.0)
