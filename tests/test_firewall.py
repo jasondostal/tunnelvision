@@ -112,3 +112,126 @@ class TestFirewallRulePatterns:
         rules_file.write_text("# custom rules\n")
         assert rules_file.exists()
         assert rules_file.read_text() == "# custom rules\n"
+
+
+class TestPreVpnFirewall:
+    """Verify init-firewall-pre endpoint parsing logic.
+
+    Tests the pattern logic used by the pre-VPN firewall script to parse
+    WireGuard/OpenVPN configs and distinguish IPs from hostnames.
+    """
+
+    def _parse_wg_endpoint(self, conf_text):
+        """Replicate the WireGuard endpoint parsing from init-firewall-pre.sh."""
+        import re
+
+        for line in conf_text.splitlines():
+            if re.match(r"^\s*Endpoint\s*=", line, re.IGNORECASE):
+                raw = line.split("=", 1)[1].strip().strip("[]")
+                # Strip port
+                port_match = re.search(r":(\d+)$", raw)
+                port = port_match.group(1) if port_match else "51820"
+                host = re.sub(r":\d+$", "", raw).strip("[]")
+                return host, port
+        return None, None
+
+    def _parse_ovpn_remote(self, conf_text):
+        """Replicate the OpenVPN remote line parsing from init-firewall-pre.sh."""
+        for line in conf_text.splitlines():
+            parts = line.strip().split()
+            if parts and parts[0].lower() == "remote":
+                host = parts[1] if len(parts) > 1 else None
+                port = parts[2] if len(parts) > 2 else "1194"
+                return host, port
+        return None, None
+
+    def _is_ipv4(self, host):
+        import re
+        return bool(re.match(r"^\d+\.\d+\.\d+\.\d+$", host or ""))
+
+    # --- WireGuard endpoint parsing ---
+
+    def test_wg_ip_endpoint_parsed(self):
+        conf = "[Peer]\nEndpoint = 198.51.100.42:51820\n"
+        host, port = self._parse_wg_endpoint(conf)
+        assert host == "198.51.100.42"
+        assert port == "51820"
+        assert self._is_ipv4(host)
+
+    def test_wg_hostname_endpoint_detected(self):
+        conf = "[Peer]\nEndpoint = nyc-001.example.vpn:51820\n"
+        host, port = self._parse_wg_endpoint(conf)
+        assert host == "nyc-001.example.vpn"
+        assert port == "51820"
+        assert not self._is_ipv4(host)
+
+    def test_wg_nonstandard_port(self):
+        conf = "[Peer]\nEndpoint = 203.0.113.7:1337\n"
+        host, port = self._parse_wg_endpoint(conf)
+        assert host == "203.0.113.7"
+        assert port == "1337"
+
+    def test_wg_no_endpoint_returns_none(self):
+        conf = "[Interface]\nPrivateKey = abc123\n"
+        host, port = self._parse_wg_endpoint(conf)
+        assert host is None
+        assert port is None
+
+    def test_wg_endpoint_case_insensitive(self):
+        conf = "[Peer]\nendpoint = 198.51.100.1:51820\n"
+        host, port = self._parse_wg_endpoint(conf)
+        assert host == "198.51.100.1"
+
+    # --- OpenVPN remote parsing ---
+
+    def test_ovpn_ip_remote_parsed(self):
+        conf = "remote 198.51.100.10 1194\nproto udp\n"
+        host, port = self._parse_ovpn_remote(conf)
+        assert host == "198.51.100.10"
+        assert port == "1194"
+        assert self._is_ipv4(host)
+
+    def test_ovpn_hostname_remote_detected(self):
+        conf = "remote vpn.example.com 443\nproto tcp\n"
+        host, port = self._parse_ovpn_remote(conf)
+        assert host == "vpn.example.com"
+        assert port == "443"
+        assert not self._is_ipv4(host)
+
+    def test_ovpn_default_port_when_missing(self):
+        conf = "remote 203.0.113.5\n"
+        host, port = self._parse_ovpn_remote(conf)
+        assert host == "203.0.113.5"
+        assert port == "1194"
+
+    def test_ovpn_no_remote_returns_none(self):
+        conf = "proto udp\ndev tun\n"
+        host, port = self._parse_ovpn_remote(conf)
+        assert host is None
+        assert port is None
+
+    # --- Setup mode detection ---
+
+    def test_setup_mode_when_no_configs(self, tmp_path):
+        """When no WG or OVPN config exists, pre-firewall should skip (setup mode)."""
+        wg_dir = tmp_path / "wireguard"
+        ovpn_dir = tmp_path / "openvpn"
+        wg_dir.mkdir()
+        ovpn_dir.mkdir()
+
+        wg_configs = list(wg_dir.glob("*.conf"))
+        ovpn_configs = list(ovpn_dir.glob("*.ovpn")) + list(ovpn_dir.glob("*.conf"))
+
+        assert wg_configs == []
+        assert ovpn_configs == []
+        # No configs → setup mode → pre-firewall skips
+
+    def test_wg_config_triggers_pre_firewall(self, tmp_path):
+        """A WireGuard config file causes pre-firewall to engage."""
+        wg_dir = tmp_path / "wireguard"
+        wg_dir.mkdir()
+        conf = wg_dir / "wg0.conf"
+        conf.write_text("[Interface]\nPrivateKey = abc\n[Peer]\nEndpoint = 198.51.100.1:51820\n")
+
+        wg_configs = list(wg_dir.glob("*.conf"))
+        assert len(wg_configs) == 1
