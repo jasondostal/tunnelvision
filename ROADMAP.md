@@ -2,12 +2,24 @@
 
 What's coming. No promises on timelines — this is built for the love of blinkenlights.
 
-## Next
+## Next — Self-Healing VPN
+
+- [ ] Auto-reconnect watchdog — health check detects sustained failure, triggers reconnect with backoff
+- [ ] Multi-config failover — drop multiple `.conf` files, cycle through on failure
+- [ ] SSE + MQTT broadcast on reconnect events (reconnecting, failed, recovered)
+- [ ] Connection history UI — visualize uptime, rotations, failures in the dashboard
+
+## Next — Dashboard Polish
 
 - [ ] Server browser in dashboard UI (filter by country/city, show load)
+- [ ] Multi-config management (switch between VPN configs from UI)
+- [ ] Setup wizard completion (guided first-run for new users)
+- [ ] Settings panel wiring (runtime config changes from dashboard)
+
+## Future
+
 - [ ] Per-torrent VPN binding (pause individual torrents on VPN drop)
 - [ ] Bandwidth scheduling (speed limits by time of day)
-- [ ] Multi-config management (switch between VPN configs from UI)
 - [ ] HACS default store listing (pending review)
 - [ ] Native Homepage widget type (not customapi)
 - [ ] WireGuard key generation in setup wizard (no copy-paste needed)
@@ -17,10 +29,13 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
+- [x] Architecture cleanup — StateManager, Config consolidation, MQTT dispatch (v2.2.0)
+- [x] SSE real-time events + HACS SSE push (v2.1.0)
+- [x] Gluetun sidecar mode (v2.0.0)
 - [x] IVPN provider integration (v1.1.0)
 - [x] PIA provider integration (v1.1.0)
 - [x] Port forwarding — PIA (v1.1.0)
-- [x] Auto-reconnect watchdog (v1.2.0)
+- [x] Reconnect endpoint + server rotation (v1.2.0)
 - [x] Notification webhooks — Discord, Slack, Gotify (v1.2.0)
 - [x] Speed test endpoint (v1.2.0)
 - [x] Config backup/restore API (v1.2.0)

@@ -1,5 +1,32 @@
 # Changelog
 
+## v2.2.0 — Architecture Cleanup (2026-03-04)
+
+Internal refactor. Zero new features, zero breaking changes. The plumbing got proper.
+
+### StateManager
+- New singleton service (`api/services/state.py`) owns all `/var/run/tunnelvision/*` file I/O
+- Typed property accessors for every state key, `snapshot()` for bulk reads
+- Eliminates 5 duplicated `_read_state()` helpers scattered across routes
+
+### Config Consolidation
+- `os.getenv()` now only appears in `config.py` (and the intentional `settings.py` YAML fallback)
+- All provider classes accept `Config` in `__init__` instead of reading env directly
+- Added missing config fields: `mullvad_account`, `wireguard_private_key`, `wireguard_addresses`, `wireguard_dns`, `allowed_networks`, notification settings
+
+### MQTT Dispatch
+- `_on_message` now calls `do_vpn_restart()`, `do_qbt_pause()` etc. directly
+- Killed subprocess curl to localhost — MQTT and REST share the same code path
+- Control route handlers extracted into standalone `do_*()` functions
+
+### Verification
+- Zero `_read_state()` helpers remain
+- Zero `subprocess curl localhost` calls
+- `os.getenv` confined to `config.py`
+- 30 files touched, +368/-318 lines
+
+---
+
 ## v2.1.0 — Real-Time Events (2026-03-03)
 
 ### Server-Sent Events (SSE)
@@ -48,10 +75,10 @@ custom, mullvad, ivpn, pia, gluetun (sidecar)
 
 Everything from the roadmap, in one push.
 
-### Auto-Reconnect Watchdog
-- Health monitor detects sustained VPN failure (3 consecutive checks, ~90s)
-- Automatically attempts `wg-quick up wg0` to restore the tunnel
-- Configurable via `AUTO_RECONNECT=true` (default on)
+### Reconnect Endpoint
+- `POST /api/v1/vpn/reconnect` — manually trigger VPN reconnection
+- `AUTO_RECONNECT` config flag (default on) — foundation for future watchdog
+- Server rotation reconnects through provider-aware logic (Mullvad, PIA, IVPN pick new servers)
 
 ### Notification Webhooks
 - Discord, Slack, Gotify, and generic webhook support
