@@ -58,6 +58,7 @@ CONFIGURABLE_FIELDS = {
     "wireguard_addresses": {"env": "WIREGUARD_ADDRESSES", "default": "", "secret": False},
     "port_forward_enabled": {"env": "PORT_FORWARD_ENABLED", "default": "false", "secret": False},
     "port_forward_interval": {"env": "PORT_FORWARD_INTERVAL", "default": str(PORT_FORWARD_INTERVAL), "secret": False},
+    "port_forward_hook": {"env": "PORT_FORWARD_HOOK", "default": "", "secret": False},
     "auto_reconnect": {"env": "AUTO_RECONNECT", "default": "true", "secret": False},
     "notify_webhook_url": {"env": "NOTIFY_WEBHOOK_URL", "default": "", "secret": False},
     "notify_gotify_url": {"env": "NOTIFY_GOTIFY_URL", "default": "", "secret": False},

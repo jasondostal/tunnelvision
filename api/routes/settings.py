@@ -41,6 +41,7 @@ class SettingsUpdate(BaseModel):
     wireguard_private_key: str | None = None
     wireguard_addresses: str | None = None
     port_forward_enabled: str | None = None
+    port_forward_hook: str | None = None
     auto_reconnect: str | None = None
     notify_webhook_url: str | None = None
     notify_gotify_url: str | None = None

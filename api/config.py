@@ -60,6 +60,7 @@ class Config:
     pia_pass: str = field(default_factory=lambda: _secret_or_env("PIA_PASS"))
     port_forward_enabled: bool = field(default_factory=lambda: os.getenv("PORT_FORWARD_ENABLED", "false").lower() == "true")
     port_forward_interval: int = field(default_factory=lambda: int(os.getenv("PORT_FORWARD_INTERVAL", str(PORT_FORWARD_INTERVAL))))
+    port_forward_hook: str = field(default_factory=lambda: os.getenv("PORT_FORWARD_HOOK", ""))
 
     # WireGuard config generation (for API-capable providers)
     wireguard_private_key: str = field(default_factory=lambda: _secret_or_env("WIREGUARD_PRIVATE_KEY"))

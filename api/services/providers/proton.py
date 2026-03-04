@@ -111,7 +111,7 @@ class ProtonProvider(VPNProvider):
         """Start NAT-PMP port forwarding if enabled and server supports it."""
         if config and config.port_forward_enabled and server.port_forward:
             from api.services.natpmp import get_natpmp_service
-            get_natpmp_service().start(peer.endpoint)
+            get_natpmp_service(config=config).start(peer.endpoint)
 
     async def _fetch_servers(self) -> list[ServerInfo]:
         """Fetch ProtonVPN server list with WireGuard endpoints."""

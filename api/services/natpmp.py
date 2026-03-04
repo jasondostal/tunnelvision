@@ -34,6 +34,7 @@ from api.constants import (
     NATPMP_REFRESH_INTERVAL,
     TIMEOUT_QUICK,
 )
+from api.services.hooks import fire_port_change_hook
 from api.services.state import StateManager
 
 logger = logging.getLogger(__name__)
@@ -76,10 +77,15 @@ def parse_response(data: bytes) -> dict | None:
 class NatPMPService:
     """Manages NAT-PMP port forwarding lifecycle."""
 
-    def __init__(self, state_mgr: StateManager | None = None):
+    def __init__(self, config=None, state_mgr: StateManager | None = None):
+        self._config = config
         self._state = state_mgr or StateManager()
         self._task: asyncio.Task | None = None
         self._port: int | None = None
+
+    @property
+    def _hook_script(self) -> str:
+        return self._config.port_forward_hook if self._config else ""
 
     @property
     def port(self) -> int | None:
@@ -101,6 +107,9 @@ class NatPMPService:
             self._task.cancel()
         self._port = None
         self._state.delete_forwarded_port()
+        asyncio.get_event_loop().create_task(
+            fire_port_change_hook(self._hook_script, 0)
+        )
 
     async def _run(self, gateway_ip: str):
         """Request mapping, then keep alive before lifetime expires."""
@@ -113,6 +122,7 @@ class NatPMPService:
                         self._port = ext_port
                         self._state.forwarded_port = str(ext_port)
                         logger.info(f"NAT-PMP: mapped external port {ext_port}")
+                        await fire_port_change_hook(self._hook_script, ext_port)
                 else:
                     logger.warning("NAT-PMP: mapping request failed")
 
@@ -142,8 +152,8 @@ class NatPMPService:
 _service: NatPMPService | None = None
 
 
-def get_natpmp_service() -> NatPMPService:
+def get_natpmp_service(config=None) -> NatPMPService:
     global _service
     if _service is None:
-        _service = NatPMPService()
+        _service = NatPMPService(config=config)
     return _service

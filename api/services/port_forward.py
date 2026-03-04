@@ -14,6 +14,7 @@ from pathlib import Path
 
 from api.config import Config
 from api.constants import PORT_FORWARD_INTERVAL, http_client
+from api.services.hooks import fire_port_change_hook
 from api.services.state import StateManager
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,10 @@ class PortForwardService:
         if self._config:
             return self._config.port_forward_interval
         return PORT_FORWARD_INTERVAL
+
+    @property
+    def _hook_script(self) -> str:
+        return self._config.port_forward_hook if self._config else ""
 
     @property
     def port(self) -> int | None:
@@ -92,9 +97,10 @@ class PortForwardService:
                 logger.error("Port forwarding: no port in payload")
                 return
 
-            # Write port to state file
+            # Write port to state file and fire hook
             self._state.forwarded_port = str(self._port)
             logger.info(f"Port forwarding: assigned port {self._port}")
+            await fire_port_change_hook(self._hook_script, self._port)
 
             # Step 2: Bind and keep alive
             while True:
@@ -103,6 +109,7 @@ class PortForwardService:
 
         except asyncio.CancelledError:
             logger.info("Port forwarding: stopped")
+            await fire_port_change_hook(self._hook_script, 0)
         except Exception as e:
             logger.error(f"Port forwarding error: {e}")
 
