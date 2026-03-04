@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query, Request
 
+from api.services.providers.base import ServerFilter
 from api.services.vpn import get_provider
 
 router = APIRouter()
@@ -105,15 +106,27 @@ async def vpn_server_list(
     request: Request,
     country: str | None = Query(None, description="Filter by country name or code"),
     city: str | None = Query(None, description="Filter by city name or code"),
+    owned_only: bool | None = Query(None, description="Only servers owned by the provider"),
+    p2p: bool | None = Query(None, description="P2P / torrenting capability"),
+    streaming: bool | None = Query(None, description="Streaming-optimized servers"),
+    port_forward: bool | None = Query(None, description="Port forwarding capable"),
+    secure_core: bool | None = Query(None, description="Secure core / double-hop"),
+    multihop: bool | None = Query(None, description="Multi-hop routing"),
+    max_load: int | None = Query(None, description="Maximum server load percentage (0-100)"),
 ):
-    """List available VPN servers.
+    """List available VPN servers with optional filtering.
 
-    For Mullvad: full server list with metadata (hostname, location, speed, owned status).
-    For custom: returns empty list.
+    Supported filters vary by provider — see filter_capabilities in /vpn/providers.
+    For custom/paste providers: returns empty list.
     """
     config = request.app.state.config
     provider = get_provider(config.vpn_provider, config)
-    servers = await provider.list_servers(country=country, city=city)
+    server_filter = ServerFilter(
+        country=country, city=city, owned_only=owned_only, p2p=p2p,
+        streaming=streaming, port_forward=port_forward, secure_core=secure_core,
+        multihop=multihop, max_load=max_load,
+    )
+    servers = await provider.list_servers(filter=server_filter)
 
     return {
         "provider": provider.name,
@@ -124,9 +137,16 @@ async def vpn_server_list(
                 "country": s.country,
                 "country_code": s.country_code,
                 "city": s.city,
+                "city_code": s.city_code,
                 "owned": s.owned,
                 "speed_gbps": s.speed_gbps,
+                "load": s.load,
                 "fqdn": s.fqdn,
+                "port_forward": s.port_forward,
+                "p2p": s.p2p,
+                "streaming": s.streaming,
+                "secure_core": s.secure_core,
+                "multihop": s.multihop,
             }
             for s in servers
         ],

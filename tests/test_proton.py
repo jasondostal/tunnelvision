@@ -115,8 +115,9 @@ class TestProtonProvider:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(return_value=mock_resp)
 
+        from api.services.providers.base import ServerFilter
         with patch("httpx.AsyncClient", return_value=mock_client):
-            servers = await provider.list_servers(country="ch")
+            servers = await provider.list_servers(filter=ServerFilter(country="ch"))
 
         assert len(servers) == 1
         assert servers[0].hostname == "CH#1"

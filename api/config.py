@@ -12,6 +12,7 @@ from api.constants import (
     HTTP_PROXY_PORT,
     MQTT_PORT,
     PORT_FORWARD_INTERVAL,
+    PROVIDER_CACHE_TTL,
     SOCKS_PROXY_PORT,
     WEBUI_PORT,
 )
@@ -103,6 +104,10 @@ class Config:
     # Health
     health_check_interval: int = field(default_factory=lambda: int(os.getenv("HEALTH_CHECK_INTERVAL", str(HEALTH_CHECK_INTERVAL))))
     auto_reconnect: bool = field(default_factory=lambda: os.getenv("AUTO_RECONNECT", "true").lower() == "true")
+
+    # Server list
+    server_list_auto_update: bool = field(default_factory=lambda: os.getenv("SERVER_LIST_AUTO_UPDATE", "true").lower() == "true")
+    server_list_update_interval: int = field(default_factory=lambda: int(os.getenv("SERVER_LIST_UPDATE_INTERVAL", str(PROVIDER_CACHE_TTL))))
 
     # Firewall
     firewall_vpn_input_ports: str = field(default_factory=lambda: os.getenv("FIREWALL_VPN_INPUT_PORTS", ""))

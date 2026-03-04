@@ -123,3 +123,46 @@ async def get_account_info(config: Config | None = None, provider: VPNProvider |
     if provider is None:
         provider = get_provider(config=config)
     return await provider.get_account_info()
+
+
+async def refresh_provider_server_list(name: str) -> int:
+    """Force-refresh the cached server list for a named provider.
+
+    Bypasses TTL — intended for background auto-updater use only.
+    Returns count of servers refreshed, or 0 if provider has no instance or no list.
+    """
+    from datetime import datetime, timezone
+
+    provider = _instances.get(name)
+    if provider is None:
+        return 0
+
+    try:
+        meta = provider.meta
+        if not meta.supports_server_list:
+            return 0
+    except Exception:
+        return 0
+
+    try:
+        servers = await provider._fetch_servers()
+        provider._server_cache = servers
+        provider._cache_time = datetime.now(timezone.utc)
+        return len(servers)
+    except Exception:
+        log.warning("Server list refresh failed for %s", name, exc_info=True)
+        return 0
+
+
+def get_server_list_providers() -> list[str]:
+    """Return names of all providers that support server lists."""
+    result = []
+    for name, cls in PROVIDERS.items():
+        try:
+            instance = cls.__new__(cls)
+            meta = cls.meta.fget(instance)  # type: ignore[union-attr]
+            if meta.supports_server_list:
+                result.append(name)
+        except Exception:
+            pass
+    return result

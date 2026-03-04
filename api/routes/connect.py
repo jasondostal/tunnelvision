@@ -23,7 +23,7 @@ from api.constants import (
     WIREGUARD_DIR,
     activate_wg_config,
 )
-from api.services.providers.base import ConnectError
+from api.services.providers.base import ConnectError, ServerFilter
 from api.services.state import StateManager
 from api.services.vpn import get_provider
 from api.services.history import log_event
@@ -36,6 +36,13 @@ class ConnectRequest(BaseModel):
     country: str | None = None
     city: str | None = None
     hostname: str | None = None
+    owned_only: bool | None = None
+    p2p: bool | None = None
+    streaming: bool | None = None
+    port_forward: bool | None = None
+    secure_core: bool | None = None
+    multihop: bool | None = None
+    max_load: int | None = None
 
 
 class ConnectResponse(BaseModel):
@@ -220,7 +227,12 @@ async def _connect_provider(body: ConnectRequest, provider, state_mgr: StateMana
     5. Reconnect VPN
     6. Post-connect hooks (port forwarding, etc.)
     """
-    servers = await provider.list_servers(country=body.country, city=body.city)
+    server_filter = ServerFilter(
+        country=body.country, city=body.city, owned_only=body.owned_only,
+        p2p=body.p2p, streaming=body.streaming, port_forward=body.port_forward,
+        secure_core=body.secure_core, multihop=body.multihop, max_load=body.max_load,
+    )
+    servers = await provider.list_servers(filter=server_filter)
 
     if not servers:
         desc = ""

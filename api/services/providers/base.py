@@ -64,6 +64,28 @@ class ProviderMeta:
 
 
 # =============================================================================
+# Server filtering
+# =============================================================================
+
+@dataclass
+class ServerFilter:
+    """Filter criteria for server selection.
+
+    All fields are optional — omitted means no constraint on that dimension.
+    Providers declare which filters they support via ProviderMeta.filter_capabilities.
+    """
+    country: str | None = None          # country name or code (case-insensitive)
+    city: str | None = None             # city name or code (case-insensitive)
+    owned_only: bool | None = None      # True = only servers owned by the provider
+    p2p: bool | None = None             # P2P / torrenting capability
+    streaming: bool | None = None       # Optimized for streaming
+    port_forward: bool | None = None    # Port forwarding capable
+    secure_core: bool | None = None     # Double-hop / secure core
+    multihop: bool | None = None        # Multi-hop routing
+    max_load: int | None = None         # Maximum server load % (0-100)
+
+
+# =============================================================================
 # Data models
 # =============================================================================
 
@@ -199,8 +221,7 @@ class VPNProvider(ABC):
 
     async def list_servers(
         self,
-        country: str | None = None,
-        city: str | None = None,
+        filter: "ServerFilter | None" = None,
     ) -> list[ServerInfo]:
         """List available servers, optionally filtered.
 
@@ -213,15 +234,15 @@ class VPNProvider(ABC):
         if self._server_cache is not None and self._cache_time:
             age = (now - self._cache_time).total_seconds()
             if age < PROVIDER_CACHE_TTL:
-                return self._filter_servers(self._server_cache, country, city)
+                return self._filter_servers(self._server_cache, filter)
 
         try:
             servers = await self._fetch_servers()
             self._server_cache = servers
             self._cache_time = now
-            return self._filter_servers(servers, country, city)
+            return self._filter_servers(servers, filter)
         except Exception:
-            return self._filter_servers(self._server_cache or [], country, city)
+            return self._filter_servers(self._server_cache or [], filter)
 
     # ---- Unified connect pipeline methods ----
 
@@ -280,23 +301,41 @@ class VPNProvider(ABC):
     @staticmethod
     def _filter_servers(
         servers: list[ServerInfo],
-        country: str | None = None,
-        city: str | None = None,
+        filter: "ServerFilter | None" = None,
     ) -> list[ServerInfo]:
-        """Filter servers by country and/or city. Case-insensitive."""
+        """Filter servers by all criteria in ServerFilter. Case-insensitive for strings."""
+        if not filter:
+            return servers
+
         result = servers
-        if country:
-            country_lower = country.lower()
-            result = [
-                s for s in result
-                if s.country_code.lower() == country_lower
-                or s.country.lower() == country_lower
-            ]
-        if city:
-            city_lower = city.lower()
-            result = [
-                s for s in result
-                if s.city_code.lower() == city_lower
-                or s.city.lower() == city_lower
-            ]
+
+        if filter.country:
+            c = filter.country.lower()
+            result = [s for s in result if s.country_code.lower() == c or s.country.lower() == c]
+
+        if filter.city:
+            ci = filter.city.lower()
+            result = [s for s in result if s.city_code.lower() == ci or s.city.lower() == ci]
+
+        if filter.owned_only:
+            result = [s for s in result if s.owned is True]
+
+        if filter.p2p is not None:
+            result = [s for s in result if s.p2p == filter.p2p]
+
+        if filter.streaming is not None:
+            result = [s for s in result if s.streaming == filter.streaming]
+
+        if filter.port_forward is not None:
+            result = [s for s in result if s.port_forward == filter.port_forward]
+
+        if filter.secure_core is not None:
+            result = [s for s in result if s.secure_core == filter.secure_core]
+
+        if filter.multihop is not None:
+            result = [s for s in result if s.multihop == filter.multihop]
+
+        if filter.max_load is not None:
+            result = [s for s in result if s.load <= filter.max_load]
+
         return result

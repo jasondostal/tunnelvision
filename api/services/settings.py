@@ -13,6 +13,7 @@ from api.constants import (
     MQTT_PORT,
     PORT_FORWARD_INTERVAL,
     DNS_BLOCKLIST_REFRESH,
+    PROVIDER_CACHE_TTL,
     SETTINGS_PATH,
     SOCKS_PROXY_PORT,
 )
@@ -60,6 +61,9 @@ CONFIGURABLE_FIELDS = {
     "port_forward_interval": {"env": "PORT_FORWARD_INTERVAL", "default": str(PORT_FORWARD_INTERVAL), "secret": False},
     "port_forward_hook": {"env": "PORT_FORWARD_HOOK", "default": "", "secret": False},
     "auto_reconnect": {"env": "AUTO_RECONNECT", "default": "true", "secret": False},
+    # Server list
+    "server_list_auto_update": {"env": "SERVER_LIST_AUTO_UPDATE", "default": "true", "secret": False},
+    "server_list_update_interval": {"env": "SERVER_LIST_UPDATE_INTERVAL", "default": str(PROVIDER_CACHE_TTL), "secret": False},
     "notify_webhook_url": {"env": "NOTIFY_WEBHOOK_URL", "default": "", "secret": False},
     "notify_gotify_url": {"env": "NOTIFY_GOTIFY_URL", "default": "", "secret": False},
     "notify_gotify_token": {"env": "NOTIFY_GOTIFY_TOKEN", "default": "", "secret": True},

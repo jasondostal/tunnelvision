@@ -43,6 +43,9 @@ class SettingsUpdate(BaseModel):
     port_forward_enabled: str | None = None
     port_forward_hook: str | None = None
     auto_reconnect: str | None = None
+    # Server list
+    server_list_auto_update: str | None = None
+    server_list_update_interval: str | None = None
     notify_webhook_url: str | None = None
     notify_gotify_url: str | None = None
     notify_gotify_token: str | None = None
