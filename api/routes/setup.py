@@ -7,18 +7,12 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from api.services.state import StateManager
+
 router = APIRouter()
 
 WIREGUARD_DIR = Path("/config/wireguard")
 WG_CONF_PATH = WIREGUARD_DIR / "wg0.conf"
-STATE_DIR = Path("/var/run/tunnelvision")
-
-
-def _is_setup_required() -> bool:
-    try:
-        return (STATE_DIR / "setup_required").read_text().strip() == "true"
-    except FileNotFoundError:
-        return not WG_CONF_PATH.exists()
 
 
 # -- Models --
@@ -56,16 +50,14 @@ class VerifyResponse(BaseModel):
 # -- Endpoints --
 
 @router.get("/setup/status", response_model=SetupStatus)
-async def setup_status():
+async def setup_status(request: Request):
     """Current setup state — drives the wizard UI."""
-    required = _is_setup_required()
+    state_mgr: StateManager = request.app.state.state
+    required = state_mgr.setup_required
     has_config = WG_CONF_PATH.exists()
 
     # Determine current step
-    provider_file = STATE_DIR / "setup_provider"
-    provider = None
-    if provider_file.exists():
-        provider = provider_file.read_text().strip()
+    provider = state_mgr.setup_provider or None
 
     if not required and has_config:
         step = "complete"
@@ -131,10 +123,9 @@ async def list_providers():
 
 
 @router.post("/setup/provider")
-async def select_provider(body: ProviderSelectRequest):
+async def select_provider(body: ProviderSelectRequest, request: Request):
     """Select VPN provider."""
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    (STATE_DIR / "setup_provider").write_text(body.provider)
+    request.app.state.state.setup_provider = body.provider
     return {"provider": body.provider, "next": "needs_config"}
 
 
@@ -229,19 +220,16 @@ async def verify_connection():
 
 
 @router.post("/setup/complete")
-async def complete_setup():
+async def complete_setup(request: Request):
     """Finalize setup — mark setup as complete and signal s6 to restart services."""
     if not WG_CONF_PATH.exists():
         return {"success": False, "error": "No WireGuard config — run /setup/wireguard first"}
 
-    # Write provider to env file for s6
-    provider = "custom"
-    provider_file = STATE_DIR / "setup_provider"
-    if provider_file.exists():
-        provider = provider_file.read_text().strip()
+    state_mgr: StateManager = request.app.state.state
+    provider = state_mgr.setup_provider or "custom"
 
     # Mark setup complete
-    (STATE_DIR / "setup_required").write_text("false")
+    state_mgr.setup_required = False
 
     # Signal s6 to restart the init chain + services
     # s6-svc -r tells s6 to restart the service

@@ -9,14 +9,6 @@ from api.services.vpn import get_provider
 router = APIRouter()
 
 
-def _read_state(path: str, default: str = "") -> str:
-    try:
-        with open(path) as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        return default
-
-
 @router.get("/vpn/check")
 async def vpn_connection_check(request: Request):
     """Verify VPN connection via provider API.
@@ -24,7 +16,8 @@ async def vpn_connection_check(request: Request):
     For Mullvad: confirms exit IP is a Mullvad server, checks blacklist status.
     For custom: returns public IP via generic check services.
     """
-    provider = get_provider(request.app.state.config.vpn_provider)
+    config = request.app.state.config
+    provider = get_provider(config.vpn_provider, config)
     check = await provider.check_connection()
 
     return {
@@ -47,8 +40,9 @@ async def vpn_server_info(request: Request):
     For Mullvad: hostname, country, city, hosting provider, owned status, speed.
     For custom: returns null (no server metadata available).
     """
-    provider = get_provider(request.app.state.config.vpn_provider)
-    endpoint = _read_state("/var/run/tunnelvision/vpn_endpoint")
+    config = request.app.state.config
+    provider = get_provider(config.vpn_provider, config)
+    endpoint = request.app.state.state.vpn_endpoint
 
     # Extract IP from endpoint (format: "IP:PORT")
     endpoint_ip = endpoint.split(":")[0] if ":" in endpoint else endpoint
@@ -86,7 +80,8 @@ async def vpn_account_info(request: Request):
     Requires MULLVAD_ACCOUNT environment variable.
     For custom: returns null (no account check available).
     """
-    provider = get_provider(request.app.state.config.vpn_provider)
+    config = request.app.state.config
+    provider = get_provider(config.vpn_provider, config)
     account = await provider.get_account_info()
 
     if account is None:
@@ -116,7 +111,8 @@ async def vpn_server_list(
     For Mullvad: full server list with metadata (hostname, location, speed, owned status).
     For custom: returns empty list.
     """
-    provider = get_provider(request.app.state.config.vpn_provider)
+    config = request.app.state.config
+    provider = get_provider(config.vpn_provider, config)
     servers = await provider.list_servers(country=country, city=city)
 
     return {

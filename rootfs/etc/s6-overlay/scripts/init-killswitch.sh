@@ -8,6 +8,7 @@ set -e
 
 VPN_ENABLED=${VPN_ENABLED:-true}
 KILLSWITCH_ENABLED=${KILLSWITCH_ENABLED:-true}
+QBT_ENABLED=${QBT_ENABLED:-true}
 WEBUI_PORT=${WEBUI_PORT:-8080}
 API_PORT=${API_PORT:-8081}
 WEBUI_ALLOWED_NETWORKS=${WEBUI_ALLOWED_NETWORKS:-"192.168.0.0/16,172.16.0.0/12,10.0.0.0/8"}
@@ -84,6 +85,15 @@ if [ -n "$DEFAULT_GW" ] && [ -n "$DEFAULT_IF" ]; then
     done
 fi
 
+# --- Build conditional WebUI rules ---
+if [ "$QBT_ENABLED" = "true" ]; then
+    WEBUI_INPUT_RULE="ip saddr @allowed_networks tcp dport ${WEBUI_PORT} accept"
+    WEBUI_OUTPUT_RULE="ip daddr @allowed_networks tcp sport ${WEBUI_PORT} accept"
+else
+    WEBUI_INPUT_RULE=""
+    WEBUI_OUTPUT_RULE=""
+fi
+
 # --- Apply nftables rules ---
 # NOTE: Do NOT 'flush ruleset' — wg-quick adds nft rules for fwmark routing
 # that we need to keep. Only delete/recreate our own tables.
@@ -120,8 +130,9 @@ table ip tunnelvision {
         # VPN handshake responses
         ip saddr ${VPN_ENDPOINT_IP} ${VPN_PROTO} sport ${VPN_ENDPOINT_PORT} accept
 
-        # WebUI + API from allowed networks
-        ip saddr @allowed_networks tcp dport ${WEBUI_PORT} accept
+        # WebUI (qBittorrent) from allowed networks — only if qBt enabled
+        ${WEBUI_INPUT_RULE}
+        # API from allowed networks
         ip saddr @allowed_networks tcp dport ${API_PORT} accept
 
         icmp type { destination-unreachable, time-exceeded, echo-request } accept
@@ -137,7 +148,7 @@ table ip tunnelvision {
     chain output {
         type filter hook postrouting priority 0; policy drop;
 
-        # Loopback (internal service-to-service: API, healthcheck, qBit)
+        # Loopback (internal service-to-service: API, healthcheck)
         oifname "lo" accept
 
         # All traffic through VPN tunnel (DNS included — resolv.conf controls server)
@@ -146,8 +157,9 @@ table ip tunnelvision {
         # VPN handshake to endpoint (must exit on host interface, not tunnel)
         ip daddr ${VPN_ENDPOINT_IP} ${VPN_PROTO} dport ${VPN_ENDPOINT_PORT} accept
 
-        # WebUI + API responses to allowed networks
-        ip daddr @allowed_networks tcp sport ${WEBUI_PORT} accept
+        # WebUI (qBittorrent) responses — only if qBt enabled
+        ${WEBUI_OUTPUT_RULE}
+        # API responses to allowed networks
         ip daddr @allowed_networks tcp sport ${API_PORT} accept
 
         icmp type { destination-unreachable, time-exceeded, echo-reply } accept

@@ -9,28 +9,27 @@ Uses Last Will and Testament (LWT) for availability tracking.
 
 import json
 import logging
-import os
-import threading
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
 
-log = logging.getLogger("tunnelvision.mqtt")
+from api.config import Config
+from api.services.state import StateManager
 
-STATE_DIR = Path("/var/run/tunnelvision")
+log = logging.getLogger("tunnelvision.mqtt")
 
 
 class MQTTService:
     """Publishes TunnelVision state to MQTT with HA Discovery."""
 
-    def __init__(self):
-        self.enabled = os.getenv("MQTT_ENABLED", "false").lower() == "true"
-        self.broker = os.getenv("MQTT_BROKER", "")
-        self.port = int(os.getenv("MQTT_PORT", "1883"))
-        self.user = os.getenv("MQTT_USER", "")
-        self.password = os.getenv("MQTT_PASS", "")
-        self.prefix = os.getenv("MQTT_TOPIC_PREFIX", "tunnelvision")
-        self.discovery_prefix = os.getenv("MQTT_DISCOVERY_PREFIX", "homeassistant")
+    def __init__(self, config: Config, state_mgr: StateManager):
+        self.config = config
+        self.state = state_mgr
+        self.enabled = config.mqtt_enabled
+        self.broker = config.mqtt_broker
+        self.port = config.mqtt_port
+        self.prefix = config.mqtt_topic_prefix
+        self.discovery_prefix = config.mqtt_discovery_prefix
         self.client: mqtt.Client | None = None
         self._connected = False
 
@@ -46,8 +45,8 @@ class MQTTService:
             client_id="tunnelvision",
         )
 
-        if self.user:
-            self.client.username_pw_set(self.user, self.password)
+        if self.config.mqtt_user:
+            self.client.username_pw_set(self.config.mqtt_user, self.config.mqtt_pass)
 
         # Last Will — marks device offline if container dies
         self.client.will_set(
@@ -93,22 +92,31 @@ class MQTTService:
         log.warning(f"MQTT disconnected: {reason_code}")
 
     def _on_message(self, client, userdata, msg):
-        """Handle incoming commands from HA or other MQTT clients."""
-        import subprocess
+        """Handle incoming commands — calls action functions directly."""
+        from api.routes.control import (
+            do_vpn_restart, do_vpn_disconnect,
+            do_killswitch_enable, do_killswitch_disable,
+            do_qbt_restart, do_qbt_pause, do_qbt_resume,
+        )
+
         command = msg.payload.decode().strip().lower()
         log.info(f"MQTT command received: {command}")
 
-        commands = {
-            "vpn_restart": ["POST", "/api/v1/vpn/restart"],
-            "vpn_disconnect": ["POST", "/api/v1/vpn/disconnect"],
-            "vpn_reconnect": ["POST", "/api/v1/vpn/reconnect"],
-            "vpn_rotate": ["POST", "/api/v1/vpn/rotate"],
-            "killswitch_enable": ["POST", "/api/v1/killswitch/enable"],
-            "killswitch_disable": ["POST", "/api/v1/killswitch/disable"],
-            "qbt_restart": ["POST", "/api/v1/qbt/restart"],
-            "qbt_pause": ["POST", "/api/v1/qbt/pause"],
-            "qbt_resume": ["POST", "/api/v1/qbt/resume"],
+        # Map commands to action functions
+        commands: dict[str, callable] = {
+            "vpn_restart": lambda: do_vpn_restart(self.state),
+            "vpn_disconnect": lambda: do_vpn_disconnect(self.state),
+            "killswitch_enable": lambda: do_killswitch_enable(),
+            "killswitch_disable": lambda: do_killswitch_disable(self.state),
         }
+
+        # qBittorrent commands only when enabled
+        if self.config.qbt_enabled:
+            commands.update({
+                "qbt_restart": lambda: do_qbt_restart(self.config),
+                "qbt_pause": lambda: do_qbt_pause(self.config),
+                "qbt_resume": lambda: do_qbt_resume(self.config),
+            })
 
         if command not in commands:
             log.warning(f"Unknown MQTT command: {command}")
@@ -116,13 +124,9 @@ class MQTTService:
                           json.dumps({"success": False, "error": f"Unknown command: {command}"}))
             return
 
-        method, path = commands[command]
         try:
-            result = subprocess.run(
-                ["curl", "-sf", "-X", method, f"http://localhost:8081{path}"],
-                capture_output=True, text=True, timeout=30,
-            )
-            client.publish(f"{self.prefix}/command_result", result.stdout or '{"success": true}')
+            result = commands[command]()
+            client.publish(f"{self.prefix}/command_result", result.model_dump_json())
         except Exception as e:
             client.publish(f"{self.prefix}/command_result",
                           json.dumps({"success": False, "error": str(e)}))
@@ -135,7 +139,7 @@ class MQTTService:
         if not self._connected or not self.client:
             return
 
-        state = self._read_all_state()
+        state = self.state.snapshot()
 
         # Publish full state as JSON
         self.client.publish(
@@ -153,27 +157,6 @@ class MQTTService:
                 qos=0,
                 retain=True,
             )
-
-    def _read_all_state(self) -> dict:
-        """Read all state files into a dict."""
-        def _read(name: str, default: str = "") -> str:
-            try:
-                return (STATE_DIR / name).read_text().strip()
-            except FileNotFoundError:
-                return default
-
-        return {
-            "vpn_state": _read("vpn_state", "unknown"),
-            "public_ip": _read("public_ip"),
-            "country": _read("country"),
-            "city": _read("city"),
-            "organization": _read("organization"),
-            "killswitch": _read("killswitch_state", "disabled"),
-            "vpn_type": _read("vpn_type", "wireguard"),
-            "rx_bytes": _read("rx_bytes", "0"),
-            "tx_bytes": _read("tx_bytes", "0"),
-            "healthy": _read("healthy", "true"),
-        }
 
     def _publish_discovery(self):
         """Publish HA MQTT Discovery messages for auto-entity creation."""
@@ -265,15 +248,24 @@ class MQTTService:
             "icon": "mdi:upload",
         }, device, availability)
 
-        # --- Buttons (HA 2024.2+ button platform via MQTT) ---
-        for btn_id, btn_name, btn_icon, btn_cmd in [
+        # --- Buttons ---
+        vpn_buttons = [
             ("vpn_restart", "Restart VPN", "mdi:vpn", "vpn_restart"),
             ("vpn_rotate", "Rotate Server", "mdi:earth-arrow-right", "vpn_rotate"),
             ("vpn_disconnect", "Disconnect VPN", "mdi:vpn-off", "vpn_disconnect"),
+        ]
+
+        qbt_buttons = [
             ("qbt_restart", "Restart qBittorrent", "mdi:restart", "qbt_restart"),
             ("qbt_pause", "Pause All Torrents", "mdi:pause-circle", "qbt_pause"),
             ("qbt_resume", "Resume All Torrents", "mdi:play-circle", "qbt_resume"),
-        ]:
+        ]
+
+        buttons = vpn_buttons
+        if self.config.qbt_enabled:
+            buttons += qbt_buttons
+
+        for btn_id, btn_name, btn_icon, btn_cmd in buttons:
             self._discover("button", btn_id, {
                 "name": btn_name,
                 "command_topic": f"{self.prefix}/command",
@@ -313,8 +305,13 @@ class MQTTService:
 _instance: MQTTService | None = None
 
 
-def get_mqtt_service() -> MQTTService:
+def get_mqtt_service(config: Config | None = None, state_mgr: StateManager | None = None) -> MQTTService:
     global _instance
     if _instance is None:
-        _instance = MQTTService()
+        if config is None:
+            from api.config import load_config
+            config = load_config()
+        if state_mgr is None:
+            state_mgr = StateManager()
+        _instance = MQTTService(config, state_mgr)
     return _instance

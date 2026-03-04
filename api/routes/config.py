@@ -1,7 +1,5 @@
 """Configuration endpoint — view current config (safe subset)."""
 
-import os
-
 from fastapi import APIRouter, Request
 
 from api.models import ConfigResponse
@@ -18,6 +16,7 @@ async def get_config(request: Request):
         vpn_enabled=config.vpn_enabled,
         vpn_provider=config.vpn_provider,
         killswitch_enabled=config.killswitch_enabled,
+        qbt_enabled=config.qbt_enabled,
         webui_port=config.webui_port,
         api_port=config.api_port,
         ui_enabled=config.ui_enabled,
@@ -25,5 +24,5 @@ async def get_config(request: Request):
         timezone=config.tz,
         puid=config.puid,
         pgid=config.pgid,
-        allowed_networks=os.getenv("WEBUI_ALLOWED_NETWORKS", ""),
+        allowed_networks=config.allowed_networks,
     )

@@ -13,6 +13,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from api.services.state import StateManager
 from api.services.vpn import get_provider
 from api.services.history import log_event
 
@@ -21,7 +22,6 @@ router = APIRouter()
 WIREGUARD_DIR = Path("/config/wireguard")
 OPENVPN_DIR = Path("/config/openvpn")
 WG_CONF_PATH = WIREGUARD_DIR / "wg0.conf"
-STATE_DIR = Path("/var/run/tunnelvision")
 
 
 class ConnectRequest(BaseModel):
@@ -37,13 +37,6 @@ class ConnectResponse(BaseModel):
     city: str = ""
     config_file: str = ""
     error: str = ""
-
-
-def _read_state(path: str, default: str = "") -> str:
-    try:
-        return Path(path).read_text().strip()
-    except FileNotFoundError:
-        return default
 
 
 def _list_config_files() -> list[Path]:
@@ -66,15 +59,16 @@ async def connect_to_server(body: ConnectRequest, request: Request):
     Custom provider with one config: reconnects using it.
     """
     config = request.app.state.config
-    provider = get_provider(config.vpn_provider)
+    state_mgr: StateManager = request.app.state.state
+    provider = get_provider(config.vpn_provider, config)
 
     # --- API-capable providers ---
     if provider.name == "mullvad":
-        return await _connect_mullvad(body, provider)
+        return await _connect_mullvad(body, provider, state_mgr, config)
     if provider.name == "ivpn":
-        return await _connect_ivpn(body, provider)
+        return await _connect_ivpn(body, provider, state_mgr, config)
     if provider.name == "pia":
-        return await _connect_pia(body, provider, config)
+        return await _connect_pia(body, provider, config, state_mgr)
 
     # --- Config-file rotation (custom/other providers) ---
     configs = _list_config_files()
@@ -86,7 +80,7 @@ async def connect_to_server(body: ConnectRequest, request: Request):
 
     # Symlink as the active config
     vpn_type = "openvpn" if chosen.suffix == ".ovpn" else "wireguard"
-    (STATE_DIR / "vpn_type").write_text(vpn_type)
+    state_mgr.vpn_type = vpn_type
 
     if vpn_type == "wireguard":
         os.makedirs("/etc/wireguard", exist_ok=True)
@@ -100,9 +94,9 @@ async def connect_to_server(body: ConnectRequest, request: Request):
 
 
 @router.post("/vpn/reconnect", response_model=ConnectResponse)
-async def reconnect():
+async def reconnect(request: Request):
     """Reconnect to VPN using current config."""
-    vpn_type = _read_state("/var/run/tunnelvision/vpn_type", "wireguard")
+    vpn_type = request.app.state.state.vpn_type
     return await _reconnect_vpn(vpn_type)
 
 
@@ -113,19 +107,18 @@ async def rotate_server(request: Request):
     Mullvad: new random server from entire pool (or filtered by VPN_COUNTRY/VPN_CITY env).
     Custom: pick different random config file from /config/wireguard/ or /config/openvpn/.
     """
-    country = os.getenv("VPN_COUNTRY")
-    city = os.getenv("VPN_CITY")
+    config = request.app.state.config
     return await connect_to_server(
-        ConnectRequest(country=country, city=city),
+        ConnectRequest(country=config.vpn_country or None, city=config.vpn_city or None),
         request,
     )
 
 
 @router.get("/vpn/configs")
-async def list_configs():
+async def list_configs(request: Request):
     """List available VPN config files (for config-file rotation)."""
     configs = _list_config_files()
-    active = _read_state("/var/run/tunnelvision/active_config")
+    active = request.app.state.state.active_config
 
     return {
         "count": len(configs),
@@ -144,7 +137,7 @@ async def list_configs():
     }
 
 
-async def _connect_mullvad(body: ConnectRequest, provider) -> ConnectResponse:
+async def _connect_mullvad(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:
     """Generate wg0.conf for a Mullvad server and connect."""
     servers = await provider.list_servers(country=body.country, city=body.city)
 
@@ -166,9 +159,9 @@ async def _connect_mullvad(body: ConnectRequest, provider) -> ConnectResponse:
         server = random.choice(servers)
 
     # Get private key from existing config or env
-    private_key = os.getenv("WIREGUARD_PRIVATE_KEY", "")
-    address = os.getenv("WIREGUARD_ADDRESSES", "")
-    dns = os.getenv("WIREGUARD_DNS", "10.64.0.1")
+    private_key = config.wireguard_private_key if config else ""
+    address = config.wireguard_addresses if config else ""
+    dns = (config.wireguard_dns if config and config.wireguard_dns else "") or "10.64.0.1"
 
     if not private_key and WG_CONF_PATH.exists():
         for line in WG_CONF_PATH.read_text().splitlines():
@@ -220,9 +213,9 @@ async def _connect_mullvad(body: ConnectRequest, provider) -> ConnectResponse:
     )
     os.chmod(WG_CONF_PATH, 0o600)
 
-    (STATE_DIR / "vpn_type").write_text("wireguard")
-    (STATE_DIR / "vpn_server_hostname").write_text(server.hostname)
-    (STATE_DIR / "active_config").write_text("wg0.conf")
+    state_mgr.vpn_type = "wireguard"
+    state_mgr.vpn_server_hostname = server.hostname
+    state_mgr.active_config = "wg0.conf"
 
     result = await _reconnect_vpn("wireguard")
     result.hostname = server.hostname
@@ -231,7 +224,7 @@ async def _connect_mullvad(body: ConnectRequest, provider) -> ConnectResponse:
     return result
 
 
-async def _connect_ivpn(body: ConnectRequest, provider) -> ConnectResponse:
+async def _connect_ivpn(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:
     """Pick an IVPN server and generate wg0.conf with its public key."""
     servers = await provider.list_servers(country=body.country, city=body.city)
 
@@ -251,9 +244,9 @@ async def _connect_ivpn(body: ConnectRequest, provider) -> ConnectResponse:
     else:
         server = random.choice(servers)
 
-    private_key = os.getenv("WIREGUARD_PRIVATE_KEY", "")
-    address = os.getenv("WIREGUARD_ADDRESSES", "")
-    dns = os.getenv("WIREGUARD_DNS", "172.16.0.1")  # IVPN default DNS
+    private_key = config.wireguard_private_key if config else ""
+    address = config.wireguard_addresses if config else ""
+    dns = (config.wireguard_dns if config and config.wireguard_dns else "") or "172.16.0.1"  # IVPN default DNS
 
     if not private_key and WG_CONF_PATH.exists():
         for line in WG_CONF_PATH.read_text().splitlines():
@@ -290,9 +283,9 @@ async def _connect_ivpn(body: ConnectRequest, provider) -> ConnectResponse:
     )
     os.chmod(WG_CONF_PATH, 0o600)
 
-    (STATE_DIR / "vpn_type").write_text("wireguard")
-    (STATE_DIR / "vpn_server_hostname").write_text(server.hostname)
-    (STATE_DIR / "active_config").write_text("wg0.conf")
+    state_mgr.vpn_type = "wireguard"
+    state_mgr.vpn_server_hostname = server.hostname
+    state_mgr.active_config = "wg0.conf"
 
     result = await _reconnect_vpn("wireguard")
     result.hostname = server.hostname
@@ -301,7 +294,7 @@ async def _connect_ivpn(body: ConnectRequest, provider) -> ConnectResponse:
     return result
 
 
-async def _connect_pia(body: ConnectRequest, provider, config) -> ConnectResponse:
+async def _connect_pia(body: ConnectRequest, provider, config, state_mgr: StateManager) -> ConnectResponse:
     """Authenticate with PIA, negotiate WireGuard keys, and connect."""
     import subprocess as _sp
 
@@ -377,9 +370,9 @@ async def _connect_pia(body: ConnectRequest, provider, config) -> ConnectRespons
     )
     os.chmod(WG_CONF_PATH, 0o600)
 
-    (STATE_DIR / "vpn_type").write_text("wireguard")
-    (STATE_DIR / "vpn_server_hostname").write_text(server.hostname)
-    (STATE_DIR / "active_config").write_text("wg0.conf")
+    state_mgr.vpn_type = "wireguard"
+    state_mgr.vpn_server_hostname = server.hostname
+    state_mgr.active_config = "wg0.conf"
 
     result = await _reconnect_vpn("wireguard")
     result.hostname = server.hostname

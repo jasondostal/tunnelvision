@@ -14,10 +14,9 @@ from pathlib import Path
 
 import httpx
 
-logger = logging.getLogger(__name__)
+from api.services.state import StateManager
 
-STATE_DIR = Path("/var/run/tunnelvision")
-PORT_FILE = STATE_DIR / "forwarded_port"
+logger = logging.getLogger(__name__)
 
 # PIA gateway uses self-signed certs
 _no_verify = ssl.create_default_context()
@@ -28,7 +27,8 @@ _no_verify.verify_mode = ssl.CERT_NONE
 class PortForwardService:
     """Manages PIA port forwarding lifecycle."""
 
-    def __init__(self):
+    def __init__(self, state_mgr: StateManager | None = None):
+        self._state = state_mgr or StateManager()
         self._task: asyncio.Task | None = None
         self._port: int | None = None
         self._payload: str | None = None
@@ -55,7 +55,7 @@ class PortForwardService:
         self._port = None
         self._payload = None
         self._signature = None
-        PORT_FILE.unlink(missing_ok=True)
+        self._state.delete_forwarded_port()
 
     async def _run(self, gateway_ip: str, token: str):
         """Get signature, bind port, then keep alive every 15 minutes."""
@@ -85,7 +85,7 @@ class PortForwardService:
                 return
 
             # Write port to state file
-            PORT_FILE.write_text(str(self._port))
+            self._state.forwarded_port = str(self._port)
             logger.info(f"Port forwarding: assigned port {self._port}")
 
             # Step 2: Bind and keep alive

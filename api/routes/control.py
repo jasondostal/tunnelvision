@@ -1,11 +1,17 @@
-"""Control plane — VPN and qBittorrent management actions."""
+"""Control plane — VPN and qBittorrent management actions.
+
+Action logic lives in standalone do_*() functions so both
+the REST routes and MQTT command handler can call them directly.
+"""
 
 import subprocess
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from api.config import Config
 from api.routes.events import broadcast
+from api.services.state import StateManager
 
 router = APIRouter()
 
@@ -29,13 +35,10 @@ def _run(cmd: list[str], timeout: int = 15) -> tuple[bool, str]:
         return False, str(e)
 
 
-# --- VPN Controls ---
+# --- Action functions (callable from routes AND MQTT) ---
 
-@router.post("/vpn/disconnect", response_model=ActionResponse)
-async def vpn_disconnect():
-    """Disconnect the VPN tunnel. Killswitch remains active."""
-    from pathlib import Path
-    vpn_type = Path("/var/run/tunnelvision/vpn_type").read_text().strip() if Path("/var/run/tunnelvision/vpn_type").exists() else "wireguard"
+def do_vpn_disconnect(state_mgr: StateManager) -> ActionResponse:
+    vpn_type = state_mgr.vpn_type
 
     if vpn_type == "wireguard":
         ok, msg = _run(["wg-quick", "down", "wg0"])
@@ -43,7 +46,7 @@ async def vpn_disconnect():
         ok, msg = _run(["killall", "openvpn"])
 
     if ok:
-        Path("/var/run/tunnelvision/vpn_state").write_text("down")
+        state_mgr.vpn_state = "down"
         broadcast("vpn_state", {"state": "down", "action": "disconnect"})
 
     return ActionResponse(
@@ -54,11 +57,8 @@ async def vpn_disconnect():
     )
 
 
-@router.post("/vpn/restart", response_model=ActionResponse)
-async def vpn_restart():
-    """Restart the VPN tunnel (down + up)."""
-    from pathlib import Path
-    vpn_type = Path("/var/run/tunnelvision/vpn_type").read_text().strip() if Path("/var/run/tunnelvision/vpn_type").exists() else "wireguard"
+def do_vpn_restart(state_mgr: StateManager) -> ActionResponse:
+    vpn_type = state_mgr.vpn_type
 
     if vpn_type == "wireguard":
         _run(["wg-quick", "down", "wg0"], timeout=10)
@@ -68,7 +68,7 @@ async def vpn_restart():
         ok, msg = _run(["/etc/s6-overlay/scripts/init-wireguard.sh"], timeout=30)
 
     if ok:
-        Path("/var/run/tunnelvision/vpn_state").write_text("up")
+        state_mgr.vpn_state = "up"
         broadcast("vpn_state", {"state": "up", "action": "restart"})
 
     return ActionResponse(
@@ -79,11 +79,7 @@ async def vpn_restart():
     )
 
 
-# --- Killswitch Controls ---
-
-@router.post("/killswitch/enable", response_model=ActionResponse)
-async def killswitch_enable():
-    """Re-apply killswitch firewall rules."""
+def do_killswitch_enable() -> ActionResponse:
     ok, msg = _run(["/etc/s6-overlay/scripts/init-killswitch.sh"], timeout=10)
     return ActionResponse(
         success=ok,
@@ -93,13 +89,10 @@ async def killswitch_enable():
     )
 
 
-@router.post("/killswitch/disable", response_model=ActionResponse)
-async def killswitch_disable():
-    """Flush killswitch rules — WARNING: traffic may leak outside VPN."""
+def do_killswitch_disable(state_mgr: StateManager) -> ActionResponse:
     ok, msg = _run(["nft", "flush", "ruleset"])
     if ok:
-        from pathlib import Path
-        Path("/var/run/tunnelvision/killswitch_state").write_text("disabled")
+        state_mgr.killswitch_state = "disabled"
 
     return ActionResponse(
         success=ok,
@@ -109,11 +102,9 @@ async def killswitch_disable():
     )
 
 
-# --- qBittorrent Controls ---
-
-@router.post("/qbt/restart", response_model=ActionResponse)
-async def qbt_restart():
-    """Restart the qBittorrent service via s6."""
+def do_qbt_restart(config: Config) -> ActionResponse:
+    if not config.qbt_enabled:
+        return ActionResponse(success=False, action="qbt_restart", error="qBittorrent is disabled")
     ok, msg = _run(["s6-svc", "-r", "/run/service/svc-qbittorrent"])
     return ActionResponse(
         success=ok,
@@ -123,11 +114,11 @@ async def qbt_restart():
     )
 
 
-@router.post("/qbt/pause", response_model=ActionResponse)
-async def qbt_pause_all():
-    """Pause all torrents."""
+def do_qbt_pause(config: Config) -> ActionResponse:
+    if not config.qbt_enabled:
+        return ActionResponse(success=False, action="qbt_pause", error="qBittorrent is disabled")
     ok, msg = _run(["curl", "-sf", "-X", "POST",
-                     "http://localhost:8080/api/v2/torrents/pause",
+                     f"http://localhost:{config.webui_port}/api/v2/torrents/pause",
                      "-d", "hashes=all"])
     return ActionResponse(
         success=ok,
@@ -137,11 +128,11 @@ async def qbt_pause_all():
     )
 
 
-@router.post("/qbt/resume", response_model=ActionResponse)
-async def qbt_resume_all():
-    """Resume all torrents."""
+def do_qbt_resume(config: Config) -> ActionResponse:
+    if not config.qbt_enabled:
+        return ActionResponse(success=False, action="qbt_resume", error="qBittorrent is disabled")
     ok, msg = _run(["curl", "-sf", "-X", "POST",
-                     "http://localhost:8080/api/v2/torrents/resume",
+                     f"http://localhost:{config.webui_port}/api/v2/torrents/resume",
                      "-d", "hashes=all"])
     return ActionResponse(
         success=ok,
@@ -149,3 +140,47 @@ async def qbt_resume_all():
         message="All torrents resumed" if ok else "",
         error="" if ok else msg,
     )
+
+
+# --- REST Routes (thin wrappers around action functions) ---
+
+@router.post("/vpn/disconnect", response_model=ActionResponse)
+async def vpn_disconnect(request: Request):
+    """Disconnect the VPN tunnel. Killswitch remains active."""
+    return do_vpn_disconnect(request.app.state.state)
+
+
+@router.post("/vpn/restart", response_model=ActionResponse)
+async def vpn_restart(request: Request):
+    """Restart the VPN tunnel (down + up)."""
+    return do_vpn_restart(request.app.state.state)
+
+
+@router.post("/killswitch/enable", response_model=ActionResponse)
+async def killswitch_enable():
+    """Re-apply killswitch firewall rules."""
+    return do_killswitch_enable()
+
+
+@router.post("/killswitch/disable", response_model=ActionResponse)
+async def killswitch_disable(request: Request):
+    """Flush killswitch rules — WARNING: traffic may leak outside VPN."""
+    return do_killswitch_disable(request.app.state.state)
+
+
+@router.post("/qbt/restart", response_model=ActionResponse)
+async def qbt_restart(request: Request):
+    """Restart the qBittorrent service via s6."""
+    return do_qbt_restart(request.app.state.config)
+
+
+@router.post("/qbt/pause", response_model=ActionResponse)
+async def qbt_pause_all(request: Request):
+    """Pause all torrents."""
+    return do_qbt_pause(request.app.state.config)
+
+
+@router.post("/qbt/resume", response_model=ActionResponse)
+async def qbt_resume_all(request: Request):
+    """Resume all torrents."""
+    return do_qbt_resume(request.app.state.config)

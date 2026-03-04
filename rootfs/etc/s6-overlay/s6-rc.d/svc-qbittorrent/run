@@ -4,6 +4,12 @@
 # Skips in setup mode — VPN must be configured first.
 # ============================================================================
 
+QBT_ENABLED=${QBT_ENABLED:-true}
+if [ "$QBT_ENABLED" != "true" ]; then
+    echo "[tunnelvision] qBittorrent disabled (QBT_ENABLED=false)"
+    exec sleep infinity
+fi
+
 SETUP_REQUIRED=$(cat /var/run/tunnelvision/setup_required 2>/dev/null || echo "false")
 if [ "$SETUP_REQUIRED" = "true" ]; then
     echo "[tunnelvision] Setup mode — qBittorrent waiting for VPN configuration"

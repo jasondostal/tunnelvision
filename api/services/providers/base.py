@@ -52,6 +52,9 @@ class VPNProvider(ABC):
     just inherit the default no-op implementations.
     """
 
+    def __init__(self, config=None):
+        self.config = config
+
     @property
     @abstractmethod
     def name(self) -> str:

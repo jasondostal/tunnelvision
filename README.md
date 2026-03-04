@@ -304,4 +304,4 @@ make dev      # Start development environment
 
 ## License
 
-[MIT](LICENSE)
+[GPL-3.0](LICENSE)

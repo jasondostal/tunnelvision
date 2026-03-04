@@ -9,7 +9,6 @@ Endpoints used:
 - http://<gluetun>:8000/v1/portforward — forwarded port (if available)
 """
 
-import os
 from datetime import datetime, timezone
 
 import httpx
@@ -21,11 +20,12 @@ from api.services.providers.custom import CustomProvider
 class GluetunProvider(VPNProvider):
     """Reads VPN state from gluetun's control server API."""
 
-    def __init__(self):
-        self._base_url = os.getenv("GLUETUN_URL", "http://gluetun:8000")
-        self._api_key = os.getenv("GLUETUN_API_KEY", "")
+    def __init__(self, config=None):
+        super().__init__(config)
+        self._base_url = config.gluetun_url if config else "http://gluetun:8000"
+        self._api_key = config.gluetun_api_key if config else ""
         # Fall back to CustomProvider for geo-IP (gluetun only returns the IP, not location)
-        self._geo = CustomProvider()
+        self._geo = CustomProvider(config)
 
     @property
     def name(self) -> str:

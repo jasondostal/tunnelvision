@@ -37,10 +37,13 @@ if [ "$VPN_ENABLED" = "true" ]; then
     fi
 fi
 
-# --- Check qBittorrent WebUI ---
-if ! curl -sf -o /dev/null --max-time 5 "http://localhost:${WEBUI_PORT}"; then
-    echo "UNHEALTHY: qBittorrent WebUI not responding on port ${WEBUI_PORT}"
-    errors=$((errors + 1))
+# --- Check qBittorrent WebUI (if enabled) ---
+QBT_ENABLED=${QBT_ENABLED:-true}
+if [ "$QBT_ENABLED" = "true" ]; then
+    if ! curl -sf -o /dev/null --max-time 5 "http://localhost:${WEBUI_PORT}"; then
+        echo "UNHEALTHY: qBittorrent WebUI not responding on port ${WEBUI_PORT}"
+        errors=$((errors + 1))
+    fi
 fi
 
 # --- Check API (if enabled) ---

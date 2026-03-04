@@ -11,23 +11,16 @@ from api.models import HealthResponse
 router = APIRouter()
 
 
-def _read_state(path: str, default: str = "unknown") -> str:
-    try:
-        with open(path) as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        return default
-
-
 @router.get("/health", response_model=HealthResponse)
 async def health_check(request: Request):
     """Comprehensive container health status."""
     config = request.app.state.config
+    state_mgr = request.app.state.state
 
-    setup_required = _read_state("/var/run/tunnelvision/setup_required", "false") == "true"
-    vpn_state = _read_state("/var/run/tunnelvision/vpn_state", "disabled" if not config.vpn_enabled else "unknown")
-    killswitch_state = _read_state("/var/run/tunnelvision/killswitch_state", "disabled")
-    healthy_str = _read_state("/var/run/tunnelvision/healthy", "true")
+    setup_required = state_mgr.setup_required
+    vpn_state = state_mgr.read("vpn_state", "disabled" if not config.vpn_enabled else "unknown")
+    killswitch_state = state_mgr.killswitch_state
+    healthy_str = state_mgr.healthy
 
     # In setup mode, qBit isn't running — that's expected
     if setup_required:
@@ -41,16 +34,19 @@ async def health_check(request: Request):
             checked_at=datetime.now(timezone.utc),
         )
 
-    # Check qBittorrent
-    try:
-        result = subprocess.run(
-            ["curl", "-sf", "-o", "/dev/null", "--max-time", "3",
-             f"http://localhost:{config.webui_port}"],
-            capture_output=True, timeout=5,
-        )
-        qbt_state = "running" if result.returncode == 0 else "stopped"
-    except Exception:
-        qbt_state = "stopped"
+    # Check qBittorrent (if enabled)
+    if config.qbt_enabled:
+        try:
+            result = subprocess.run(
+                ["curl", "-sf", "-o", "/dev/null", "--max-time", "3",
+                 f"http://localhost:{config.webui_port}"],
+                capture_output=True, timeout=5,
+            )
+            qbt_state = "running" if result.returncode == 0 else "stopped"
+        except Exception:
+            qbt_state = "stopped"
+    else:
+        qbt_state = "disabled"
 
     uptime = time.time() - request.app.state.started_at
 
@@ -61,8 +57,12 @@ async def health_check(request: Request):
     except Exception:
         pass
 
+    healthy = healthy_str == "true"
+    if config.qbt_enabled:
+        healthy = healthy and qbt_state == "running"
+
     return HealthResponse(
-        healthy=healthy_str == "true" and qbt_state == "running",
+        healthy=healthy,
         vpn=vpn_state,
         killswitch=killswitch_state,
         qbittorrent=qbt_state,

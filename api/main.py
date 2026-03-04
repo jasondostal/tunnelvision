@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api import __version__
 from api.config import load_config
+from api.services.state import StateManager
 from api.routes import auth, health, vpn, qbt, system, config as config_routes, provider, setup, connect, metrics, control, settings, speedtest, backup, events
 
 
@@ -19,10 +20,11 @@ async def lifespan(app: FastAPI):
     from api.services.mqtt import get_mqtt_service
 
     app.state.config = load_config()
+    app.state.state = StateManager()
     app.state.started_at = time.time()
 
     # Start MQTT if configured
-    mqtt_svc = get_mqtt_service()
+    mqtt_svc = get_mqtt_service(app.state.config, app.state.state)
     mqtt_svc.start()
 
     yield
@@ -33,7 +35,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="TunnelVision",
-    description="All-in-one qBittorrent + WireGuard VPN + API",
+    description="WireGuard VPN gateway + killswitch + API + dashboard",
     version=__version__,
     docs_url="/api/docs",
     redoc_url="/api/redoc",

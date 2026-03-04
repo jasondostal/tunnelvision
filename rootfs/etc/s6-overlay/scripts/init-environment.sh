@@ -22,30 +22,38 @@ fi
 echo "[tunnelvision] Running as UID=$PUID GID=$PGID"
 
 # --- Directory Setup ---
+QBT_ENABLED=${QBT_ENABLED:-true}
+
 mkdir -p \
-    /config/qBittorrent/config \
-    /config/qBittorrent/data \
     /config/wireguard \
-    /downloads \
     /var/run/tunnelvision
 
-# --- Default Config ---
-if [ ! -f /config/qBittorrent/config/qBittorrent.conf ]; then
-    echo "[tunnelvision] First run — copying default qBittorrent config"
-    cp /defaults/qBittorrent.conf /config/qBittorrent/config/qBittorrent.conf
-fi
+if [ "$QBT_ENABLED" = "true" ]; then
+    mkdir -p \
+        /config/qBittorrent/config \
+        /config/qBittorrent/data \
+        /downloads
 
-# --- Apply WebUI port to config ---
-WEBUI_PORT=${WEBUI_PORT:-8080}
-if grep -q "WebUI\\\\Port=" /config/qBittorrent/config/qBittorrent.conf; then
-    sed -i "s/WebUI\\\\Port=.*/WebUI\\\\Port=${WEBUI_PORT}/" /config/qBittorrent/config/qBittorrent.conf
-fi
+    # --- Default Config ---
+    if [ ! -f /config/qBittorrent/config/qBittorrent.conf ]; then
+        echo "[tunnelvision] First run — copying default qBittorrent config"
+        cp /defaults/qBittorrent.conf /config/qBittorrent/config/qBittorrent.conf
+    fi
 
-# --- Ensure localhost auth bypass (API needs unauthenticated local access) ---
-QBT_CONF="/config/qBittorrent/config/qBittorrent.conf"
-if ! grep -q "LocalHostAuth" "$QBT_CONF"; then
-    echo "[tunnelvision] Patching qBittorrent config: localhost auth bypass"
-    sed -i '/\[Preferences\]/a WebUI\\LocalHostAuth=false\nWebUI\\AuthSubnetWhitelist=127.0.0.0/8\nWebUI\\AuthSubnetWhitelistEnabled=true' "$QBT_CONF"
+    # --- Apply WebUI port to config ---
+    WEBUI_PORT=${WEBUI_PORT:-8080}
+    if grep -q "WebUI\\\\Port=" /config/qBittorrent/config/qBittorrent.conf; then
+        sed -i "s/WebUI\\\\Port=.*/WebUI\\\\Port=${WEBUI_PORT}/" /config/qBittorrent/config/qBittorrent.conf
+    fi
+
+    # --- Ensure localhost auth bypass (API needs unauthenticated local access) ---
+    QBT_CONF="/config/qBittorrent/config/qBittorrent.conf"
+    if ! grep -q "LocalHostAuth" "$QBT_CONF"; then
+        echo "[tunnelvision] Patching qBittorrent config: localhost auth bypass"
+        sed -i '/\[Preferences\]/a WebUI\\LocalHostAuth=false\nWebUI\\AuthSubnetWhitelist=127.0.0.0/8\nWebUI\\AuthSubnetWhitelistEnabled=true' "$QBT_CONF"
+    fi
+else
+    echo "[tunnelvision] qBittorrent disabled — skipping config setup"
 fi
 
 # --- Permissions ---

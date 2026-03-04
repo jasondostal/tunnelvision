@@ -19,7 +19,9 @@ export function HealthCard({ data }: { data: HealthResponse }) {
       <div className="space-y-2.5">
         <Row label="VPN" value={data.vpn} />
         <Row label="Killswitch" value={data.killswitch} />
-        <Row label="qBittorrent" value={data.qbittorrent} />
+        {data.qbittorrent !== "disabled" && (
+          <Row label="qBittorrent" value={data.qbittorrent} />
+        )}
         <Row label="API" value={data.api} />
         <div className="flex items-center justify-between border-t border-surface-border pt-2.5">
           <span className="text-xs text-text-muted">Uptime</span>

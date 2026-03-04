@@ -5,19 +5,20 @@ Fires on VPN disconnect, reconnect, and port forwarding changes.
 """
 
 import logging
-import os
 from datetime import datetime, timezone
 
 import httpx
 
+from api.config import Config
+
 logger = logging.getLogger(__name__)
 
 
-async def notify(event: str, message: str, details: dict | None = None):
+async def notify(event: str, message: str, details: dict | None = None, config: Config | None = None):
     """Send notification to all configured webhooks."""
-    webhook_url = os.getenv("NOTIFY_WEBHOOK_URL", "")
-    gotify_url = os.getenv("NOTIFY_GOTIFY_URL", "")
-    gotify_token = os.getenv("NOTIFY_GOTIFY_TOKEN", "")
+    webhook_url = config.notify_webhook_url if config else ""
+    gotify_url = config.notify_gotify_url if config else ""
+    gotify_token = config.notify_gotify_token if config else ""
 
     if not webhook_url and not gotify_url:
         return

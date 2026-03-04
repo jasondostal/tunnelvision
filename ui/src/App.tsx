@@ -51,7 +51,8 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
 
   const health = usePoll(useCallback(() => api.health(), []), POLL_INTERVAL, sseRefresh);
   const vpn = usePoll(useCallback(() => api.vpnStatus(), []), POLL_INTERVAL, sseRefresh);
-  const qbt = usePoll(useCallback(() => api.qbtStatus(), []), POLL_INTERVAL, sseRefresh);
+  const qbtEnabled = health.data?.qbittorrent !== "disabled";
+  const qbt = usePoll(useCallback(() => qbtEnabled ? api.qbtStatus() : Promise.resolve(null), [qbtEnabled]), POLL_INTERVAL, sseRefresh);
   const system = usePoll(useCallback(() => api.system(), []), 30_000);
 
   const loading = health.loading || vpn.loading;
@@ -95,7 +96,7 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
           )}
         </div>
         <div className="flex items-center gap-3">
-          {vpn.data && (
+          {vpn.data && qbtEnabled && (
             <a
               href={`http://${window.location.hostname}:8080`}
               target="_blank"

@@ -14,6 +14,9 @@ async def qbt_status(request: Request):
     """qBittorrent connection stats."""
     config = request.app.state.config
 
+    if not config.qbt_enabled:
+        return QBTStatusResponse(state="disabled", webui_port=config.webui_port)
+
     # Check if qBittorrent is responding
     try:
         result = subprocess.run(

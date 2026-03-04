@@ -78,6 +78,7 @@ class ConfigResponse(BaseModel):
     vpn_enabled: bool
     vpn_provider: str
     killswitch_enabled: bool
+    qbt_enabled: bool = True
     webui_port: int
     api_port: int
     ui_enabled: bool

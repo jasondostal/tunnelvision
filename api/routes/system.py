@@ -12,14 +12,6 @@ from api.models import SystemResponse
 router = APIRouter()
 
 
-def _read_state(path: str, default: str = "") -> str:
-    try:
-        with open(path) as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        return default
-
-
 def _get_command_output(cmd: list[str], default: str = "") -> str:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
@@ -36,7 +28,7 @@ async def system_info(request: Request):
 
     # VPN uptime
     vpn_uptime = None
-    started_at = _read_state("/var/run/tunnelvision/vpn_started_at")
+    started_at = request.app.state.state.vpn_started_at
     if started_at:
         try:
             from datetime import datetime
@@ -50,7 +42,7 @@ async def system_info(request: Request):
         container_uptime=round(container_uptime, 1),
         vpn_uptime=round(vpn_uptime, 1) if vpn_uptime else None,
         alpine_version=_get_command_output(["cat", "/etc/alpine-release"]),
-        qbittorrent_version=_get_command_output(["qbittorrent-nox", "--version"]),
+        qbittorrent_version=_get_command_output(["qbittorrent-nox", "--version"]) if config.qbt_enabled else "",
         wireguard_version=_get_command_output(["wg", "--version"]),
         python_version=platform.python_version(),
         api_port=config.api_port,

@@ -13,23 +13,16 @@ _last_state: dict = {}
 router = APIRouter()
 
 
-def _read_state(path: str, default: str = "") -> str:
-    try:
-        with open(path) as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        return default
-
-
 @router.get("/vpn/status", response_model=VPNStatusResponse)
 async def vpn_status(request: Request):
     """Full VPN connection status with transfer stats and location."""
     config = request.app.state.config
+    state_mgr = request.app.state.state
 
     # Sidecar mode: read all VPN state from gluetun
     if config.vpn_provider == "gluetun":
         from api.services.providers.gluetun import GluetunProvider
-        gluetun = GluetunProvider()
+        gluetun = GluetunProvider(config)
         gluetun_status = await gluetun.get_vpn_status()
         state = "up" if gluetun_status == "running" else "down"
         check = await gluetun.check_connection()
@@ -40,17 +33,17 @@ async def vpn_status(request: Request):
         endpoint = ""
         killswitch = "gluetun"  # Gluetun manages the firewall
     else:
-        state = _read_state("/var/run/tunnelvision/vpn_state", "disabled" if not config.vpn_enabled else "unknown")
-        public_ip = _read_state("/var/run/tunnelvision/public_ip")
-        country = _read_state("/var/run/tunnelvision/country")
-        city = _read_state("/var/run/tunnelvision/city")
-        vpn_ip = _read_state("/var/run/tunnelvision/vpn_ip")
-        endpoint = _read_state("/var/run/tunnelvision/vpn_endpoint")
-        killswitch = _read_state("/var/run/tunnelvision/killswitch_state", "disabled")
+        state = state_mgr.read("vpn_state", "disabled" if not config.vpn_enabled else "unknown")
+        public_ip = state_mgr.public_ip
+        country = state_mgr.country
+        city = state_mgr.city
+        vpn_ip = state_mgr.vpn_ip
+        endpoint = state_mgr.vpn_endpoint
+        killswitch = state_mgr.killswitch_state
 
     # Parse timestamps
     connected_since = None
-    started_at = _read_state("/var/run/tunnelvision/vpn_started_at")
+    started_at = state_mgr.vpn_started_at
     if started_at:
         try:
             connected_since = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
@@ -59,7 +52,7 @@ async def vpn_status(request: Request):
 
     # Parse handshake
     last_handshake = None
-    hs_epoch = _read_state("/var/run/tunnelvision/last_handshake")
+    hs_epoch = state_mgr.last_handshake
     if hs_epoch and hs_epoch != "0":
         try:
             last_handshake = datetime.fromtimestamp(int(hs_epoch), tz=timezone.utc)
@@ -67,8 +60,8 @@ async def vpn_status(request: Request):
             pass
 
     # Transfer stats
-    rx = int(_read_state("/var/run/tunnelvision/rx_bytes", "0") or "0")
-    tx = int(_read_state("/var/run/tunnelvision/tx_bytes", "0") or "0")
+    rx = int(state_mgr.rx_bytes or "0")
+    tx = int(state_mgr.tx_bytes or "0")
 
     # Human-readable location
     location = ""
@@ -95,10 +88,10 @@ async def vpn_status(request: Request):
     forwarded_port = None
     if config.vpn_provider == "gluetun":
         from api.services.providers.gluetun import GluetunProvider
-        gluetun = GluetunProvider()
+        gluetun = GluetunProvider(config)
         forwarded_port = await gluetun.get_forwarded_port()
     else:
-        pf_str = _read_state("/var/run/tunnelvision/forwarded_port")
+        pf_str = state_mgr.forwarded_port
         if pf_str:
             try:
                 forwarded_port = int(pf_str)
@@ -142,9 +135,9 @@ async def vpn_history(limit: int = 50):
 @router.get("/vpn/ip", response_model=VPNIPResponse)
 async def vpn_ip(request: Request):
     """Just the public IP — for Homepage widgets and quick checks."""
-    config = request.app.state.config
-    ip = _read_state("/var/run/tunnelvision/public_ip", "unknown")
-    state = _read_state("/var/run/tunnelvision/vpn_state", "disabled")
+    state_mgr = request.app.state.state
+    ip = state_mgr.read("public_ip", "unknown")
+    state = state_mgr.vpn_state
 
     return VPNIPResponse(
         ip=ip,

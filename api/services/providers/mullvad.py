@@ -6,7 +6,6 @@ Endpoints used:
 - https://api.mullvad.net/public/accounts/v1/{account}/ — account expiry
 """
 
-import os
 from datetime import datetime, timezone
 
 import httpx
@@ -68,7 +67,7 @@ class MullvadProvider(VPNProvider):
 
     async def get_account_info(self) -> AccountInfo | None:
         """Check Mullvad account expiry."""
-        account = os.getenv("MULLVAD_ACCOUNT", "")
+        account = self.config.mullvad_account if self.config else ""
         if not account:
             return None
 

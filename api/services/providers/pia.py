@@ -14,7 +14,6 @@ Endpoints used:
 - https://<gateway>:19999/bindPort — port forwarding bind (every 15 min)
 """
 
-import os
 import ssl
 from datetime import datetime, timezone
 
@@ -125,8 +124,8 @@ class PIAProvider(VPNProvider):
             if age < 43200:
                 return self._token
 
-        username = os.getenv("PIA_USER", "")
-        password = os.getenv("PIA_PASS", "")
+        username = self.config.pia_user if self.config else ""
+        password = self.config.pia_pass if self.config else ""
         if not username or not password:
             return None
 

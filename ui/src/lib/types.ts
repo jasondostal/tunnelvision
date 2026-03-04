@@ -54,6 +54,7 @@ export interface ConfigResponse {
   vpn_enabled: boolean;
   vpn_provider: string;
   killswitch_enabled: boolean;
+  qbt_enabled: boolean;
   webui_port: number;
   api_port: number;
   ui_enabled: boolean;
