@@ -43,6 +43,7 @@ CONFIGURABLE_FIELDS = {
     "vpn_city": {"env": "VPN_CITY", "default": "", "secret": False},
     "vpn_dns": {"env": "VPN_DNS", "default": "", "secret": False},
     "killswitch_enabled": {"env": "KILLSWITCH_ENABLED", "default": "true", "secret": False},
+    "wg_userspace": {"env": "WG_USERSPACE", "default": "auto", "secret": False},
     "ui_enabled": {"env": "UI_ENABLED", "default": "true", "secret": False},
     "mqtt_enabled": {"env": "MQTT_ENABLED", "default": "false", "secret": False},
     "mqtt_broker": {"env": "MQTT_BROKER", "default": "", "secret": False},

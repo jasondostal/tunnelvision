@@ -86,6 +86,30 @@ WRAPPER
         chmod +x /sbin/sysctl
     fi
 
+    # --- Determine WireGuard implementation ---
+    WG_USERSPACE=${WG_USERSPACE:-auto}
+    WG_IMPL="kernel"
+
+    if [ "$WG_USERSPACE" = "userspace" ]; then
+        export WG_QUICK_USERSPACE_IMPLEMENTATION=wireguard-go
+        WG_IMPL="userspace"
+        echo "[tunnelvision] WireGuard: userspace mode (wireguard-go)"
+    elif [ "$WG_USERSPACE" = "kernel" ]; then
+        echo "[tunnelvision] WireGuard: kernel mode (required)"
+    else
+        # auto: probe for kernel module availability
+        if ip link add wg-probe type wireguard 2>/dev/null; then
+            ip link del wg-probe 2>/dev/null || true
+            echo "[tunnelvision] WireGuard: kernel module detected"
+        else
+            export WG_QUICK_USERSPACE_IMPLEMENTATION=wireguard-go
+            WG_IMPL="userspace"
+            echo "[tunnelvision] WireGuard: kernel module unavailable, falling back to wireguard-go"
+        fi
+    fi
+
+    echo "$WG_IMPL" > /var/run/tunnelvision/wg_implementation
+
     wg-quick up wg0
 
     if ! ip link show wg0 &>/dev/null; then

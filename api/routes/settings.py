@@ -27,6 +27,7 @@ class SettingsUpdate(BaseModel):
     vpn_city: str | None = None
     vpn_dns: str | None = None
     killswitch_enabled: str | None = None
+    wg_userspace: str | None = None
     ui_enabled: str | None = None
     mqtt_enabled: str | None = None
     mqtt_broker: str | None = None

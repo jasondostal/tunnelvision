@@ -96,6 +96,7 @@ RUN apk add --no-cache \
     qbittorrent-nox \
     shadow \
     tzdata \
+    wireguard-go \
     wireguard-tools
 
 # Create app user (will be modified at runtime by init-environment)

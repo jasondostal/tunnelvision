@@ -48,6 +48,7 @@ class Config:
     vpn_country: str = field(default_factory=lambda: os.getenv("VPN_COUNTRY", ""))
     vpn_city: str = field(default_factory=lambda: os.getenv("VPN_CITY", ""))
     killswitch_enabled: bool = field(default_factory=lambda: os.getenv("KILLSWITCH_ENABLED", "true").lower() == "true")
+    wg_userspace: str = field(default_factory=lambda: os.getenv("WG_USERSPACE", "auto"))
 
     # Sidecar mode (gluetun)
     gluetun_url: str = field(default_factory=lambda: os.getenv("GLUETUN_URL", GLUETUN_DEFAULT_URL))
