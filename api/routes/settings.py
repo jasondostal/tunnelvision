@@ -27,7 +27,15 @@ class SettingsUpdate(BaseModel):
     mqtt_port: str | None = None
     mqtt_user: str | None = None
     mqtt_pass: str | None = None
+    gluetun_url: str | None = None
+    gluetun_api_key: str | None = None
+    pia_user: str | None = None
+    pia_pass: str | None = None
+    port_forward_enabled: str | None = None
     auto_reconnect: str | None = None
+    notify_webhook_url: str | None = None
+    notify_gotify_url: str | None = None
+    notify_gotify_token: str | None = None
 
 
 @router.get("/settings")
@@ -55,9 +63,17 @@ async def update_settings(body: SettingsUpdate, request: Request):
 
     save_settings(updates)
 
-    # Determine if restart is needed
-    restart_fields = {"killswitch_enabled", "vpn_dns", "vpn_provider", "mqtt_enabled", "mqtt_broker"}
-    needs_restart = bool(restart_fields & set(updates.keys()))
+    # These fields are re-read from settings YAML at runtime — no restart needed
+    hot_reload_fields = {
+        "auto_reconnect",       # watchdog re-reads each tick
+        "health_check_interval",  # watchdog re-reads each tick
+        "vpn_country",          # rotate endpoint re-reads
+        "vpn_city",             # rotate endpoint re-reads
+        "notify_webhook_url",   # notifications re-read on send
+        "notify_gotify_url",    # notifications re-read on send
+        "notify_gotify_token",  # notifications re-read on send
+    }
+    needs_restart = bool(set(updates.keys()) - hot_reload_fields)
 
     return {
         "message": "Settings saved to /config/tunnelvision.yml",

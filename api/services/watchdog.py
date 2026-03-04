@@ -96,14 +96,17 @@ class WatchdogService:
         self._set_state(WatchdogState.IDLE)
         log.info("Watchdog stopped")
 
-    def _is_auto_reconnect_enabled(self) -> bool:
-        """Re-read auto_reconnect from settings each call — togglable without restart."""
+    def _load_setting(self, key: str, default: str = "") -> str:
+        """Re-read a single setting from YAML — hot-reloadable without restart."""
         try:
             from api.services.settings import load_settings
-            settings = load_settings()
-            return str(settings.get("auto_reconnect", "true")).lower() == "true"
+            return str(load_settings().get(key, default))
         except Exception:
-            return self.config.auto_reconnect
+            return default
+
+    def _is_auto_reconnect_enabled(self) -> bool:
+        """Re-read auto_reconnect from settings each call — togglable without restart."""
+        return self._load_setting("auto_reconnect", "true").lower() == "true"
 
     def _is_sidecar_mode(self) -> bool:
         """Check if we're running in sidecar mode (gluetun manages VPN)."""
@@ -124,7 +127,13 @@ class WatchdogService:
 
         while True:
             try:
-                interval = self.config.health_check_interval
+                try:
+                    interval = int(self._load_setting(
+                        "health_check_interval",
+                        str(self.config.health_check_interval),
+                    ))
+                except (ValueError, TypeError):
+                    interval = self.config.health_check_interval
                 await asyncio.sleep(interval)
                 self._last_check = time.time()
 

@@ -105,14 +105,22 @@ async def reconnect(request: Request):
 async def rotate_server(request: Request):
     """Pick a new random server and reconnect.
 
-    Mullvad: new random server from entire pool (or filtered by VPN_COUNTRY/VPN_CITY env).
+    Mullvad: new random server from entire pool (or filtered by VPN_COUNTRY/VPN_CITY).
     Custom: pick different random config file from /config/wireguard/ or /config/openvpn/.
+
+    Re-reads country/city from settings YAML so rotation filters are hot-reloadable.
     """
     config = request.app.state.config
-    return await connect_to_server(
-        ConnectRequest(country=config.vpn_country or None, city=config.vpn_city or None),
-        request,
-    )
+    # Hot-reload: prefer settings YAML over frozen Config
+    try:
+        from api.services.settings import load_settings
+        settings = load_settings()
+        country = settings.get("vpn_country", config.vpn_country) or None
+        city = settings.get("vpn_city", config.vpn_city) or None
+    except Exception:
+        country = config.vpn_country or None
+        city = config.vpn_city or None
+    return await connect_to_server(ConnectRequest(country=country, city=city), request)
 
 
 @router.get("/vpn/configs")

@@ -15,10 +15,22 @@ logger = logging.getLogger(__name__)
 
 
 async def notify(event: str, message: str, details: dict | None = None, config: Config | None = None):
-    """Send notification to all configured webhooks."""
-    webhook_url = config.notify_webhook_url if config else ""
-    gotify_url = config.notify_gotify_url if config else ""
-    gotify_token = config.notify_gotify_token if config else ""
+    """Send notification to all configured webhooks.
+
+    Re-reads URLs from persistent settings (YAML) so they're hot-reloadable.
+    Falls back to Config (env vars) if settings can't be read.
+    """
+    # Hot-reload: prefer settings YAML over frozen Config
+    try:
+        from api.services.settings import load_settings
+        settings = load_settings()
+        webhook_url = settings.get("notify_webhook_url", "")
+        gotify_url = settings.get("notify_gotify_url", "")
+        gotify_token = settings.get("notify_gotify_token", "")
+    except Exception:
+        webhook_url = config.notify_webhook_url if config else ""
+        gotify_url = config.notify_gotify_url if config else ""
+        gotify_token = config.notify_gotify_token if config else ""
 
     if not webhook_url and not gotify_url:
         return

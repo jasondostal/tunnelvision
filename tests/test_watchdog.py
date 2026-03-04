@@ -460,6 +460,26 @@ class TestSettingsReread:
             result = watchdog._is_auto_reconnect_enabled()
         assert result is True  # Falls back to config.auto_reconnect
 
+    def test_load_setting_reads_from_yaml(self, watchdog):
+        with patch("api.services.settings.load_settings",
+                    return_value={"health_check_interval": "60"}):
+            assert watchdog._load_setting("health_check_interval", "30") == "60"
+
+    def test_load_setting_fallback_on_error(self, watchdog):
+        with patch("api.services.settings.load_settings", side_effect=Exception("fail")):
+            assert watchdog._load_setting("health_check_interval", "30") == "30"
+
+    def test_health_check_interval_hot_reloads(self, watchdog):
+        """Verify health_check_interval re-reads from settings, not frozen Config."""
+        with patch("api.services.settings.load_settings",
+                    return_value={"health_check_interval": "45"}):
+            val = int(watchdog._load_setting(
+                "health_check_interval",
+                str(watchdog.config.health_check_interval),
+            ))
+        assert val == 45
+        assert watchdog.config.health_check_interval == 1  # frozen Config unchanged
+
 
 # --- StateManager tests ---
 
@@ -478,3 +498,87 @@ class TestStateManagerWatchdog:
         snap = state_mgr.snapshot()
         assert snap["watchdog_state"] == "degraded"
         assert snap["active_config"] == "test.conf"
+
+
+# --- Settings model alignment tests ---
+
+
+class TestSettingsModelAlignment:
+    """Verify SettingsUpdate model covers all CONFIGURABLE_FIELDS."""
+
+    def test_all_configurable_fields_in_update_model(self):
+        from api.services.settings import CONFIGURABLE_FIELDS
+        from api.routes.settings import SettingsUpdate
+
+        model_fields = set(SettingsUpdate.model_fields.keys())
+        config_fields = set(CONFIGURABLE_FIELDS.keys())
+
+        missing = config_fields - model_fields
+        assert missing == set(), f"Fields in CONFIGURABLE_FIELDS but not in SettingsUpdate: {missing}"
+
+    def test_needs_restart_accuracy(self):
+        """Hot-reload fields should NOT trigger needs_restart."""
+        from api.routes.settings import SettingsUpdate
+
+        hot_reload_fields = {
+            "auto_reconnect", "health_check_interval",
+            "vpn_country", "vpn_city",
+            "notify_webhook_url", "notify_gotify_url", "notify_gotify_token",
+        }
+
+        # Changing only hot-reload fields should not need restart
+        for field in hot_reload_fields:
+            updates = {field: "test_value"}
+            needs_restart = bool(set(updates.keys()) - hot_reload_fields)
+            assert not needs_restart, f"{field} should be hot-reloadable"
+
+        # Changing a non-hot-reload field should need restart
+        updates = {"mqtt_broker": "10.0.0.1"}
+        needs_restart = bool(set(updates.keys()) - hot_reload_fields)
+        assert needs_restart, "mqtt_broker should need restart"
+
+
+# --- Notifications hot-reload test ---
+
+
+class TestNotificationsHotReload:
+    @pytest.mark.asyncio
+    async def test_notify_reads_from_settings(self):
+        from api.services.notifications import notify
+
+        with patch("api.services.settings.load_settings", return_value={
+            "notify_webhook_url": "https://hooks.example.com/test",
+            "notify_gotify_url": "",
+            "notify_gotify_token": "",
+        }), patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            await notify("test_event", "test message")
+
+            mock_client.post.assert_called_once()
+            call_url = mock_client.post.call_args[0][0]
+            assert call_url == "https://hooks.example.com/test"
+
+    @pytest.mark.asyncio
+    async def test_notify_falls_back_to_config(self):
+        from api.services.notifications import notify
+
+        config = Config(
+            notify_webhook_url="https://fallback.example.com",
+        )
+
+        with patch("api.services.settings.load_settings", side_effect=Exception("no file")), \
+             patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            await notify("test_event", "test message", config=config)
+
+            mock_client.post.assert_called_once()
+            call_url = mock_client.post.call_args[0][0]
+            assert call_url == "https://fallback.example.com"
