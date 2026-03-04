@@ -12,17 +12,25 @@
 
 ---
 
-qBittorrent + WireGuard VPN + killswitch + REST API + dashboard. One container. Full visibility.
+qBittorrent + WireGuard/OpenVPN + killswitch + REST API + dashboard. One container. Full visibility.
 
-Drop your WireGuard config, `docker compose up`, and you can see everything — what IP you're on, where you're exiting, transfer stats, killswitch state, qBittorrent health. From your Homepage dashboard, from Home Assistant, from Prometheus, from the built-in UI, from `curl`. No guessing. No SSH-ing in.
+Drop your VPN config, `docker compose up`, and you can see everything — what IP you're on, where you're exiting, transfer stats, killswitch state, qBittorrent health. From your Homepage dashboard, from Home Assistant, from Prometheus, from the built-in UI, from `curl`. No guessing. No SSH-ing in.
 
-Works with **any WireGuard provider**. Mullvad, IVPN, Proton, AirVPN, PIA, or your own server.
+Works with **any WireGuard or OpenVPN provider**. Native integrations for [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), and [PIA](https://privateinternetaccess.com) (ephemeral key negotiation, port forwarding). Or bring your own config from Proton, AirVPN, Windscribe, or your own server.
 
 <p align="center">
   <img src="images/screenshot-dashboard.png" alt="TunnelVision Dashboard" width="700">
 </p>
 
 ## Quick Start
+
+**One-liner install:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jasondostal/tunnelvision/main/scripts/install.sh | bash
+```
+
+**Or manually:**
 
 ```bash
 mkdir -p tunnelvision/wireguard
@@ -35,11 +43,33 @@ docker compose up -d
 Three things are now running inside one container:
 - **qBittorrent WebUI** on port `8080`
 - **TunnelVision API + Dashboard** on port `8081`
-- **WireGuard VPN** with nftables killswitch
+- **WireGuard/OpenVPN** with nftables killswitch
 
 ```bash
 curl http://localhost:8081/api/v1/health | jq .
 ```
+
+## Already running gluetun?
+
+Keep it. TunnelVision can run alongside gluetun in **sidecar mode** — gluetun manages the VPN tunnel, TunnelVision adds the visibility layer. You get the dashboard, API, Home Assistant integration, and monitoring without changing your VPN setup. And you inherit gluetun's 30+ provider support instantly.
+
+```yaml
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    # ... your existing gluetun config ...
+
+  tunnelvision:
+    image: ghcr.io/jasondostal/tunnelvision:latest
+    network_mode: "service:gluetun"
+    environment:
+      - VPN_PROVIDER=gluetun
+      - GLUETUN_URL=http://localhost:8000
+    volumes:
+      - ./config:/config
+```
+
+TunnelVision reads gluetun's API for status but never touches the tunnel. Full read-only observability.
 
 ## Integrations
 
@@ -123,7 +153,7 @@ You get:
 - **2 switches** — VPN on/off, Killswitch on/off (reflect actual state)
 - **3 services** — `tunnelvision.vpn`, `tunnelvision.qbittorrent`, `tunnelvision.killswitch` for automations
 
-No MQTT required. Real-time updates via SSE with polling fallback.
+No MQTT required. Real-time updates via Server-Sent Events (SSE) with polling fallback — state changes appear in HA within seconds, not minutes.
 
 ### Prometheus + Grafana
 
@@ -132,6 +162,8 @@ curl http://localhost:8081/metrics
 ```
 
 Exports `tunnelvision_vpn_up`, `tunnelvision_killswitch_active`, `tunnelvision_transfer_rx_bytes_total`, `tunnelvision_transfer_tx_bytes_total`, `tunnelvision_vpn_connected_seconds`, and more. Scrape it, graph it, alert on it.
+
+A ready-made Grafana dashboard is included at [`examples/grafana-dashboard.json`](examples/grafana-dashboard.json) — import it and point at your Prometheus data source.
 
 ### Sonarr / Radarr / Prowlarr
 
@@ -142,6 +174,16 @@ Use `tunnelvision` (or your container name) as the download client host in your 
 - **Password**: your qBittorrent password
 
 All torrent traffic routes through the VPN. The killswitch ensures nothing leaks if the tunnel drops.
+
+### Notifications
+
+Webhook notifications for VPN state changes — reconnects, failures, port forwarding updates. Supports Discord, Slack, Gotify, and generic webhooks out of the box.
+
+| Variable | What it does |
+|----------|-------------|
+| `NOTIFY_WEBHOOK_URL` | Discord/Slack webhook URL, or any generic endpoint |
+| `NOTIFY_GOTIFY_URL` | Gotify server URL |
+| `NOTIFY_GOTIFY_TOKEN` | Gotify app token |
 
 ## Authentication
 
@@ -183,7 +225,7 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `AUTH_PROXY_HEADER` | *(empty)* | Trusted header from reverse proxy (e.g. `Remote-User`) |
 | `VPN_ENABLED` | `true` | Enable/disable VPN |
 | `VPN_TYPE` | `auto` | VPN engine: `auto`, `wireguard`, or `openvpn` |
-| `VPN_PROVIDER` | `custom` | VPN provider: `custom` or `mullvad` |
+| `VPN_PROVIDER` | `custom` | VPN provider: `custom`, `mullvad`, `ivpn`, `pia`, or `gluetun` (sidecar mode) |
 | `VPN_DNS` | *(from config)* | Override DNS server (default: provider DNS or `10.64.0.1`) |
 | `VPN_COUNTRY` | *(empty)* | Filter server rotation by country (e.g. `ch`, `us`) |
 | `VPN_CITY` | *(empty)* | Filter server rotation by city (e.g. `zurich`) |
@@ -197,6 +239,13 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `MQTT_BROKER` | *(empty)* | MQTT broker hostname/IP |
 | `MQTT_PORT` | `1883` | MQTT broker port |
 | `MQTT_USER` / `MQTT_PASS` | *(empty)* | MQTT authentication |
+| `GLUETUN_URL` | `http://gluetun:8000` | Gluetun API URL (sidecar mode) |
+| `GLUETUN_API_KEY` | *(empty)* | Gluetun API key (if auth is enabled) |
+| `AUTO_RECONNECT` | `true` | Auto-reconnect VPN on failure (watchdog) |
+| `NOTIFY_WEBHOOK_URL` | *(empty)* | Discord/Slack/generic webhook for notifications |
+| `NOTIFY_GOTIFY_URL` | *(empty)* | Gotify server URL |
+| `NOTIFY_GOTIFY_TOKEN` | *(empty)* | Gotify app token |
+| `PORT_FORWARD_ENABLED` | `false` | Enable port forwarding (PIA) |
 | `PUID` | `1000` | User ID for file permissions |
 | `PGID` | `1000` | Group ID for file permissions |
 | `TZ` | `America/Chicago` | Container timezone |
@@ -232,14 +281,20 @@ Interactive docs at `http://localhost:8081/api/docs` (Swagger) when running.
 
 | Endpoint | What it returns |
 |----------|----------------|
-| `GET /api/v1/health` | Container health — VPN, killswitch, qBittorrent, uptime |
+| `GET /api/v1/health` | Container health — VPN, killswitch, qBittorrent, watchdog, uptime |
 | `GET /api/v1/vpn/status` | Full VPN status — IP, location, uptime, transfer stats |
 | `GET /api/v1/vpn/ip` | Just the public IP |
 | `GET /api/v1/vpn/check` | Provider-verified connection check |
+| `GET /api/v1/vpn/configs` | Available VPN config files and active config |
 | `GET /api/v1/qbt/status` | Speeds, torrent counts, version |
 | `GET /api/v1/system` | Container versions and uptime |
 | `GET /api/v1/config` | Current configuration (no secrets) |
+| `GET /api/v1/settings` | Persistent settings (secrets masked) |
+| `GET /api/v1/history` | Connection history — rotations, reconnects, watchdog events |
+| `GET /api/v1/events` | SSE stream — real-time state changes |
+| `GET /api/v1/speedtest` | Run a VPN speed test |
 | `GET /metrics` | Prometheus metrics |
+| `POST /api/v1/vpn/connect` | Connect to a specific server |
 | `POST /api/v1/vpn/restart` | Restart VPN tunnel |
 | `POST /api/v1/vpn/rotate` | Rotate to a new server |
 | `POST /api/v1/vpn/disconnect` | Disconnect VPN |
@@ -248,29 +303,33 @@ Interactive docs at `http://localhost:8081/api/docs` (Swagger) when running.
 | `POST /api/v1/qbt/restart` | Restart qBittorrent |
 | `POST /api/v1/qbt/pause` | Pause all torrents |
 | `POST /api/v1/qbt/resume` | Resume all torrents |
+| `GET /api/v1/backup` | Export config backup (JSON) |
+| `POST /api/v1/backup/restore` | Restore from backup |
 
 </details>
 
 <details>
 <summary>Migrating from other setups</summary>
 
-**From gluetun + qBittorrent:** Copy your qBittorrent config directory and your WireGuard config. Point the volumes. Done.
+**From gluetun + qBittorrent:** Two options. Full migration: copy your qBittorrent config and WireGuard config, point the volumes, done. Gentle option: keep gluetun for the tunnel and add TunnelVision in [sidecar mode](#already-running-gluetun) for visibility — zero risk, try before you switch.
 
 **From Trigus42/qbittorrentvpn:** Same config structure — mount `/config` and `/config/wireguard` the same way.
 
-**From transmission-openvpn:** You'll need to switch to qBittorrent. The VPN config carries over if it's WireGuard.
+**From transmission-openvpn:** You'll need to switch to qBittorrent. The VPN config carries over if it's WireGuard or OpenVPN.
 
 </details>
 
 <details>
 <summary>Architecture</summary>
 
+**Standalone mode** — TunnelVision manages everything:
+
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  TunnelVision Container                                  │
 │                                                          │
 │  ┌─────────────────┐  ┌──────────────┐  ┌────────────┐  │
-│  │  WireGuard VPN   │  │ qBittorrent  │  │ FastAPI    │  │
+│  │  WireGuard/OVPN  │  │ qBittorrent  │  │ FastAPI    │  │
 │  │  + nftables      │  │   -nox       │  │ REST API   │  │
 │  │  killswitch      │  │              │  │ + React UI │  │
 │  └────────┬─────────┘  └──────┬───────┘  └─────┬──────┘  │
@@ -286,6 +345,19 @@ Interactive docs at `http://localhost:8081/api/docs` (Swagger) when running.
 └──────────────────────────────────────────────────────────┘
          │              │              │
     :8080 (WebUI)  :8081 (API)    wg0 (tunnel)
+```
+
+**Sidecar mode** — gluetun manages the tunnel, TunnelVision adds visibility:
+
+```
+┌─────────────────────┐    ┌──────────────────────────┐
+│  Gluetun Container   │    │  TunnelVision Container   │
+│                      │    │  (network_mode: gluetun)  │
+│  WireGuard/OpenVPN   │◄───│                           │
+│  30+ providers       │ API│  FastAPI + React UI       │
+│  Tunnel management   │    │  MQTT, SSE, Prometheus    │
+│                      │    │  Watchdog (read-only)     │
+└──────────────────────┘    └──────────────────────────┘
 ```
 
 </details>

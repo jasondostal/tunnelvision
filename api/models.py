@@ -16,6 +16,7 @@ class HealthResponse(BaseModel):
     api: str = "running"
     uptime_seconds: float = 0
     checked_at: datetime
+    watchdog: dict | None = Field(None, description="Watchdog state snapshot")
 
 
 class VPNStatusResponse(BaseModel):

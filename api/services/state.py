@@ -159,6 +159,16 @@ class StateManager:
     def active_config(self, value: str) -> None:
         self.write("active_config", value)
 
+    # --- Watchdog ---
+
+    @property
+    def watchdog_state(self) -> str:
+        return self.read("watchdog_state", "idle")
+
+    @watchdog_state.setter
+    def watchdog_state(self, value: str) -> None:
+        self.write("watchdog_state", value)
+
     # --- Snapshot (for MQTT / bulk reads) ---
 
     def snapshot(self) -> dict[str, str]:
@@ -174,4 +184,6 @@ class StateManager:
             "rx_bytes": self.rx_bytes,
             "tx_bytes": self.tx_bytes,
             "healthy": self.healthy,
+            "watchdog_state": self.watchdog_state,
+            "active_config": self.active_config,
         }

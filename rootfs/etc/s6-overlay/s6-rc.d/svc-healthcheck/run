@@ -77,13 +77,7 @@ while true; do
             LAST_HS="0"
             HEALTHY=false
             CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
-
-            # Auto-reconnect after sustained failure
-            if [ "$AUTO_RECONNECT" = "true" ] && [ "$CONSECUTIVE_FAILURES" -ge "$RECONNECT_THRESHOLD" ]; then
-                echo "[tunnelvision] VPN down for ${CONSECUTIVE_FAILURES} checks — attempting reconnect..."
-                wg-quick up wg0 2>/dev/null || true
-                CONSECUTIVE_FAILURES=0
-            fi
+            # Auto-reconnect is handled by the Python watchdog service
         fi
     else
         VPN_STATE="disabled"

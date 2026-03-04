@@ -71,6 +71,7 @@ class Config:
 
     # Health
     health_check_interval: int = field(default_factory=lambda: int(os.getenv("HEALTH_CHECK_INTERVAL", "30")))
+    auto_reconnect: bool = field(default_factory=lambda: os.getenv("AUTO_RECONNECT", "true").lower() == "true")
 
     @property
     def api_auth_required(self) -> bool:

@@ -1,5 +1,14 @@
 /** API response types — mirrors api/models.py */
 
+export interface WatchdogState {
+  state: string;
+  consecutive_failures: number;
+  tried_configs: string[];
+  recovery_count: number;
+  auto_reconnect: boolean;
+  cooldown_remaining: number;
+}
+
 export interface HealthResponse {
   healthy: boolean;
   setup_required: boolean;
@@ -9,6 +18,7 @@ export interface HealthResponse {
   api: string;
   uptime_seconds: number;
   checked_at: string;
+  watchdog: WatchdogState | null;
 }
 
 export interface VPNStatusResponse {

@@ -61,6 +61,14 @@ async def health_check(request: Request):
     if config.qbt_enabled:
         healthy = healthy and qbt_state == "running"
 
+    # Watchdog snapshot
+    watchdog_snapshot = None
+    try:
+        from api.services.watchdog import get_watchdog_service
+        watchdog_snapshot = get_watchdog_service().snapshot()
+    except Exception:
+        pass
+
     return HealthResponse(
         healthy=healthy,
         vpn=vpn_state,
@@ -68,4 +76,5 @@ async def health_check(request: Request):
         qbittorrent=qbt_state,
         uptime_seconds=round(uptime, 1),
         checked_at=datetime.now(timezone.utc),
+        watchdog=watchdog_snapshot,
     )

@@ -273,6 +273,19 @@ class MQTTService:
                 "icon": btn_icon,
             }, device, availability)
 
+        # --- Watchdog sensors ---
+        self._discover("sensor", "watchdog_state", {
+            "name": "Watchdog",
+            "state_topic": f"{self.prefix}/watchdog_state",
+            "icon": "mdi:shield-refresh",
+        }, device, availability)
+
+        self._discover("sensor", "active_config", {
+            "name": "Active Config",
+            "state_topic": f"{self.prefix}/active_config",
+            "icon": "mdi:file-cog",
+        }, device, availability)
+
         # --- Switch (killswitch toggle) ---
         self._discover("switch", "killswitch_toggle", {
             "name": "Killswitch",

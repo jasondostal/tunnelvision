@@ -88,6 +88,7 @@ async def connect_to_server(body: ConnectRequest, request: Request):
             os.remove("/etc/wireguard/wg0.conf")
         os.symlink(str(chosen), "/etc/wireguard/wg0.conf")
 
+    state_mgr.active_config = chosen.name
     result = await _reconnect_vpn(vpn_type)
     result.config_file = chosen.name
     return result

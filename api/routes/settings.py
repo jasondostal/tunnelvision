@@ -27,6 +27,7 @@ class SettingsUpdate(BaseModel):
     mqtt_port: str | None = None
     mqtt_user: str | None = None
     mqtt_pass: str | None = None
+    auto_reconnect: str | None = None
 
 
 @router.get("/settings")

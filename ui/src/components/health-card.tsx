@@ -23,6 +23,25 @@ export function HealthCard({ data }: { data: HealthResponse }) {
           <Row label="qBittorrent" value={data.qbittorrent} />
         )}
         <Row label="API" value={data.api} />
+        {data.watchdog && (
+          <Row label="Watchdog" value={data.watchdog.state} />
+        )}
+        {data.watchdog && data.watchdog.consecutive_failures > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-text-muted">Failures</span>
+            <span className="font-mono text-sm text-amber-400">
+              {data.watchdog.consecutive_failures}
+            </span>
+          </div>
+        )}
+        {data.watchdog && data.watchdog.cooldown_remaining > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-text-muted">Cooldown</span>
+            <span className="font-mono text-sm text-amber-400">
+              {humanDuration(data.watchdog.cooldown_remaining)}
+            </span>
+          </div>
+        )}
         <div className="flex items-center justify-between border-t border-surface-border pt-2.5">
           <span className="text-xs text-text-muted">Uptime</span>
           <span className="font-mono text-sm text-text-secondary">

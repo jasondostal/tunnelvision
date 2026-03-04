@@ -18,6 +18,7 @@ from api.routes import auth, health, vpn, qbt, system, config as config_routes, 
 async def lifespan(app: FastAPI):
     """Application lifespan — startup and shutdown."""
     from api.services.mqtt import get_mqtt_service
+    from api.services.watchdog import get_watchdog_service
 
     app.state.config = load_config()
     app.state.state = StateManager()
@@ -27,9 +28,14 @@ async def lifespan(app: FastAPI):
     mqtt_svc = get_mqtt_service(app.state.config, app.state.state)
     mqtt_svc.start()
 
+    # Start watchdog
+    watchdog_svc = get_watchdog_service(app.state.config, app.state.state)
+    watchdog_svc.start()
+
     yield
 
     # Shutdown
+    watchdog_svc.stop()
     mqtt_svc.stop()
 
 
