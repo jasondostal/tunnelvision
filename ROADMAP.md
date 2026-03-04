@@ -4,7 +4,6 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Next
 
-- [ ] **Provider wave 1** — NordVPN, Surfshark, Windscribe, AirVPN, ExpressVPN (single-file drops, auto-discovered)
 - [ ] **Provider wave 2** — Perfect Privacy, CyberGhost, IPVanish, TorGuard, PrivateVPN
 - [ ] **Provider wave 3** — Privado, PureVPN, VPNSecure, VPN Unlimited, VyprVPN, FastestVPN, HideMyAss, SlickVPN, Giganews
 
@@ -25,6 +24,7 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
+- [x] Provider wave 1 — NordVPN (full rotation), Windscribe, AirVPN, Surfshark, ExpressVPN (v2.8.0)
 - [x] Infrastructure hardening — firewall-first boot, userspace WireGuard fallback (wireguard-go), port forward hooks, server auto-updater, richer server filters (v2.7.0)
 - [x] Provider framework refactor — metadata protocol, unified connect pipeline, auto-discovery, metadata-driven config, parametrized tests (v2.6.0)
 - [x] Docker Secrets support — `_SECRETFILE` env vars for all secret fields (v2.5.0)

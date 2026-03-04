@@ -1,5 +1,37 @@
 # Changelog
 
+## v2.8.0 — Provider Wave 1 (2026-03-04)
+
+Five new native provider integrations. All auto-discovered, auto-configured, auto-tested.
+
+### NordVPN
+- Full server rotation via the NordVPN public API — server list includes WireGuard public keys, load, and categories
+- P2P and Double VPN (multi-hop) servers correctly flagged for filtering
+- Dual connection check: NordVPN's IP lookup endpoint with generic geo-IP fallback
+- Setup: add a WireGuard key in your NordVPN dashboard, set `WIREGUARD_PRIVATE_KEY` and `WIREGUARD_ADDRESSES`
+
+### Windscribe
+- Server browser via public server list — country, city, hostname, P2P flag
+- Setup: download WireGuard config from the Windscribe website and place in `/config/wireguard/wg0.conf`
+
+### AirVPN
+- Server browser via public status API — country, city, IP, load
+- Optional `AIRVPN_API_KEY` for account info in the dashboard (days remaining, status)
+- Setup: generate a WireGuard config from the AirVPN config generator and paste it in
+
+### Surfshark
+- Server browser via Surfshark cluster API — country, city, load
+- Setup: generate a WireGuard key pair on the Surfshark website and download the config
+
+### ExpressVPN
+- Connection monitoring (IP, country, city) via geo-IP
+- Setup: download WireGuard config from the ExpressVPN app or website
+
+### Tests
+- 420 total tests (up from 319)
+
+---
+
 ## v2.7.0 — Infrastructure Hardening (2026-03-04)
 
 Security, resilience, and observability upgrades across the boot chain, VPN engine, port forwarding, and server management layers.

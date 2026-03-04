@@ -33,7 +33,10 @@ class TestProviderDiscovery:
     """Auto-discovery finds all expected providers."""
 
     def test_known_providers_registered(self):
-        expected = {"mullvad", "ivpn", "pia", "proton", "custom", "gluetun"}
+        expected = {
+            "mullvad", "ivpn", "pia", "proton", "custom", "gluetun",
+            "nordvpn", "windscribe", "airvpn", "surfshark", "expressvpn",
+        }
         assert expected == set(PROVIDER_IDS)
 
     def test_no_duplicate_ids(self):
@@ -93,7 +96,7 @@ class TestProviderMeta:
                 )
 
     def test_filter_capabilities_valid(self, provider_id):
-        valid_caps = {"country", "city", "owned_only", "streaming", "p2p", "port_forward", "secure_core"}
+        valid_caps = {"country", "city", "owned_only", "streaming", "p2p", "port_forward", "secure_core", "multihop"}
         provider = _make_instance(provider_id)
         caps = set(provider.meta.filter_capabilities)
         invalid = caps - valid_caps
