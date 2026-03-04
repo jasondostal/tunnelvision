@@ -23,6 +23,7 @@ class IVPNProvider(VPNProvider):
 
     SERVERS_URL = "https://api.ivpn.net/v5/servers.json"
     GEO_URL = "https://api.ivpn.net/v4/geo-lookup"
+    HEALTH_PING_URL = "https://api.ivpn.net/"
 
     @property
     def name(self) -> str:

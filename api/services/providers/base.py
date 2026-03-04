@@ -182,6 +182,8 @@ class VPNProvider(ABC):
     or account checks just inherit the default no-op implementations.
     """
 
+    HEALTH_PING_URL: str | None = None  # Override with API base URL for reachability checks
+
     def __init__(self, config=None):
         self.config = config
         self._server_cache: list[ServerInfo] | None = None

@@ -106,6 +106,26 @@ export interface ConfigListResponse {
   hint: string;
 }
 
+export interface ProviderAccountInfo {
+  available: boolean;
+  active?: boolean;
+  expires_at?: string;
+  days_remaining?: number;
+}
+
+export interface ProviderHealthResponse {
+  provider_id: string;
+  provider_name: string;
+  supports_account_check: boolean;
+  api_reachable: boolean | null;
+  api_latency_ms: number | null;
+  server_count: number | null;
+  cache_age_seconds: number | null;
+  cache_fresh: boolean | null;
+  account: ProviderAccountInfo;
+  checked_at: string;
+}
+
 export interface ConfigResponse {
   vpn_enabled: boolean;
   vpn_provider: string;

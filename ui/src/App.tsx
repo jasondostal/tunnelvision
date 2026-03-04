@@ -14,6 +14,7 @@ import { SettingsPanel } from "@/components/settings-panel";
 import { ConnectionHistory } from "@/components/connection-history";
 import { ConfigManager } from "@/components/config-manager";
 import { ServerBrowser } from "@/components/server-browser";
+import { ProviderHealthCard } from "@/components/provider-health-card";
 import { useSSE } from "@/lib/use-sse";
 
 const POLL_INTERVAL = 10_000; // 10s
@@ -49,6 +50,7 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showServerBrowser, setShowServerBrowser] = useState(false);
   const [sseRefresh, setSSERefresh] = useState(0);
+  const [providerHealthRefresh, setProviderHealthRefresh] = useState(0);
 
   // SSE — instant refresh on VPN state changes
   useSSE(() => setSSERefresh((n) => n + 1));
@@ -60,6 +62,7 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
   const system = usePoll(useCallback(() => api.system(), []), 30_000);
   const history = usePoll(useCallback(() => api.history(), []), 30_000, sseRefresh);
   const configs = usePoll(useCallback(() => api.configs(), []), 30_000, sseRefresh);
+  const providerHealth = usePoll(useCallback(() => api.providerHealth(), []), 300_000, providerHealthRefresh);
 
   const loading = health.loading || vpn.loading;
   const error = health.error || vpn.error;
@@ -181,6 +184,13 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
           )}
 
           {health.data && <HealthCard data={health.data} />}
+          {providerHealth.data && (
+            <ProviderHealthCard
+              data={providerHealth.data}
+              onRefresh={() => setProviderHealthRefresh((n) => n + 1)}
+              refreshing={providerHealth.loading}
+            />
+          )}
           {configs.data && configs.data.count > 1 && (
             <ConfigManager data={configs.data} />
           )}

@@ -8,6 +8,7 @@ import type {
   HistoryResponse,
   ServerListResponse,
   ConfigListResponse,
+  ProviderHealthResponse,
 } from "./types";
 
 const cache = new Map<string, { data: unknown; ts: number }>();
@@ -54,6 +55,7 @@ export const api = {
   system: () => get<SystemResponse>("/api/v1/system"),
   history: () => get<HistoryResponse>("/api/v1/vpn/history"),
   configs: () => get<ConfigListResponse>("/api/v1/vpn/configs"),
+  providerHealth: () => get<ProviderHealthResponse>("/api/v1/vpn/provider-health"),
   servers: (country?: string, city?: string) => {
     const params = new URLSearchParams();
     if (country) params.set("country", country);

@@ -26,6 +26,7 @@ class MullvadProvider(VPNProvider):
     CHECK_URL = "https://am.i.mullvad.net/json"
     RELAYS_URL = "https://api.mullvad.net/www/relays/wireguard/"
     ACCOUNT_URL = "https://api.mullvad.net/public/accounts/v1/{account}/"
+    HEALTH_PING_URL = "https://api.mullvad.net/"
 
     @property
     def name(self) -> str:

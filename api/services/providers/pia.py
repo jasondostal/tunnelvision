@@ -40,6 +40,7 @@ class PIAProvider(VPNProvider):
 
     SERVERS_URL = "https://serverlist.piaservers.net/vpninfo/servers/v6"
     TOKEN_URL = "https://www.privateinternetaccess.com/api/client/v2/token"
+    HEALTH_PING_URL = "https://serverlist.piaservers.net/"
     WG_PORT = 1337
 
     def __init__(self, config=None):

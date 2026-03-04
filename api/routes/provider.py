@@ -1,9 +1,11 @@
 """Provider-specific endpoints — connection verification, server metadata, account info."""
 
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query, Request
 
+from api.constants import PROVIDER_CACHE_TTL, http_client
 from api.services.providers.base import ServerFilter
 from api.services.vpn import get_provider
 
@@ -150,4 +152,67 @@ async def vpn_server_list(
             }
             for s in servers
         ],
+    }
+
+
+@router.get("/vpn/provider-health")
+async def provider_health(request: Request):
+    """Provider observability — API reachability, server cache freshness, account expiry.
+
+    Returns live signal about the active provider's health:
+    - api_reachable: whether the provider's API endpoint responds (null for PASTE providers)
+    - api_latency_ms: round-trip time to the API (null if not applicable / unreachable)
+    - server_count: number of servers in the in-memory cache (null if never fetched)
+    - cache_age_seconds: seconds since the server list was last refreshed
+    - cache_fresh: whether the cache is within the TTL window (1 hour)
+    - account: expiry data where the provider supports account checks
+    """
+    config = request.app.state.config
+    provider = get_provider(config.vpn_provider, config)
+
+    # API reachability ping
+    api_reachable: bool | None = None
+    api_latency_ms: int | None = None
+    ping_url = provider.HEALTH_PING_URL
+    if ping_url:
+        t0 = time.monotonic()
+        try:
+            async with http_client() as client:
+                await client.head(ping_url, timeout=3.0)
+            api_reachable = True
+            api_latency_ms = round((time.monotonic() - t0) * 1000)
+        except Exception:
+            api_reachable = False
+
+    # Server cache metadata (read directly from in-memory singleton)
+    server_count: int | None = len(provider._server_cache) if provider._server_cache is not None else None
+    cache_age_seconds: int | None = None
+    cache_fresh: bool | None = None
+    if provider._cache_time is not None:
+        cache_age_seconds = int((datetime.now(timezone.utc) - provider._cache_time).total_seconds())
+        cache_fresh = cache_age_seconds < PROVIDER_CACHE_TTL
+
+    # Account info — only for providers that support it
+    account_payload: dict = {"available": False}
+    if provider.meta.supports_account_check:
+        account = await provider.get_account_info()
+        if account is not None:
+            account_payload = {
+                "available": True,
+                "active": account.active,
+                "expires_at": account.expires_at.isoformat() if account.expires_at else None,
+                "days_remaining": account.days_remaining,
+            }
+
+    return {
+        "provider_id": provider.meta.id,
+        "provider_name": provider.meta.display_name,
+        "supports_account_check": provider.meta.supports_account_check,
+        "api_reachable": api_reachable,
+        "api_latency_ms": api_latency_ms,
+        "server_count": server_count,
+        "cache_age_seconds": cache_age_seconds,
+        "cache_fresh": cache_fresh,
+        "account": account_payload,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
     }

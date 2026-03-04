@@ -37,6 +37,7 @@ class ProtonProvider(VPNProvider):
 
     SERVERS_URL = "https://api.protonvpn.ch/vpn/logicals"
     GEO_URL = "https://ipwho.is/"
+    HEALTH_PING_URL = "https://api.protonvpn.ch/"
 
     @property
     def name(self) -> str:

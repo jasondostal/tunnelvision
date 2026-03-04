@@ -1,5 +1,28 @@
 # Changelog
 
+## v3.3.0 — Provider Health Dashboard + CI Test Pipeline (2026-03-04)
+
+### Provider Health Dashboard
+New dashboard card exposing live observability for the active VPN provider.
+
+- **API reachability** — HEAD-pings the provider's API endpoint with 3s timeout; shows green/red dot and round-trip latency
+- **Server cache status** — number of servers in cache and age since last refresh; amber dot when stale (>1h)
+- **Account expiry** — for Mullvad and AirVPN: expiry date, days remaining, and a color-coded progress bar (green >30d, amber 7–30d, red <7d)
+- **Manual refresh** — Refresh button triggers a new check without waiting for the 5-minute poll interval
+- New `GET /api/v1/vpn/provider-health` endpoint
+- `HEALTH_PING_URL` class constant added to `VPNProvider` base; Mullvad, IVPN, PIA, and ProtonVPN configured
+
+### CI test pipeline
+Tests now run in GitHub Actions on every push and pull request.
+
+- New `test` job: Python 3.12, installs requirements, runs `pytest tests/ -q --tb=short`
+- `build` job depends on `test` — broken tests block Docker image pushes
+
+### Tests
+- 698 total tests (up from 691)
+
+---
+
 ## v3.2.0 — Smart Server Selection + WireGuard Key Generation (2026-03-04)
 
 ### Smart server selection
