@@ -36,6 +36,7 @@ class TestProviderDiscovery:
         expected = {
             "mullvad", "ivpn", "pia", "proton", "custom", "gluetun",
             "nordvpn", "windscribe", "airvpn", "surfshark", "expressvpn",
+            "ipvanish", "torguard", "privatevpn", "perfectprivacy", "cyberghost",
         }
         assert expected == set(PROVIDER_IDS)
 

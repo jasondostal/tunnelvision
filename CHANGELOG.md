@@ -1,5 +1,34 @@
 # Changelog
 
+## v2.9.0 — Provider Wave 2 (2026-03-04)
+
+Five more provider integrations. Reality check included — not every provider has a clean API.
+
+### IPVanish
+- Server browser via public GeoJSON API — hostname, country, city, load
+- Setup: log into IPVanish account → Service Management → WireGuard → Generate. Note: configs expire after 30 days.
+
+### TorGuard
+- Connection monitoring (IP, country, city) via geo-IP
+- Setup: torguard.net → Tools → Config Generator → WireGuard. Note: configs expire after 12-24 hours by design.
+
+### PrivateVPN
+- Connection monitoring via geo-IP
+- Setup: privatevpn.com account → WireGuard Configurations → Generate Config.
+
+### Perfect Privacy
+- Connection monitoring via geo-IP
+- WireGuard is explicitly not supported by Perfect Privacy (architectural decision). Requires OpenVPN — set `VPN_TYPE=openvpn`.
+
+### CyberGhost
+- Connection monitoring via geo-IP
+- WireGuard is app-only — no manual config export. Requires OpenVPN for container deployments — set `VPN_TYPE=openvpn`.
+
+### Tests
+- 513 total tests (up from 420)
+
+---
+
 ## v2.8.0 — Provider Wave 1 (2026-03-04)
 
 Five new native provider integrations. All auto-discovered, auto-configured, auto-tested.
