@@ -1,5 +1,51 @@
 # Changelog
 
+## v2.3.0 — Self-Healing VPN (2026-03-03)
+
+If the tunnel drops at 3am, TunnelVision brings it back. No cron jobs, no external scripts.
+
+### Auto-Reconnect Watchdog
+- Background asyncio service with state machine: MONITORING → DEGRADED → RECONNECTING → FAILING_OVER → COOLDOWN
+- WireGuard health: `wg show wg0 latest-handshakes` staleness (>180s = stale)
+- OpenVPN health: `tun0` interface existence check
+- Sidecar health: gluetun API read-only probe
+- Escalation: 1-2 failures → degrade + broadcast. 3rd failure → reconnect. Reconnect fails → failover to next config. All configs exhausted → cooldown 5min, reset, retry
+- SSE broadcasts on every state transition (`watchdog_degraded`, `watchdog_reconnecting`, `watchdog_failover`, `watchdog_recovered`, `watchdog_cooldown`)
+- MQTT HA Discovery entities: `watchdog_state`, `active_config`
+- Notification webhooks fire on reconnect attempts and recovery
+- Runtime toggle: re-reads `auto_reconnect` from settings YAML each tick — togglable without restart
+
+### Multi-Config Failover
+- Scans `/config/wireguard/*.conf` + `/config/openvpn/*.ovpn` for available configs
+- On reconnect failure, cycles to next untried config
+- Strips PostUp/PostDown from configs before activation (safety)
+- Re-applies killswitch after config switch (nftables rules hardcode endpoint IP)
+- Resets tried-config list on recovery or after cooldown
+
+### Settings Hot-Reload
+- 7 fields now take effect immediately without restart: `auto_reconnect`, `health_check_interval`, `vpn_country`, `vpn_city`, `notify_webhook_url`, `notify_gotify_url`, `notify_gotify_token`
+- Watchdog re-reads `health_check_interval` from settings YAML each tick
+- Notifications re-read webhook URLs from settings YAML on each send
+- Server rotation re-reads `vpn_country`/`vpn_city` from settings YAML
+- All 25 configurable fields now persist correctly via settings API (8 were silently dropped before)
+- `needs_restart` response flipped from blocklist to hot-reload whitelist
+
+### Settings Panel UI
+- Per-field dirty tracking with amber border on changed inputs
+- Per-field hot-reload indicator: green zap (instant) vs amber refresh (needs restart)
+- "Unsaved" badge in header when changes exist
+- Confirm dialog on close/cancel when dirty
+- Save button disabled when no changes
+- Footer legend showing icon meanings
+
+### Bug Fix
+- `active_config` in StateManager now set correctly for custom config rotation (was only set for Mullvad/IVPN/PIA)
+
+### Tests
+- 40 unit tests covering state transitions, health probes, escalation, failover, cooldown, config activation, settings hot-reload, singleton pattern, model alignment
+
+---
+
 ## v2.2.0 — Architecture Cleanup (2026-03-04)
 
 Internal refactor. Zero new features, zero breaking changes. The plumbing got proper.

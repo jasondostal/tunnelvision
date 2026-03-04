@@ -2,19 +2,12 @@
 
 What's coming. No promises on timelines — this is built for the love of blinkenlights.
 
-## Next — Self-Healing VPN
-
-- [ ] Auto-reconnect watchdog — health check detects sustained failure, triggers reconnect with backoff
-- [ ] Multi-config failover — drop multiple `.conf` files, cycle through on failure
-- [ ] SSE + MQTT broadcast on reconnect events (reconnecting, failed, recovered)
-- [ ] Connection history UI — visualize uptime, rotations, failures in the dashboard
-
 ## Next — Dashboard Polish
 
+- [ ] Connection history UI — visualize uptime, rotations, failures in the dashboard
 - [ ] Server browser in dashboard UI (filter by country/city, show load)
 - [ ] Multi-config management (switch between VPN configs from UI)
 - [ ] Setup wizard completion (guided first-run for new users)
-- [ ] Settings panel wiring (runtime config changes from dashboard)
 
 ## Future
 
@@ -29,6 +22,7 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
+- [x] Self-healing VPN — auto-reconnect watchdog, multi-config failover, settings hot-reload (v2.3.0)
 - [x] Architecture cleanup — StateManager, Config consolidation, MQTT dispatch (v2.2.0)
 - [x] SSE real-time events + HACS SSE push (v2.1.0)
 - [x] Gluetun sidecar mode (v2.0.0)
