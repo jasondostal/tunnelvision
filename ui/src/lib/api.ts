@@ -5,6 +5,9 @@ import type {
   VPNStatusResponse,
   QBTStatusResponse,
   SystemResponse,
+  HistoryResponse,
+  ServerListResponse,
+  ConfigListResponse,
 } from "./types";
 
 const cache = new Map<string, { data: unknown; ts: number }>();
@@ -49,6 +52,15 @@ export const api = {
   vpnStatus: () => get<VPNStatusResponse>("/api/v1/vpn/status"),
   qbtStatus: () => get<QBTStatusResponse>("/api/v1/qbt/status"),
   system: () => get<SystemResponse>("/api/v1/system"),
+  history: () => get<HistoryResponse>("/api/v1/vpn/history"),
+  configs: () => get<ConfigListResponse>("/api/v1/vpn/configs"),
+  servers: (country?: string, city?: string) => {
+    const params = new URLSearchParams();
+    if (country) params.set("country", country);
+    if (city) params.set("city", city);
+    const qs = params.toString();
+    return get<ServerListResponse>(`/api/v1/vpn/servers${qs ? `?${qs}` : ""}`);
+  },
 
   async checkAuth(): Promise<AuthResponse> {
     const r = await fetch("/api/v1/auth/me");

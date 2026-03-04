@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, LogOut, Settings } from "lucide-react";
+import { ExternalLink, Globe, LogOut, Settings } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { api } from "@/lib/api";
 import type { AuthResponse } from "@/lib/api";
@@ -11,6 +11,9 @@ import { SystemInfo } from "@/components/system-info";
 import { SetupWizard } from "@/components/setup-wizard";
 import { Login } from "@/components/login";
 import { SettingsPanel } from "@/components/settings-panel";
+import { ConnectionHistory } from "@/components/connection-history";
+import { ConfigManager } from "@/components/config-manager";
+import { ServerBrowser } from "@/components/server-browser";
 import { useSSE } from "@/lib/use-sse";
 
 const POLL_INTERVAL = 10_000; // 10s
@@ -44,6 +47,7 @@ export default function App() {
 function Dashboard({ authState }: { authState: AuthResponse | null }) {
   const [setupComplete, setSetupComplete] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showServerBrowser, setShowServerBrowser] = useState(false);
   const [sseRefresh, setSSERefresh] = useState(0);
 
   // SSE — instant refresh on VPN state changes
@@ -54,9 +58,14 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
   const qbtEnabled = health.data?.qbittorrent !== "disabled";
   const qbt = usePoll(useCallback(() => qbtEnabled ? api.qbtStatus() : Promise.resolve(null), [qbtEnabled]), POLL_INTERVAL, sseRefresh);
   const system = usePoll(useCallback(() => api.system(), []), 30_000);
+  const history = usePoll(useCallback(() => api.history(), []), 30_000, sseRefresh);
+  const configs = usePoll(useCallback(() => api.configs(), []), 30_000, sseRefresh);
 
   const loading = health.loading || vpn.loading;
   const error = health.error || vpn.error;
+
+  // Show server browser button for API-capable providers
+  const hasServerBrowser = vpn.data && ["mullvad", "ivpn", "pia"].includes(vpn.data.provider);
 
   // Setup mode — show wizard instead of dashboard
   const needsSetup = health.data?.setup_required && !setupComplete;
@@ -106,6 +115,16 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
               qBit WebUI
               <ExternalLink className="h-3 w-3" />
             </a>
+          )}
+          {hasServerBrowser && (
+            <button
+              onClick={() => setShowServerBrowser(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-surface-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-cyan-500/30 hover:text-cyan-400"
+              title="Server Browser"
+            >
+              <Globe className="h-3 w-3" />
+              Servers
+            </button>
           )}
           <a
             href="/api/docs"
@@ -162,11 +181,20 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
           )}
 
           {health.data && <HealthCard data={health.data} />}
+          {configs.data && configs.data.count > 1 && (
+            <ConfigManager data={configs.data} />
+          )}
           {qbt.data && <QBTStatus data={qbt.data} />}
 
           {system.data && (
             <div className="sm:col-span-2">
               <SystemInfo data={system.data} />
+            </div>
+          )}
+
+          {history.data && (
+            <div className="sm:col-span-2">
+              <ConnectionHistory data={history.data} />
             </div>
           )}
         </div>
@@ -178,6 +206,9 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
 
       {showSettings && (
         <SettingsPanel onClose={() => setShowSettings(false)} />
+      )}
+      {showServerBrowser && (
+        <ServerBrowser onClose={() => setShowServerBrowser(false)} />
       )}
     </div>
   );

@@ -1,12 +1,16 @@
 """Setup wizard API — first-run configuration flow."""
 
+import base64
+import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from api.services.settings import save_settings
 from api.services.state import StateManager
 
 router = APIRouter()
@@ -45,6 +49,88 @@ class VerifyResponse(BaseModel):
     country: str = ""
     city: str = ""
     error: str = ""
+
+
+class CredentialsRequest(BaseModel):
+    provider: str
+    private_key: str | None = None
+    addresses: str | None = None
+    dns: str | None = None
+    pia_user: str | None = None
+    pia_pass: str | None = None
+    port_forward: bool = False
+    gluetun_url: str | None = None
+    gluetun_api_key: str | None = None
+
+
+class CredentialsResponse(BaseModel):
+    success: bool
+    next: str = ""
+    error: str = ""
+
+
+class ServerSelectRequest(BaseModel):
+    hostname: str
+
+
+# -- Credential validators (per-provider) --
+
+def _validate_wireguard_creds(body: CredentialsRequest) -> CredentialsResponse | None:
+    """Validate WG private key + address for Mullvad/IVPN. Returns error response or None on success."""
+    if not body.private_key:
+        return CredentialsResponse(success=False, error="WireGuard private key is required")
+    key = body.private_key.strip()
+    if len(key) != 44 or key[-1] != "=":
+        return CredentialsResponse(success=False, error="Invalid private key format — expected 44-character base64 string")
+    try:
+        decoded = base64.b64decode(key)
+        if len(decoded) != 32:
+            raise ValueError()
+    except Exception:
+        return CredentialsResponse(success=False, error="Invalid private key — not valid base64")
+
+    if not body.addresses:
+        return CredentialsResponse(success=False, error="WireGuard address is required (e.g. 10.x.x.x/32)")
+    addr = body.addresses.strip()
+    if not re.match(r"^[\d.:a-fA-F]+/\d+", addr):
+        return CredentialsResponse(success=False, error="Address should be in CIDR format (e.g. 10.66.0.1/32)")
+    return None
+
+
+async def _validate_pia_creds(body: CredentialsRequest) -> CredentialsResponse | None:
+    """Validate PIA username/password by getting a token. Returns error response or None on success."""
+    if not body.pia_user or not body.pia_pass:
+        return CredentialsResponse(success=False, error="PIA username and password are required")
+
+    try:
+        from api.services.vpn import get_provider
+        from api.config import Config
+        temp_config = Config()
+        object.__setattr__(temp_config, "pia_user", body.pia_user)
+        object.__setattr__(temp_config, "pia_pass", body.pia_pass)
+        pia_provider = get_provider("pia", temp_config)
+        token = await pia_provider.get_token()
+        if not token:
+            return CredentialsResponse(success=False, error="PIA authentication failed — check username and password")
+    except Exception:
+        return CredentialsResponse(success=False, error="PIA authentication failed — check username and password")
+    return None
+
+
+async def _validate_gluetun(body: CredentialsRequest) -> CredentialsResponse | None:
+    """Validate connection to gluetun. Returns error response or None on success."""
+    url = (body.gluetun_url or "http://gluetun:8000").rstrip("/")
+    try:
+        import httpx
+        headers = {}
+        if body.gluetun_api_key:
+            headers["X-Api-Key"] = body.gluetun_api_key
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{url}/v1/openvpn/status", headers=headers)
+            resp.raise_for_status()
+    except Exception:
+        return CredentialsResponse(success=False, error=f"Could not connect to gluetun at {url}")
+    return None
 
 
 # -- Endpoints --
@@ -185,7 +271,6 @@ async def verify_connection():
         city = ""
 
         if ip_result.returncode == 0:
-            import json
             try:
                 data = json.loads(ip_result.stdout)
                 public_ip = data.get("ip", "")
@@ -194,7 +279,7 @@ async def verify_connection():
             except json.JSONDecodeError:
                 pass
 
-        # Bring tunnel back down (setup/complete will bring it up for real)
+        # Always tear down — setup/complete will bring it up for real
         subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=10)
 
         if not public_ip:
@@ -211,7 +296,6 @@ async def verify_connection():
         )
 
     except subprocess.TimeoutExpired:
-        # Clean up
         subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=5)
         return VerifyResponse(success=False, error="Connection timed out")
     except Exception as e:
@@ -219,23 +303,84 @@ async def verify_connection():
         return VerifyResponse(success=False, error=str(e))
 
 
+@router.post("/setup/credentials", response_model=CredentialsResponse)
+async def setup_credentials(body: CredentialsRequest, request: Request):
+    """Validate and persist provider-specific credentials."""
+    provider = body.provider.lower()
+    state_mgr: StateManager = request.app.state.state
+    state_mgr.setup_provider = provider
+
+    if provider in ("mullvad", "ivpn"):
+        err = _validate_wireguard_creds(body)
+        if err:
+            return err
+
+        settings: dict = {
+            "vpn_provider": provider,
+            "wireguard_private_key": body.private_key.strip(),  # type: ignore[union-attr]
+            "wireguard_addresses": body.addresses.strip(),  # type: ignore[union-attr]
+        }
+        if body.dns:
+            settings["vpn_dns"] = body.dns.strip()
+        save_settings(settings)
+        return CredentialsResponse(success=True, next="server")
+
+    elif provider == "pia":
+        err = await _validate_pia_creds(body)
+        if err:
+            return err
+
+        save_settings({
+            "vpn_provider": "pia",
+            "pia_user": body.pia_user,
+            "pia_pass": body.pia_pass,
+            "port_forward_enabled": "true" if body.port_forward else "false",
+        })
+        return CredentialsResponse(success=True, next="server")
+
+    elif provider == "gluetun":
+        err = await _validate_gluetun(body)
+        if err:
+            return err
+
+        url = (body.gluetun_url or "http://gluetun:8000").rstrip("/")
+        settings = {"vpn_provider": "gluetun", "gluetun_url": url}
+        if body.gluetun_api_key:
+            settings["gluetun_api_key"] = body.gluetun_api_key
+        save_settings(settings)
+        return CredentialsResponse(success=True, next="done")
+
+    else:
+        save_settings({"vpn_provider": provider})
+        return CredentialsResponse(success=True, next="config")
+
+
+@router.post("/setup/server")
+async def setup_server(body: ServerSelectRequest, request: Request):
+    """Select a server and generate WireGuard config. Reuses connect logic."""
+    from api.routes.connect import ConnectRequest, ConnectResponse, connect_to_server
+    result = await connect_to_server(ConnectRequest(hostname=body.hostname), request)
+    return result
+
+
 @router.post("/setup/complete")
 async def complete_setup(request: Request):
     """Finalize setup — mark setup as complete and signal s6 to restart services."""
-    if not WG_CONF_PATH.exists():
-        return {"success": False, "error": "No WireGuard config — run /setup/wireguard first"}
-
     state_mgr: StateManager = request.app.state.state
     provider = state_mgr.setup_provider or "custom"
+
+    # Gluetun manages VPN externally — no WG config needed
+    if provider != "gluetun" and not WG_CONF_PATH.exists():
+        return {"success": False, "error": "No WireGuard config — run /setup/wireguard first"}
+
+    # Persist provider to settings YAML so it survives container restarts
+    save_settings({"vpn_provider": provider})
 
     # Mark setup complete
     state_mgr.setup_required = False
 
     # Signal s6 to restart the init chain + services
-    # s6-svc -r tells s6 to restart the service
     try:
-        # Restart the whole container's service tree by touching a restart flag
-        # The health monitor will pick this up, or we restart services directly
         subprocess.run(["s6-svc", "-r", "/run/service/svc-qbittorrent"], capture_output=True, timeout=5)
     except Exception:
         pass

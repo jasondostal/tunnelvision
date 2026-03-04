@@ -30,6 +30,8 @@ CONFIGURABLE_FIELDS = {
     "gluetun_api_key": {"env": "GLUETUN_API_KEY", "default": "", "secret": True},
     "pia_user": {"env": "PIA_USER", "default": "", "secret": False},
     "pia_pass": {"env": "PIA_PASS", "default": "", "secret": True},
+    "wireguard_private_key": {"env": "WIREGUARD_PRIVATE_KEY", "default": "", "secret": True},
+    "wireguard_addresses": {"env": "WIREGUARD_ADDRESSES", "default": "", "secret": False},
     "port_forward_enabled": {"env": "PORT_FORWARD_ENABLED", "default": "false", "secret": False},
     "auto_reconnect": {"env": "AUTO_RECONNECT", "default": "true", "secret": False},
     "notify_webhook_url": {"env": "NOTIFY_WEBHOOK_URL", "default": "", "secret": False},

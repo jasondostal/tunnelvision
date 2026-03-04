@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Logo } from "@/components/logo";
 import {
   Shield,
@@ -8,8 +8,13 @@ import {
   AlertCircle,
   MapPin,
   FileText,
+  Key,
+  User,
+  Globe,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ServerEntry } from "@/lib/types";
 
 interface Provider {
   id: string;
@@ -27,34 +32,176 @@ interface VerifyResult {
   error: string;
 }
 
-type Step = "welcome" | "provider" | "config" | "verify" | "done";
+type Step = "welcome" | "provider" | "credentials" | "config" | "server" | "verify" | "done";
+
+const ALL_STEPS: Step[] = ["welcome", "provider", "credentials", "verify", "done"];
+
+// Shared styles
+const inputClass =
+  "w-full rounded-xl border border-surface-border bg-surface-card p-2.5 pl-10 text-sm text-text-primary placeholder:text-text-muted/50 focus:border-amber-500/50 focus:outline-none";
+const inputMonoClass = `${inputClass} font-mono`;
+const backBtnClass =
+  "rounded-xl border border-surface-border px-4 py-2.5 text-sm text-text-secondary transition-colors hover:border-amber-500/30";
+const primaryBtnClass =
+  "flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 font-medium text-black transition-colors hover:bg-amber-400 disabled:opacity-50";
+
+function WizardError({ message }: { message: string }) {
+  if (!message) return null;
+  return (
+    <div className="mt-3 flex items-center gap-2 text-sm text-status-down">
+      <AlertCircle className="h-4 w-4 shrink-0" />
+      {message}
+    </div>
+  );
+}
+
+/** Map provider ID to the step the user should return to on failure. */
+function stepForProvider(provider: string): Step {
+  if (provider === "custom" || provider === "proton") return "config";
+  if (provider === "mullvad" || provider === "ivpn" || provider === "pia") return "server";
+  return "credentials";
+}
+
+function stepIndex(step: Step): number {
+  const map: Record<Step, number> = {
+    welcome: 0,
+    provider: 1,
+    credentials: 2,
+    config: 2,
+    server: 2,
+    verify: 3,
+    done: 4,
+  };
+  return map[step];
+}
 
 export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState<Step>("welcome");
   const [providers, setProviders] = useState<Provider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>("");
-  const [configText, setConfigText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
 
+  // Config paste (custom/proton)
+  const [configText, setConfigText] = useState("");
+
+  // WG credentials (mullvad/ivpn)
+  const [privateKey, setPrivateKey] = useState("");
+  const [addresses, setAddresses] = useState("");
+  const [dns, setDns] = useState("");
+
+  // PIA credentials
+  const [piaUser, setPiaUser] = useState("");
+  const [piaPass, setPiaPass] = useState("");
+  const [portForward, setPortForward] = useState(false);
+
+  // Gluetun
+  const [gluetunUrl, setGluetunUrl] = useState("http://gluetun:8000");
+  const [gluetunApiKey, setGluetunApiKey] = useState("");
+
+  // Server picker
+  const [servers, setServers] = useState<ServerEntry[]>([]);
+  const [serverSearch, setServerSearch] = useState("");
+  const [countryFilter, setCountryFilter] = useState("");
+  const [serversLoading, setServersLoading] = useState(false);
+
   const loadProviders = useCallback(async () => {
-    const resp = await fetch("/api/v1/setup/providers");
-    const data = await resp.json();
-    setProviders(data.providers);
-    setStep("provider");
+    try {
+      const resp = await fetch("/api/v1/setup/providers");
+      const data = await resp.json();
+      setProviders(data.providers);
+      setStep("provider");
+    } catch {
+      setError("Failed to load providers");
+    }
   }, []);
 
   const selectProvider = useCallback(async (id: string) => {
     setSelectedProvider(id);
     setError("");
-    await fetch("/api/v1/setup/provider", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider: id }),
-    });
-    setStep("config");
+    try {
+      await fetch("/api/v1/setup/provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: id }),
+      });
+      if (id === "custom" || id === "proton") {
+        setStep("config");
+      } else {
+        setStep("credentials");
+      }
+    } catch {
+      setError("Failed to select provider");
+    }
   }, []);
+
+  const doVerify = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const resp = await fetch("/api/v1/setup/verify", { method: "POST" });
+      const data: VerifyResult = await resp.json();
+      setVerifyResult(data);
+      if (!data.success) {
+        setError(data.error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const doComplete = useCallback(async () => {
+    setLoading(true);
+    try {
+      await fetch("/api/v1/setup/complete", { method: "POST" });
+      setStep("done");
+      setTimeout(onComplete, 2000);
+    } finally {
+      setLoading(false);
+    }
+  }, [onComplete]);
+
+  const submitCredentials = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const body: Record<string, unknown> = { provider: selectedProvider };
+
+      if (selectedProvider === "mullvad" || selectedProvider === "ivpn") {
+        body.private_key = privateKey;
+        body.addresses = addresses;
+        if (dns) body.dns = dns;
+      } else if (selectedProvider === "pia") {
+        body.pia_user = piaUser;
+        body.pia_pass = piaPass;
+        body.port_forward = portForward;
+      } else if (selectedProvider === "gluetun") {
+        body.gluetun_url = gluetunUrl;
+        if (gluetunApiKey) body.gluetun_api_key = gluetunApiKey;
+      }
+
+      const resp = await fetch("/api/v1/setup/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        setError(data.error);
+        return;
+      }
+
+      if (data.next === "server") {
+        setStep("server");
+      } else if (data.next === "done") {
+        await doComplete();
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedProvider, privateKey, addresses, dns, piaUser, piaPass, portForward, gluetunUrl, gluetunApiKey, doComplete]);
 
   const submitConfig = useCallback(async () => {
     if (!configText.trim()) {
@@ -75,62 +222,99 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
         return;
       }
       setStep("verify");
-      // Auto-verify
       await doVerify();
     } finally {
       setLoading(false);
     }
-  }, [configText]);
+  }, [configText, doVerify]);
 
-  const doVerify = useCallback(async () => {
+  // Load servers when entering server step
+  useEffect(() => {
+    if (step !== "server") return;
+    setServersLoading(true);
+    fetch("/api/v1/vpn/servers")
+      .then((r) => r.json())
+      .then((data) => setServers(data.servers || []))
+      .catch(() => setError("Failed to load server list"))
+      .finally(() => setServersLoading(false));
+  }, [step]);
+
+  const countries = useMemo(() => {
+    const set = new Set(servers.map((s) => s.country));
+    return Array.from(set).sort();
+  }, [servers]);
+
+  const filteredServers = useMemo(() => {
+    let list = servers;
+    if (countryFilter) {
+      list = list.filter((s) => s.country === countryFilter);
+    }
+    if (serverSearch) {
+      const q = serverSearch.toLowerCase();
+      list = list.filter(
+        (s) =>
+          s.hostname.toLowerCase().includes(q) ||
+          s.city.toLowerCase().includes(q) ||
+          s.country.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [servers, countryFilter, serverSearch]);
+
+  const selectServer = useCallback(async (hostname: string) => {
     setLoading(true);
     setError("");
     try {
-      const resp = await fetch("/api/v1/setup/verify", { method: "POST" });
-      const data: VerifyResult = await resp.json();
-      setVerifyResult(data);
+      const resp = await fetch("/api/v1/setup/server", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostname }),
+      });
+      const data = await resp.json();
       if (!data.success) {
         setError(data.error);
+        return;
       }
+      setStep("verify");
+      await doVerify();
     } finally {
       setLoading(false);
     }
+  }, [doVerify]);
+
+  const goBackToProvider = useCallback(() => {
+    setError("");
+    setStep("provider");
   }, []);
 
-  const completeSetup = useCallback(async () => {
-    setLoading(true);
-    try {
-      await fetch("/api/v1/setup/complete", { method: "POST" });
-      setStep("done");
-      setTimeout(onComplete, 2000);
-    } finally {
-      setLoading(false);
-    }
-  }, [onComplete]);
+  const goBackToCredentials = useCallback(() => {
+    setError("");
+    setStep("credentials");
+  }, []);
+
+  const currentStepIdx = stepIndex(step);
 
   return (
     <div className="mx-auto min-h-screen max-w-xl px-4 py-12">
       {/* Progress */}
       <div className="mb-8 flex items-center justify-center gap-2">
-        {(["welcome", "provider", "config", "verify", "done"] as Step[]).map(
-          (s, i) => (
-            <div key={s} className="flex items-center gap-2">
-              <div
-                className={cn(
-                  "h-2 w-2 rounded-full transition-colors",
-                  step === s
-                    ? "bg-amber-500"
-                    : (["welcome", "provider", "config", "verify", "done"].indexOf(step) > i)
-                      ? "bg-amber-500/50"
-                      : "bg-surface-border"
-                )}
-              />
-              {i < 4 && (
-                <div className="h-px w-6 bg-surface-border" />
+        {ALL_STEPS.map((s, i) => (
+          <div key={s} className="flex items-center gap-2">
+            <div
+              className={cn(
+                "h-2 w-2 rounded-full transition-colors",
+                currentStepIdx === i
+                  ? "bg-amber-500"
+                  : currentStepIdx > i
+                    ? "bg-amber-500/50"
+                    : "bg-surface-border"
               )}
-            </div>
-          )
-        )}
+            />
+            {i < ALL_STEPS.length - 1 && (
+              <div className="h-px w-6 bg-surface-border" />
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Welcome */}
@@ -150,6 +334,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
             Get Started
             <ChevronRight className="h-4 w-4" />
           </button>
+          <WizardError message={error} />
         </div>
       )}
 
@@ -180,21 +365,243 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
               </button>
             ))}
           </div>
+          <WizardError message={error} />
         </div>
       )}
 
-      {/* Config Input */}
+      {/* Credentials — Mullvad/IVPN */}
+      {step === "credentials" && (selectedProvider === "mullvad" || selectedProvider === "ivpn") && (
+        <div>
+          <h2 className="mb-2 text-xl font-bold text-text-primary">
+            WireGuard credentials
+          </h2>
+          <p className="mb-1 text-sm text-text-secondary">
+            {selectedProvider === "mullvad"
+              ? "Get these from mullvad.net/account → WireGuard configuration"
+              : "Get these from ivpn.net/account → WireGuard Keys"}
+          </p>
+          <p className="mb-4 text-xs text-text-muted">
+            Your private key stays on this device — never sent anywhere except your VPN provider.
+          </p>
+
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
+                Private Key
+              </label>
+              <div className="relative">
+                <Key className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+                <input
+                  type="password"
+                  value={privateKey}
+                  onChange={(e) => setPrivateKey(e.target.value)}
+                  placeholder="Base64 private key (44 characters)"
+                  className={inputMonoClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
+                Address
+              </label>
+              <div className="relative">
+                <Globe className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+                <input
+                  type="text"
+                  value={addresses}
+                  onChange={(e) => setAddresses(e.target.value)}
+                  placeholder="e.g. 10.66.0.1/32"
+                  className={inputMonoClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
+                DNS <span className="text-text-muted">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={dns}
+                onChange={(e) => setDns(e.target.value)}
+                placeholder={selectedProvider === "mullvad" ? "10.64.0.1" : "172.16.0.1"}
+                className="w-full rounded-xl border border-surface-border bg-surface-card p-2.5 font-mono text-sm text-text-primary placeholder:text-text-muted/50 focus:border-amber-500/50 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <WizardError message={error} />
+
+          <div className="mt-4 flex gap-3">
+            <button onClick={goBackToProvider} className={backBtnClass}>
+              Back
+            </button>
+            <button onClick={submitCredentials} disabled={loading} className={primaryBtnClass}>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Pick Server
+                  <ChevronRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Credentials — PIA */}
+      {step === "credentials" && selectedProvider === "pia" && (
+        <div>
+          <h2 className="mb-2 text-xl font-bold text-text-primary">
+            PIA credentials
+          </h2>
+          <p className="mb-4 text-sm text-text-secondary">
+            Your PIA username and password. TunnelVision auto-negotiates WireGuard keys with PIA's API.
+          </p>
+
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
+                Username
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+                <input
+                  type="text"
+                  value={piaUser}
+                  onChange={(e) => setPiaUser(e.target.value)}
+                  placeholder="p1234567"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
+                Password
+              </label>
+              <div className="relative">
+                <Key className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+                <input
+                  type="password"
+                  value={piaPass}
+                  onChange={(e) => setPiaPass(e.target.value)}
+                  placeholder="Your PIA password"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-3 rounded-xl border border-surface-border bg-surface-card p-3 cursor-pointer hover:border-amber-500/30">
+              <input
+                type="checkbox"
+                checked={portForward}
+                onChange={(e) => setPortForward(e.target.checked)}
+                className="h-4 w-4 rounded border-surface-border accent-amber-500"
+              />
+              <div>
+                <div className="text-sm font-medium text-text-primary">Enable port forwarding</div>
+                <div className="text-xs text-text-muted">Required for seeding. Only available on select servers.</div>
+              </div>
+            </label>
+          </div>
+
+          <WizardError message={error} />
+
+          <div className="mt-4 flex gap-3">
+            <button onClick={goBackToProvider} className={backBtnClass}>
+              Back
+            </button>
+            <button onClick={submitCredentials} disabled={loading} className={primaryBtnClass}>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Verify & Pick Server
+                  <ChevronRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Credentials — Gluetun */}
+      {step === "credentials" && selectedProvider === "gluetun" && (
+        <div>
+          <h2 className="mb-2 text-xl font-bold text-text-primary">
+            Connect to Gluetun
+          </h2>
+          <p className="mb-4 text-sm text-text-secondary">
+            Point TunnelVision at your running gluetun container. VPN management stays with gluetun — TunnelVision adds the dashboard.
+          </p>
+
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
+                Gluetun URL
+              </label>
+              <div className="relative">
+                <Globe className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+                <input
+                  type="text"
+                  value={gluetunUrl}
+                  onChange={(e) => setGluetunUrl(e.target.value)}
+                  placeholder="http://gluetun:8000"
+                  className={inputMonoClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
+                API Key <span className="text-text-muted">(optional)</span>
+              </label>
+              <div className="relative">
+                <Key className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+                <input
+                  type="password"
+                  value={gluetunApiKey}
+                  onChange={(e) => setGluetunApiKey(e.target.value)}
+                  placeholder="If gluetun has auth enabled"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </div>
+
+          <WizardError message={error} />
+
+          <div className="mt-4 flex gap-3">
+            <button onClick={goBackToProvider} className={backBtnClass}>
+              Back
+            </button>
+            <button onClick={submitCredentials} disabled={loading} className={primaryBtnClass}>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Connect
+                  <Check className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Config Input (custom/proton — paste textarea) */}
       {step === "config" && (
         <div>
           <h2 className="mb-2 text-xl font-bold text-text-primary">
             Paste your WireGuard config
           </h2>
           <p className="mb-1 text-sm text-text-secondary">
-            {selectedProvider === "mullvad"
-              ? "Get this from mullvad.net/account → WireGuard configuration"
-              : selectedProvider === "proton"
-                ? "Download from account.protonvpn.com → WireGuard"
-                : "Paste the contents of your wg0.conf file"}
+            {selectedProvider === "proton"
+              ? "Download from account.protonvpn.com → WireGuard"
+              : "Paste the contents of your wg0.conf file"}
           </p>
           <p className="mb-4 text-xs text-text-muted">
             Your private key stays on this device — never sent anywhere except your VPN provider.
@@ -211,25 +618,13 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
             />
           </div>
 
-          {error && (
-            <div className="mt-3 flex items-center gap-2 text-sm text-status-down">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {error}
-            </div>
-          )}
+          <WizardError message={error} />
 
           <div className="mt-4 flex gap-3">
-            <button
-              onClick={() => setStep("provider")}
-              className="rounded-xl border border-surface-border px-4 py-2.5 text-sm text-text-secondary transition-colors hover:border-amber-500/30"
-            >
+            <button onClick={goBackToProvider} className={backBtnClass}>
               Back
             </button>
-            <button
-              onClick={submitConfig}
-              disabled={loading}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 font-medium text-black transition-colors hover:bg-amber-400 disabled:opacity-50"
-            >
+            <button onClick={submitConfig} disabled={loading} className={primaryBtnClass}>
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -238,6 +633,104 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                   <ChevronRight className="h-4 w-4" />
                 </>
               )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Server Picker (mullvad/ivpn/pia) */}
+      {step === "server" && (
+        <div>
+          <h2 className="mb-2 text-xl font-bold text-text-primary">
+            Pick a server
+          </h2>
+          <p className="mb-4 text-sm text-text-secondary">
+            Select a server to connect through. You can change this later.
+          </p>
+
+          {/* Filters */}
+          <div className="mb-3 flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+              <input
+                type="text"
+                value={serverSearch}
+                onChange={(e) => setServerSearch(e.target.value)}
+                placeholder="Search servers..."
+                className={inputClass}
+              />
+            </div>
+            <select
+              value={countryFilter}
+              onChange={(e) => setCountryFilter(e.target.value)}
+              className="rounded-xl border border-surface-border bg-surface-card px-3 py-2.5 text-sm text-text-primary focus:border-amber-500/50 focus:outline-none"
+            >
+              <option value="">All countries</option>
+              {countries.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Server list */}
+          <div className="max-h-72 overflow-y-auto rounded-xl border border-surface-border">
+            {serversLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+              </div>
+            ) : filteredServers.length === 0 ? (
+              <div className="p-6 text-center text-sm text-text-muted">
+                No servers found
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-border bg-surface-card text-left text-xs text-text-muted">
+                    <th className="px-3 py-2">Server</th>
+                    <th className="px-3 py-2">Location</th>
+                    <th className="px-3 py-2 text-right">Speed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredServers.map((s) => (
+                    <tr
+                      key={s.hostname}
+                      onClick={() => !loading && selectServer(s.hostname)}
+                      className="cursor-pointer border-b border-surface-border last:border-0 hover:bg-surface-card-hover transition-colors"
+                    >
+                      <td className="px-3 py-2">
+                        <span className="font-mono text-text-primary">{s.hostname}</span>
+                        {s.owned && (
+                          <span className="ml-1.5 inline-block rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-500">
+                            Owned
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-text-secondary">
+                        {s.city}, {s.country}
+                      </td>
+                      <td className="px-3 py-2 text-right text-text-muted">
+                        {s.speed_gbps > 0 ? `${s.speed_gbps} Gbps` : "\u2014"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <WizardError message={error} />
+
+          {loading && (
+            <div className="mt-3 flex items-center justify-center gap-2 text-sm text-text-secondary">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Connecting to server...
+            </div>
+          )}
+
+          <div className="mt-4">
+            <button onClick={goBackToCredentials} className={backBtnClass}>
+              Back
             </button>
           </div>
         </div>
@@ -278,7 +771,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                 </div>
               </div>
               <button
-                onClick={completeSetup}
+                onClick={doComplete}
                 disabled={loading}
                 className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-3 font-medium text-black transition-colors hover:bg-amber-400"
               >
@@ -299,10 +792,13 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
               <p className="mb-6 text-sm text-status-down">{error}</p>
               <div className="flex justify-center gap-3">
                 <button
-                  onClick={() => setStep("config")}
-                  className="rounded-xl border border-surface-border px-4 py-2.5 text-sm text-text-secondary transition-colors hover:border-amber-500/30"
+                  onClick={() => {
+                    setError("");
+                    setStep(stepForProvider(selectedProvider));
+                  }}
+                  className={backBtnClass}
                 >
-                  Edit Config
+                  Go Back
                 </button>
                 <button
                   onClick={doVerify}

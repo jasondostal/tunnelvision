@@ -1,5 +1,33 @@
 # Changelog
 
+## v2.4.0 — Setup Wizard & Dashboard Components (2026-03-04)
+
+The wizard now knows what you're setting up. Pick your provider, enter the right credentials, pick a server — no more pasting configs for providers that have APIs.
+
+### Setup Wizard — Provider-Specific Flows
+- **Mullvad / IVPN**: Private key + address + optional DNS fields → server picker → verify
+- **PIA**: Username + password + port forwarding toggle → validates credentials via PIA API → server picker → verify
+- **Gluetun**: URL + optional API key → validates gluetun connection → straight to done (skips WG verify)
+- **Custom / Proton**: Paste config textarea → verify (unchanged existing flow)
+- Server picker step with country dropdown, search filter, server table (hostname, location, speed, owned badge)
+- `POST /setup/credentials` — validates and persists provider-specific credentials to `/config/tunnelvision.yml`
+- `POST /setup/server` — select a server by hostname, reuses existing connect logic to generate WireGuard config
+- `complete_setup` now persists `vpn_provider` to settings YAML — survives container restarts
+
+### Settings
+- `wireguard_private_key` and `wireguard_addresses` added to configurable fields — editable from settings UI
+- New "WireGuard" section in settings panel between VPN and Gluetun
+
+### Dashboard Components
+- Connection history card — event timeline with timestamps
+- Server browser modal — country filter, search, connect-to-server
+- Multi-config manager — switch VPN configs from dashboard
+
+### Bug Fix
+- `verify_connection` now always tears down WG tunnel, including when geo-IP lookup fails (previously left tunnel up on that path)
+
+---
+
 ## v2.3.0 — Self-Healing VPN (2026-03-03)
 
 If the tunnel drops at 3am, TunnelVision brings it back. No cron jobs, no external scripts.

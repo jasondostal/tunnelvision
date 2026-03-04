@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from api.services.state import StateManager
 from api.services.vpn import get_provider
 from api.services.history import log_event
+from api.routes.events import broadcast
 
 router = APIRouter()
 
@@ -144,6 +145,69 @@ async def list_configs(request: Request):
         "hint": "Drop multiple .conf or .ovpn files to enable rotation. POST /vpn/rotate picks a random one."
             if len(configs) <= 1 else f"{len(configs)} configs available for rotation.",
     }
+
+
+@router.post("/vpn/configs/{name}/activate", response_model=ConnectResponse)
+async def activate_config(name: str, request: Request):
+    """Switch VPN to a specific config file by name."""
+    configs = _list_config_files()
+    matching = [f for f in configs if f.name == name]
+    if not matching:
+        return ConnectResponse(success=False, error=f"Config '{name}' not found")
+
+    config_file = matching[0]
+    vpn_type = "openvpn" if config_file.suffix == ".ovpn" else "wireguard"
+    state_mgr: StateManager = request.app.state.state
+    config = request.app.state.config
+
+    try:
+        if vpn_type == "wireguard":
+            # Read config, strip PostUp/PostDown (we manage routing)
+            content = config_file.read_text()
+            clean_lines = [
+                line for line in content.splitlines()
+                if not line.strip().lower().startswith(("postup", "postdown"))
+            ]
+
+            subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=10)
+
+            os.makedirs("/etc/wireguard", exist_ok=True)
+            wg_conf = Path("/etc/wireguard/wg0.conf")
+            wg_conf.write_text("\n".join(clean_lines))
+            os.chmod(wg_conf, 0o600)
+
+            result = subprocess.run(
+                ["wg-quick", "up", "wg0"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if result.returncode != 0:
+                return ConnectResponse(success=False, error=result.stderr.strip())
+
+            if config.killswitch_enabled:
+                subprocess.run(
+                    ["/etc/s6-overlay/scripts/init-killswitch.sh"],
+                    capture_output=True, timeout=10,
+                )
+        else:
+            subprocess.run(["killall", "openvpn"], capture_output=True, timeout=5)
+            import asyncio
+            await asyncio.sleep(2)
+            result = subprocess.run(
+                ["/etc/s6-overlay/scripts/init-wireguard.sh"],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode != 0:
+                return ConnectResponse(success=False, error="OpenVPN reconnect failed")
+
+        state_mgr.vpn_type = vpn_type
+        state_mgr.active_config = config_file.name
+        log_event("config_activated", {"config": config_file.name, "vpn_type": vpn_type})
+        broadcast("vpn_status", {"event": "config_activated", "config": config_file.name})
+        return ConnectResponse(success=True, config_file=config_file.name)
+
+    except Exception as e:
+        log_event("config_activate_failed", {"config": config_file.name, "error": str(e)})
+        return ConnectResponse(success=False, error=str(e))
 
 
 async def _connect_mullvad(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:

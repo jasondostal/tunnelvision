@@ -60,6 +60,52 @@ export interface SystemResponse {
   webui_port: number;
 }
 
+/* --- Connection History --- */
+
+export interface HistoryEntry {
+  event: string;
+  timestamp: string;
+  [key: string]: unknown;
+}
+
+export interface HistoryResponse {
+  history: HistoryEntry[];
+}
+
+/* --- Server Browser --- */
+
+export interface ServerEntry {
+  hostname: string;
+  country: string;
+  country_code: string;
+  city: string;
+  owned: boolean;
+  speed_gbps: number;
+  fqdn: string;
+}
+
+export interface ServerListResponse {
+  provider: string;
+  count: number;
+  servers: ServerEntry[];
+}
+
+/* --- Config Manager --- */
+
+export interface ConfigEntry {
+  name: string;
+  path: string;
+  type: string;
+  active: boolean;
+}
+
+export interface ConfigListResponse {
+  count: number;
+  active: string;
+  configs: ConfigEntry[];
+  hint: string;
+}
+
 export interface ConfigResponse {
   vpn_enabled: boolean;
   vpn_provider: string;

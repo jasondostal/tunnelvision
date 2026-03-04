@@ -31,6 +31,8 @@ class SettingsUpdate(BaseModel):
     gluetun_api_key: str | None = None
     pia_user: str | None = None
     pia_pass: str | None = None
+    wireguard_private_key: str | None = None
+    wireguard_addresses: str | None = None
     port_forward_enabled: str | None = None
     auto_reconnect: str | None = None
     notify_webhook_url: str | None = None

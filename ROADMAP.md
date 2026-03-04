@@ -2,12 +2,7 @@
 
 What's coming. No promises on timelines — this is built for the love of blinkenlights.
 
-## Next — Dashboard Polish
-
-- [ ] Connection history UI — visualize uptime, rotations, failures in the dashboard
-- [ ] Server browser in dashboard UI (filter by country/city, show load)
-- [ ] Multi-config management (switch between VPN configs from UI)
-- [ ] Setup wizard completion (guided first-run for new users)
+## Next
 
 ## Future
 
@@ -22,6 +17,10 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
+- [x] Setup wizard — provider-specific flows for Mullvad, IVPN, PIA, Gluetun with server picker (v2.4.0)
+- [x] Connection history UI — dashboard card with event timeline (v2.4.0)
+- [x] Server browser — modal with country filter, search, connect-to-server (v2.4.0)
+- [x] Multi-config management — switch VPN configs from dashboard (v2.4.0)
 - [x] Self-healing VPN — auto-reconnect watchdog, multi-config failover, settings hot-reload (v2.3.0)
 - [x] Architecture cleanup — StateManager, Config consolidation, MQTT dispatch (v2.2.0)
 - [x] SSE real-time events + HACS SSE push (v2.1.0)

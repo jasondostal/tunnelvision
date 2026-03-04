@@ -226,6 +226,8 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `VPN_ENABLED` | `true` | Enable/disable VPN |
 | `VPN_TYPE` | `auto` | VPN engine: `auto`, `wireguard`, or `openvpn` |
 | `VPN_PROVIDER` | `custom` | VPN provider: `custom`, `mullvad`, `ivpn`, `pia`, or `gluetun` (sidecar mode) |
+| `WIREGUARD_PRIVATE_KEY` | *(empty)* | WireGuard private key for Mullvad/IVPN (base64, 44 chars) |
+| `WIREGUARD_ADDRESSES` | *(empty)* | WireGuard interface address for Mullvad/IVPN (e.g. `10.66.0.1/32`) |
 | `VPN_DNS` | *(from config)* | Override DNS server (default: provider DNS or `10.64.0.1`) |
 | `VPN_COUNTRY` | *(empty)* | Filter server rotation by country (e.g. `ch`, `us`) |
 | `VPN_CITY` | *(empty)* | Filter server rotation by city (e.g. `zurich`) |
@@ -303,6 +305,8 @@ Interactive docs at `http://localhost:8081/api/docs` (Swagger) when running.
 | `POST /api/v1/qbt/restart` | Restart qBittorrent |
 | `POST /api/v1/qbt/pause` | Pause all torrents |
 | `POST /api/v1/qbt/resume` | Resume all torrents |
+| `POST /api/v1/setup/credentials` | Validate and save provider-specific credentials |
+| `POST /api/v1/setup/server` | Select a server during setup (generates WireGuard config) |
 | `GET /api/v1/backup` | Export config backup (JSON) |
 | `POST /api/v1/backup/restore` | Restore from backup |
 

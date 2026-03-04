@@ -25,6 +25,10 @@ const FIELD_GROUPS: { label: string; fields: string[] }[] = [
     fields: ["vpn_provider", "vpn_country", "vpn_city", "vpn_dns", "killswitch_enabled", "auto_reconnect"],
   },
   {
+    label: "WireGuard",
+    fields: ["wireguard_private_key", "wireguard_addresses"],
+  },
+  {
     label: "Gluetun (Sidecar)",
     fields: ["gluetun_url", "gluetun_api_key"],
   },
@@ -53,6 +57,8 @@ const FIELD_LABELS: Record<string, string> = {
   api_key: "API Key",
   vpn_provider: "VPN Provider",
   auto_reconnect: "Auto-Reconnect",
+  wireguard_private_key: "WireGuard Private Key",
+  wireguard_addresses: "WireGuard Addresses",
   pia_user: "PIA Username",
   pia_pass: "PIA Password",
   port_forward_enabled: "Port Forwarding",
@@ -78,6 +84,8 @@ const FIELD_HINTS: Record<string, string> = {
   api_key: "For Homepage, HACS, Prometheus",
   vpn_provider: "custom, mullvad, ivpn, pia, or gluetun",
   auto_reconnect: "true or false",
+  wireguard_private_key: "Base64 private key for Mullvad/IVPN",
+  wireguard_addresses: "e.g. 10.66.0.1/32",
   pia_user: "PIA username (p1234567)",
   pia_pass: "PIA password",
   port_forward_enabled: "true or false (PIA only)",
