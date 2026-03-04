@@ -4,7 +4,7 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Next
 
-- [ ] Smart server selection — lowest load, nearest geo, preferred region sticky, failover-aware
+- [ ] Provider health dashboard — per-provider API reachability, cache freshness, account expiry
 
 ## Future
 
@@ -21,6 +21,7 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
+- [x] Smart server selection — load+speed scoring, top-5 jitter, rotation avoidance, key generation in wizard (v3.2.0)
 - [x] Full OpenVPN parity — setup wizard, verify step, and config pipeline for OpenVPN-only providers (v3.1.0)
 - [x] Provider wave 3 — Privado, PureVPN, VPNSecure, VPN Unlimited, VyprVPN, FastestVPN, HideMyAss, SlickVPN, Giganews (v3.0.0)
 - [x] Provider wave 2 — IPVanish, TorGuard, PrivateVPN, Perfect Privacy, CyberGhost (v2.9.0)

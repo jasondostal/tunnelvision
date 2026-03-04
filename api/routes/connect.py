@@ -43,6 +43,7 @@ class ConnectRequest(BaseModel):
     secure_core: bool | None = None
     multihop: bool | None = None
     max_load: int | None = None
+    exclude_hostname: str | None = None  # Internal: rotation avoids reconnecting same server
 
 
 class ConnectResponse(BaseModel):
@@ -111,14 +112,15 @@ async def reconnect(request: Request):
 
 @router.post("/vpn/rotate", response_model=ConnectResponse)
 async def rotate_server(request: Request):
-    """Pick a new random server and reconnect.
+    """Pick a new server and reconnect, avoiding the current one.
 
-    Mullvad: new random server from entire pool (or filtered by VPN_COUNTRY/VPN_CITY).
-    Custom: pick different random config file from /config/wireguard/ or /config/openvpn/.
+    Mullvad: scored selection (load + speed) from pool, excluding current server.
+    Custom: pick different config file from /config/wireguard/ or /config/openvpn/.
 
     Re-reads country/city from settings YAML so rotation filters are hot-reloadable.
     """
     config = request.app.state.config
+    state_mgr: StateManager = request.app.state.state
     # Hot-reload: prefer settings YAML over frozen Config
     try:
         from api.services.settings import load_settings
@@ -128,7 +130,8 @@ async def rotate_server(request: Request):
     except Exception:
         country = config.vpn_country or None
         city = config.vpn_city or None
-    return await connect_to_server(ConnectRequest(country=country, city=city), request)
+    current = state_mgr.vpn_server_hostname or ""
+    return await connect_to_server(ConnectRequest(country=country, city=city, exclude_hostname=current), request)
 
 
 @router.get("/vpn/configs")
@@ -217,6 +220,34 @@ async def activate_config(name: str, request: Request):
         return ConnectResponse(success=False, error=str(e))
 
 
+def _select_server(servers, exclude_hostname: str = ""):
+    """Score servers by load and speed; pick randomly from the top tier.
+
+    Scoring:
+    - Load (0-100): primary signal. load=0 means unknown, treated as 50.
+    - speed_gbps: secondary signal, normalized to 0-1 (10 Gbps = max).
+    - Picks randomly from the top 5 to distribute traffic across best options.
+
+    If the current server is the only option (e.g. forced by country/city filter),
+    it's allowed through so the caller doesn't get stuck.
+    """
+    from api.services.providers.base import ServerInfo
+
+    candidates = [s for s in servers if s.hostname != exclude_hostname]
+    if not candidates:
+        candidates = list(servers)
+
+    def _score(s: ServerInfo) -> float:
+        load_pct = s.load if s.load and s.load > 0 else 50
+        load_score = 1.0 - (load_pct / 100.0)
+        speed_score = min((s.speed_gbps or 0) / 10.0, 1.0)
+        return load_score * 0.7 + speed_score * 0.3
+
+    ranked = sorted(candidates, key=_score, reverse=True)
+    top = ranked[:min(5, len(ranked))]
+    return random.choice(top)
+
+
 async def _connect_provider(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:
     """Unified connect pipeline for all API-capable providers.
 
@@ -255,7 +286,7 @@ async def _connect_provider(body: ConnectRequest, provider, state_mgr: StateMana
             return ConnectResponse(success=False, error=f"Server {body.hostname} not found")
         server = matching[0]
     else:
-        server = random.choice(servers)
+        server = _select_server(servers, exclude_hostname=body.exclude_hostname or "")
 
     # Resolve credentials + peer config (provider handles key exchange if needed)
     try:

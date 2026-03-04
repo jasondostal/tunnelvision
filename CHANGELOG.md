@@ -1,5 +1,31 @@
 # Changelog
 
+## v3.2.0 — Smart Server Selection + WireGuard Key Generation (2026-03-04)
+
+### Smart server selection
+Server rotation is no longer random. Servers are now scored by load and speed, and the connect
+pipeline picks from the top tier — distributing traffic across the best options while reliably
+avoiding bad ones.
+
+- **Load-aware**: servers with lower load score higher (load=0/unknown treated as 50%)
+- **Speed-aware**: `speed_gbps` contributes 30% of the score (providers that expose it: NordVPN, Mullvad)
+- **Top-5 jitter**: picks randomly from the top 5 to avoid thundering-herd on a single "best" server
+- **Rotation avoidance**: `POST /vpn/rotate` now excludes the current server, guaranteeing a server change
+- **Worst servers excluded**: with 6+ servers in the pool, the bottom tier is never selected
+
+### WireGuard key generation in setup wizard
+Mullvad and IVPN users no longer need to leave the wizard to generate a keypair.
+
+- New "Generate Key" button in the credentials step — generates a keypair server-side via `wg genkey`
+- Private key is pre-filled in the private key field
+- Public key is displayed in a copyable box with provider-specific registration instructions
+- New `POST /setup/generate-keypair` backend endpoint
+
+### Tests
+- 691 total tests (up from 681)
+
+---
+
 ## v3.1.0 — Full OpenVPN Parity (2026-03-04)
 
 Setup wizard now fully supports OpenVPN-only providers. Previously, providers like HideMyAss,

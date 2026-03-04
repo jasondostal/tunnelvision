@@ -227,6 +227,39 @@ def _geo_ip_check() -> tuple[str, str, str]:
     return "", "", ""
 
 
+@router.post("/setup/generate-keypair")
+async def generate_keypair():
+    """Generate a WireGuard keypair. Returns both private and public key.
+
+    The private key is returned once — store it immediately. The public key
+    must be registered with your VPN provider before connecting.
+    """
+    try:
+        private_result = subprocess.run(
+            ["wg", "genkey"],
+            capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK,
+        )
+        if private_result.returncode != 0:
+            return {"success": False, "error": "Failed to generate key — is wireguard-tools installed?"}
+
+        private_key = private_result.stdout.strip()
+
+        public_result = subprocess.run(
+            ["wg", "pubkey"],
+            input=private_key,
+            capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK,
+        )
+        if public_result.returncode != 0:
+            return {"success": False, "error": "Failed to derive public key"}
+
+        public_key = public_result.stdout.strip()
+        return {"success": True, "private_key": private_key, "public_key": public_key}
+    except FileNotFoundError:
+        return {"success": False, "error": "wireguard-tools not found — install wg or use an existing key"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @router.post("/setup/openvpn")
 async def upload_openvpn_config(body: OpenVPNConfigRequest):
     """Accept OpenVPN config content and write to /config/openvpn/provider.ovpn."""

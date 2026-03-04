@@ -95,6 +95,9 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   const [privateKey, setPrivateKey] = useState("");
   const [addresses, setAddresses] = useState("");
   const [dns, setDns] = useState("");
+  const [generatedPublicKey, setGeneratedPublicKey] = useState("");
+  const [keyGenLoading, setKeyGenLoading] = useState(false);
+  const [keyCopied, setKeyCopied] = useState(false);
 
   // PIA credentials
   const [piaUser, setPiaUser] = useState("");
@@ -143,6 +146,32 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
       setError("Failed to select provider");
     }
   }, [providers]);
+
+  const generateKeypair = useCallback(async () => {
+    setKeyGenLoading(true);
+    setError("");
+    try {
+      const resp = await fetch("/api/v1/setup/generate-keypair", { method: "POST" });
+      const data = await resp.json();
+      if (!data.success) {
+        setError(data.error);
+        return;
+      }
+      setPrivateKey(data.private_key);
+      setGeneratedPublicKey(data.public_key);
+      setKeyCopied(false);
+    } finally {
+      setKeyGenLoading(false);
+    }
+  }, []);
+
+  const copyPublicKey = useCallback(() => {
+    if (generatedPublicKey) {
+      navigator.clipboard.writeText(generatedPublicKey);
+      setKeyCopied(true);
+      setTimeout(() => setKeyCopied(false), 2000);
+    }
+  }, [generatedPublicKey]);
 
   const doVerify = useCallback(async () => {
     setLoading(true);
@@ -398,20 +427,59 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
 
           <div className="space-y-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-text-secondary">
-                Private Key
-              </label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-sm font-medium text-text-secondary">
+                  Private Key
+                </label>
+                <button
+                  type="button"
+                  onClick={generateKeypair}
+                  disabled={keyGenLoading}
+                  className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 px-2.5 py-1 text-xs font-medium text-amber-500 transition-colors hover:bg-amber-500/10 disabled:opacity-50"
+                >
+                  {keyGenLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Key className="h-3 w-3" />
+                  )}
+                  Generate Key
+                </button>
+              </div>
               <div className="relative">
                 <Key className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
                 <input
                   type="password"
                   value={privateKey}
-                  onChange={(e) => setPrivateKey(e.target.value)}
+                  onChange={(e) => { setPrivateKey(e.target.value); setGeneratedPublicKey(""); }}
                   placeholder="Base64 private key (44 characters)"
                   className={inputMonoClass}
                 />
               </div>
             </div>
+
+            {generatedPublicKey && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 p-3">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-xs font-medium text-amber-500">Your public key</span>
+                  <button
+                    type="button"
+                    onClick={copyPublicKey}
+                    className="flex items-center gap-1 text-xs text-amber-500/70 hover:text-amber-500 transition-colors"
+                  >
+                    {keyCopied ? <Check className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+                    {keyCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+                <p className="mb-2 break-all font-mono text-xs text-amber-400/80">
+                  {generatedPublicKey}
+                </p>
+                <p className="text-xs text-text-muted">
+                  {selectedProvider === "mullvad"
+                    ? "Add this at mullvad.net → Account → WireGuard Keys, then enter your assigned address below."
+                    : "Add this at ivpn.net → Account → WireGuard Keys, then enter your assigned address below."}
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="mb-1 block text-sm font-medium text-text-secondary">
