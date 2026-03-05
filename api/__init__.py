@@ -1,3 +1,3 @@
 """TunnelVision REST API — VPN status, health, and container management."""
 
-__version__ = "3.4.6"
+__version__ = "3.4.7"

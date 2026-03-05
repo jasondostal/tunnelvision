@@ -1,5 +1,21 @@
 # Changelog
 
+## v3.4.7 — Rotate geographic diversity (2026-03-05)
+
+### Bug fixes
+- **Rotate no longer sticks to the same country** — when no country filter is set,
+  `POST /vpn/rotate` now picks a random country (excluding the current one) before
+  score-selecting within it. Previously, the globally highest-scoring country won
+  every rotation (Switzerland in practice), making rotate feel broken even though
+  it was technically working.
+- **Filter-constrained rotation unchanged** — if `VPN_COUNTRY` or `VPN_CITY` is set,
+  rotate still score-selects within that pool as before.
+
+### Tests
+- 716 passed (+7 rotate diversity tests)
+
+---
+
 ## v3.4.6 — SSE reliability + full settings exposure (2026-03-05)
 
 ### Bug fixes
