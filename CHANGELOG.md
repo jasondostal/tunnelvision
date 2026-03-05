@@ -20,7 +20,9 @@
 - New **scan** job — Trivy scans the built container image for Alpine apk package and
   system library CVEs at CRITICAL and HIGH severity
 - Build gates on both `lint` and `test`; smoke gates on `build` and `scan`
-- Total pipeline: lint (8 tools) + test (734 tests) → build (3 arches) → scan (Trivy) → smoke
+- **cosign** — every pushed image is signed with Sigstore keyless signing (OIDC-backed,
+  no keys to manage). Users can verify with `cosign verify`
+- Total pipeline: lint (8 tools) + test (734 tests) → build (3 arches) + sign → scan (Trivy) → smoke
 
 ---
 
