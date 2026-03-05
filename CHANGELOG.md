@@ -6,7 +6,7 @@
 - **Zero Ruff findings** — removed 12 unused imports, 2 stale f-prefixes, 1 identity test
 - **Zero Bandit high-severity** — added `usedforsecurity=False` to Shadowsocks MD5 (protocol-required, not security)
 - **Zero mypy errors** — type annotations for all unchecked assignments, `ServiceState.STOPPED` added to enum,
-  None-guard on MQTT publish, proper `type: ignore` for protocol-required dynamic dispatch
+  None-guard on MQTT publish, pydantic mypy plugin (`mypy.ini`) for Pydantic model validation
 - **Zero ShellCheck findings** — quoted variable expansion in init-vpn.sh
 - **Zero pip-audit CVEs** — all dependencies clean
 - `HEALTH_CHECK_INTERVAL` default corrected to 15 in Dockerfile (was still 30)
