@@ -340,6 +340,13 @@ async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
             result = subprocess.run(["wg-quick", "up", "wg0"], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG)
             if result.returncode != 0:
                 return ConnectResponse(success=False, error=result.stderr.strip())
+            # Re-run killswitch after wg-quick up so nftables allows the new
+            # server's endpoint. init-killswitch.sh reads the endpoint from
+            # `wg show wg0` — must run AFTER wg-quick up configures the peer.
+            subprocess.run(
+                ["/etc/s6-overlay/scripts/init-killswitch.sh"],
+                capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
+            )
         elif vpn_type == "openvpn":
             subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
             # Give it a moment to clean up
