@@ -224,12 +224,14 @@ def _select_server(servers, exclude_hostname: str = ""):
     """Score servers by load and speed; pick randomly from the top tier.
 
     Scoring:
-    - Load (0-100): primary signal. load=0 means unknown, treated as 50.
-    - speed_gbps: secondary signal, normalized to 0-1 (10 Gbps = max).
-    - Picks randomly from the top 5 to distribute traffic across best options.
+    - Load (0-100): primary signal. load=None/0 treated as 50 (unknown).
+    - speed_gbps: secondary signal, normalized to 0-1 (20 Gbps = max).
+    - Top tier: best 20% of candidates (min 5, max 25). Falls back to all
+      candidates when scores are uniform so selection is genuinely random
+      rather than alphabetically biased by stable sort order.
 
-    If the current server is the only option (e.g. forced by country/city filter),
-    it's allowed through so the caller doesn't get stuck.
+    If the current server is the only option (e.g. forced by country/city
+    filter), it's allowed through so the caller doesn't get stuck.
     """
     from api.services.providers.base import ServerInfo
 
@@ -240,12 +242,19 @@ def _select_server(servers, exclude_hostname: str = ""):
     def _score(s: ServerInfo) -> float:
         load_pct = s.load if s.load and s.load > 0 else 50
         load_score = 1.0 - (load_pct / 100.0)
-        speed_score = min((s.speed_gbps or 0) / 10.0, 1.0)
+        speed_score = min((s.speed_gbps or 0) / 20.0, 1.0)
         return load_score * 0.7 + speed_score * 0.3
 
     ranked = sorted(candidates, key=_score, reverse=True)
-    top = ranked[:min(5, len(ranked))]
-    return random.choice(top)
+
+    # If all scores are equal (e.g. provider doesn't expose load), the top-N
+    # cut would just be the first N alphabetically — pick from the full pool.
+    top_score = _score(ranked[0])
+    if all(_score(s) == top_score for s in ranked):
+        return random.choice(ranked)
+
+    pool_size = max(5, min(25, len(ranked) // 5))
+    return random.choice(ranked[:pool_size])
 
 
 async def _connect_provider(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:

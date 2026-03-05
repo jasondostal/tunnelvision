@@ -69,6 +69,15 @@ class TestSelectServer:
         result = _select_server(servers)
         assert result.hostname in ("a.example.com", "b.example.com")
 
+    def test_uniform_scores_pick_from_full_pool(self):
+        """When all servers have identical scores (e.g. provider exposes no load),
+        pick from the entire pool — not the first N alphabetically."""
+        # 20 servers, identical load=None (treated as 50) and speed=10 Gbps
+        servers = [_server(f"z{i:02d}.example.com", load=0, speed_gbps=10) for i in range(20)]
+        results = {_select_server(servers).hostname for _ in range(200)}
+        # With uniform scores, all 20 should appear eventually
+        assert len(results) > 5, f"Expected >5 distinct servers, got {len(results)}: {results}"
+
     def test_unknown_load_treated_as_50(self):
         """load=0 (unknown) should be treated as 50, not as best-possible."""
         # 6 unknown-load servers + 1 genuinely low-load server
