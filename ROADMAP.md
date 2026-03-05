@@ -18,7 +18,7 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
-- [x] Code quality pass + CI lint pipeline — Ruff, Bandit, mypy, ShellCheck, pip-audit in CI (v3.4.9)
+- [x] Code quality pass + CI security pipeline — 8-tool lint gate, Trivy container scan, full type safety (v3.4.9)
 - [x] Shadowsocks AEAD proxy server, settings panel UX overhaul — toggles, collapsible sections, number inputs (v3.4.8)
 - [x] Server rotation geographic diversity, no-filter random country selection (v3.4.7)
 - [x] SSE real-time reliability, all configurable constants exposed in settings UI (v3.4.6)

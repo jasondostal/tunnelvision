@@ -12,9 +12,12 @@
 - `HEALTH_CHECK_INTERVAL` default corrected to 15 in Dockerfile (was still 30)
 
 ### CI pipeline
-- New **lint** job runs in parallel with tests — Ruff, Bandit (high), mypy, ShellCheck, pip-audit
-- Build now gates on both `lint` and `test` passing
-- Total CI checks: lint (5 tools) → test (734 tests) → build (3 arches) → smoke
+- New **lint** job runs in parallel with tests — Ruff, Bandit (high), mypy, ShellCheck, pip-audit,
+  Hadolint (Dockerfile), npm audit (frontend deps)
+- New **scan** job — Trivy scans the built container image for OS-level CVEs (Alpine apk packages,
+  system libraries) at CRITICAL and HIGH severity
+- Build gates on both `lint` and `test`; smoke gates on `build` and `scan`
+- Total pipeline: lint (8 tools) + test (734 tests) → build (3 arches) → scan (Trivy) → smoke
 
 ---
 
