@@ -20,6 +20,7 @@ import hashlib
 import logging
 import os
 import struct
+from typing import Any
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM, ChaCha20Poly1305
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -32,7 +33,7 @@ TAG_SIZE = 16
 NONCE_SIZE = 12  # 96 bits for both ciphers
 MAX_PAYLOAD = 0x3FFF  # 16383 bytes per chunk
 
-CIPHERS = {
+CIPHERS: dict[str, dict[str, Any]] = {
     "aes-256-gcm": {"key_size": 32, "cls": AESGCM},
     "chacha20-ietf-poly1305": {"key_size": 32, "cls": ChaCha20Poly1305},
 }
