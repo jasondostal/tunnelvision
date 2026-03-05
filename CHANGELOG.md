@@ -1,5 +1,35 @@
 # Changelog
 
+## v3.4.6 — SSE reliability + full settings exposure (2026-03-05)
+
+### Bug fixes
+- **SSE-triggered refreshes no longer serve stale data** — the 5s GET cache in the
+  frontend was returning cached responses when SSE events fired immediately after a
+  user action (e.g. Disconnect fired SSE at T+0.1s, cache hit returned pre-disconnect
+  state). Fixed by invalidating affected cache keys before bumping the refresh signal.
+- **Watchdog events now trigger UI refresh** — `useSSE` only listened for `vpn_status`
+  and `vpn_state`. All five watchdog events (`recovered`, `reconnecting`, `failover`,
+  `degraded`, `cooldown`) were broadcast over SSE but silently dropped by the frontend.
+  Added `SSE_REFRESH_EVENTS` list covering all event types.
+
+### Features
+- **Watchdog tuning exposed as live settings** — `HANDSHAKE_STALE_SECONDS`,
+  `RECONNECT_THRESHOLD`, and `COOLDOWN_SECONDS` were previously hardcoded. Now
+  configurable via env var, YAML file, or the Settings UI — and hot-reloadable
+  without a container restart (watchdog reads them each tick via `_load_setting()`).
+- **Settings panel is now a single pane of glass** — 9 previously env-only fields
+  added to the UI: `vpn_enabled`, `vpn_type`, `wireguard_dns`, `qbt_enabled`,
+  `webui_port`, `mqtt_topic_prefix`, `mqtt_discovery_prefix`, `allowed_networks`, `tz`.
+  Each shows its `$ENV_VAR` name and the ⚡/🔄 indicator for hot-reload vs restart.
+- **New Watchdog and qBittorrent groups** in the Settings panel.
+- **Watchdog check interval tightened** — default `HEALTH_CHECK_INTERVAL` reduced from
+  30s to 15s. Halves worst-case autonomous VPN drop detection latency.
+
+### Tests
+- 709 passed (unchanged)
+
+---
+
 ## v3.4.5 — Internal code quality pass II (2026-03-05)
 
 ### Bug fixes
