@@ -8,7 +8,7 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Future
 
-- [ ] Multi-architecture builds — armv6, armv7, i686, ppc64le
+- [ ] Multi-architecture builds — armv6, i686, ppc64le (arm/v7 ✓ in v3.4.0)
 - [ ] Config export/import — encrypted archive for migration
 - [ ] Per-torrent VPN binding (pause individual torrents on VPN drop)
 - [ ] Bandwidth scheduling (speed limits by time of day)
@@ -20,6 +20,7 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
+- [x] Multi-architecture — linux/arm/v7 support, Alpine-native cryptography for all arches (v3.4.0)
 - [x] Provider health dashboard — API reachability, cache freshness, account expiry, CI test pipeline (v3.3.0)
 - [x] Smart server selection — load+speed scoring, top-5 jitter, rotation avoidance, key generation in wizard (v3.2.0)
 - [x] Full OpenVPN parity — setup wizard, verify step, and config pipeline for OpenVPN-only providers (v3.1.0)

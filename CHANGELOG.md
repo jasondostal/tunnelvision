@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.4.0 — Multi-Architecture: linux/arm/v7 (2026-03-04)
+
+### Multi-architecture builds
+TunnelVision now ships native images for `linux/arm/v7` in addition to `amd64` and `arm64`.
+Raspberry Pi 2 and Pi 3 users (running 32-bit OS) can now pull a native image — no QEMU overhead.
+
+- Build matrix extended to `linux/amd64,linux/arm64,linux/arm/v7`
+- s6-overlay ARCH mapping extended: `arm → armhf`, with stubs for `386 → i686` and `ppc64le → powerpc64le`
+- `cryptography` removed from pip requirements; replaced by Alpine's `py3-cryptography` package (44.0.0, pre-compiled for all arches)
+- `uvicorn[standard]` → `uvicorn` — drops `watchfiles` (no arm/v7 wheel; unused in production anyway)
+
+---
+
 ## v3.3.0 — Provider Health Dashboard + CI Test Pipeline (2026-03-04)
 
 ### Provider Health Dashboard
