@@ -361,6 +361,14 @@ async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
             # Give it a moment to clean up
             import asyncio
             await asyncio.sleep(2)
+            # Re-run killswitch before starting daemon so nftables allows the
+            # new server's endpoint. OpenVPN reads endpoint from the config
+            # file (grep ^remote), so this can run before the daemon starts —
+            # unlike WireGuard which needs the interface up first.
+            subprocess.run(
+                ["/etc/s6-overlay/scripts/init-killswitch.sh"],
+                capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
+            )
             result = subprocess.run(
                 ["/etc/s6-overlay/scripts/init-vpn.sh"],
                 capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
