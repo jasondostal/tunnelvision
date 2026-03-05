@@ -1,5 +1,32 @@
 # Changelog
 
+## v3.4.5 — Internal code quality pass II (2026-03-05)
+
+### Bug fixes
+- **MQTT async regression fixed** — `do_qbt_pause`/`do_qbt_resume` were converted to
+  `async def` in v3.4.4 but `_on_message()` (a paho sync callback thread) called them
+  synchronously, receiving back a coroutine object instead of an `ActionResponse`. Fixed
+  with `asyncio.run_coroutine_threadsafe()` against the event loop captured at startup.
+
+### Refactoring
+- **qBittorrent status endpoint uses httpx** — three `subprocess.run(["curl"...])` calls
+  replaced with a single shared `http_client()` async context; deferred `import json`
+  removed (httpx exposes `.json()` natively).
+- **Deferred imports moved to module level** — `from datetime import datetime` inside
+  try-blocks in `system.py` and `metrics.py`; `import os` inside `run()` in `dns.py`.
+- **`/system` Alpine version uses `Path.read_text()`** — replaced `subprocess.run(["cat",
+  "/etc/alpine-release"])` with a direct file read.
+- **`tar.extract()` now passes `filter="data"`** — suppresses Python 3.12 deprecation
+  warning and prevents path traversal via symlinks in restored backup archives.
+- **`asyncio.get_event_loop()` replaced** — `dns.py` and `natpmp.py` now use
+  `asyncio.get_running_loop()` / `asyncio.ensure_future()` (deprecated API removed).
+- **MQTT `sw_version` uses `__version__`** — was hardcoded as `"0.1.0"`.
+
+### Tests
+- 709 passed (unchanged)
+
+---
+
 ## v3.4.4 — Internal code quality pass (2026-03-05)
 
 ### Refactoring

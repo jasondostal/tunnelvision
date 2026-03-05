@@ -7,12 +7,14 @@ on the HA side. Just point at your MQTT broker.
 Uses Last Will and Testament (LWT) for availability tracking.
 """
 
+import asyncio
 import json
 import logging
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
 
+from api import __version__
 from api.config import Config
 from api.services.state import StateManager
 
@@ -37,6 +39,10 @@ class MQTTService:
         """Connect to MQTT broker and publish discovery messages."""
         if not self.enabled or not self.broker:
             return
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._loop = None
 
         log.info(f"MQTT connecting to {self.broker}:{self.port}")
 
@@ -125,7 +131,16 @@ class MQTTService:
             return
 
         try:
-            result = commands[command]()
+            result_or_coro = commands[command]()
+            if asyncio.iscoroutine(result_or_coro):
+                if self._loop and self._loop.is_running():
+                    future = asyncio.run_coroutine_threadsafe(result_or_coro, self._loop)
+                    result = future.result(timeout=10)
+                else:
+                    result_or_coro.close()
+                    raise RuntimeError("No running event loop to execute async command")
+            else:
+                result = result_or_coro
             client.publish(f"{self.prefix}/command_result", result.model_dump_json())
         except Exception as e:
             client.publish(f"{self.prefix}/command_result",
@@ -168,7 +183,7 @@ class MQTTService:
             "name": "TunnelVision",
             "manufacturer": "TunnelVision",
             "model": "VPN Container",
-            "sw_version": "0.1.0",
+            "sw_version": __version__,
         }
 
         availability = {

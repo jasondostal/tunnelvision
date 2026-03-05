@@ -9,6 +9,7 @@ Runs as a separate process under s6 supervision. Provides:
 
 import asyncio
 import logging
+import os
 import struct
 import time
 from pathlib import Path
@@ -294,8 +295,6 @@ class DNSServer:
 
     async def run(self) -> None:
         """Start DNS server and blocklist refresh loop."""
-        import os
-
         # Load config from environment
         upstreams = os.getenv("DNS_UPSTREAM", "1.1.1.1,1.0.0.1").split(",")
         upstreams = [u.strip() for u in upstreams if u.strip()]
@@ -314,7 +313,7 @@ class DNSServer:
         await self._refresh_blocklists()
 
         # Start UDP listener
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         transport, protocol = await loop.create_datagram_endpoint(
             lambda: DNSProtocol(self),
             local_addr=(self.bind, self.port),

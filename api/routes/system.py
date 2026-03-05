@@ -3,6 +3,8 @@
 import platform
 import subprocess
 import time
+from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Request
 
@@ -32,7 +34,6 @@ async def system_info(request: Request):
     started_at = request.app.state.state.vpn_started_at
     if started_at:
         try:
-            from datetime import datetime
             vpn_start = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
             vpn_uptime = time.time() - vpn_start.timestamp()
         except ValueError:
@@ -42,7 +43,7 @@ async def system_info(request: Request):
         version=__version__,
         container_uptime=round(container_uptime, 1),
         vpn_uptime=round(vpn_uptime, 1) if vpn_uptime else None,
-        alpine_version=_get_command_output(["cat", "/etc/alpine-release"]),
+        alpine_version=Path("/etc/alpine-release").read_text().strip() if Path("/etc/alpine-release").exists() else "",
         qbittorrent_version=_get_command_output(["qbittorrent-nox", "--version"]) if config.qbt_enabled else "",
         wireguard_version=_get_command_output(["wg", "--version"]),
         python_version=platform.python_version(),

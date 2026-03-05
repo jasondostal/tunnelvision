@@ -83,18 +83,18 @@ async def restore_backup(file: UploadFile = File(...)):
                     continue
 
                 if member.name == "tunnelvision.yml":
-                    tar.extract(member, "/config")
+                    tar.extract(member, "/config", filter="data")
                     restored.append(member.name)
                 elif member.name == "qBittorrent.conf":
-                    tar.extract(member, "/config/qBittorrent/config")
+                    tar.extract(member, "/config/qBittorrent/config", filter="data")
                     restored.append(member.name)
                 elif member.name.startswith("wireguard/"):
                     WIREGUARD_DIR.mkdir(parents=True, exist_ok=True)
-                    tar.extract(member, "/config")
+                    tar.extract(member, "/config", filter="data")
                     restored.append(member.name)
                 elif member.name.startswith("openvpn/"):
                     OPENVPN_DIR.mkdir(parents=True, exist_ok=True)
-                    tar.extract(member, "/config")
+                    tar.extract(member, "/config", filter="data")
                     restored.append(member.name)
 
     except Exception as e:

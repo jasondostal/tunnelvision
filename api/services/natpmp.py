@@ -107,9 +107,7 @@ class NatPMPService:
             self._task.cancel()
         self._port = None
         self._state.delete_forwarded_port()
-        asyncio.get_event_loop().create_task(
-            fire_port_change_hook(self._hook_script, 0)
-        )
+        asyncio.ensure_future(fire_port_change_hook(self._hook_script, 0))
 
     async def _run(self, gateway_ip: str):
         """Request mapping, then keep alive before lifetime expires."""

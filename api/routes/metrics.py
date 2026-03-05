@@ -1,6 +1,7 @@
 """Prometheus /metrics endpoint — text exposition format."""
 
 import time
+from datetime import datetime
 
 from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse
@@ -45,7 +46,6 @@ async def prometheus_metrics(request: Request):
     started_at = state_mgr.vpn_started_at
     if started_at:
         try:
-            from datetime import datetime
             start = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
             uptime = time.time() - start.timestamp()
             metrics.append(_metric("tunnelvision_vpn_connected_seconds", round(uptime, 1),
