@@ -1,5 +1,36 @@
 # Changelog
 
+## v3.4.8 — Shadowsocks server + settings panel UX (2026-03-05)
+
+### Shadowsocks proxy
+The Shadowsocks AEAD crypto library (shipped in v2.5.0) is now wired into a real TCP proxy server.
+Clients connect, exchange salts, and relay traffic through the VPN tunnel with full AEAD encryption.
+
+- **ShadowsocksService** — standalone TCP server implementing the standard Shadowsocks protocol
+  (salt exchange → AEAD-decrypt target address → connect → encrypted bidirectional relay)
+- **AES-256-GCM** and **ChaCha20-Poly1305** ciphers
+- Default port **8388**, configurable via `SHADOWSOCKS_PORT`
+- Started/stopped in FastAPI lifespan alongside HTTP and SOCKS5 proxies
+- Firewall rules added to killswitch (input + output from allowed networks)
+- `shadowsocks_state` tracked in StateManager + snapshot
+- Prometheus metric: `tunnelvision_shadowsocks_up`
+- Full config chain: `SHADOWSOCKS_PORT` env → Config → settings YAML → UI
+
+### Settings panel UX
+- **Toggle switches** for all 17 boolean fields — no more typing "true"/"false"
+- **Number inputs** for numeric fields (ports, intervals, thresholds)
+- **Collapsible sections** with chevron — VPN section open by default, sections with
+  unsaved changes auto-open, dirty indicator dot on collapsed headers
+- Shadowsocks split into its own section (separate from SOCKS5)
+- Groups reordered: VPN first, providers grouped, General last
+- Env var names shown inline with labels (smaller, cleaner)
+
+### Tests
+- 734 passed (+25 new: address parsing, lifecycle, full connection flow, domain targets,
+  error handling, config wiring, singleton)
+
+---
+
 ## v3.4.7 — Rotate geographic diversity (2026-03-05)
 
 ### Bug fixes

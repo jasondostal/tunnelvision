@@ -16,7 +16,7 @@ qBittorrent + WireGuard/OpenVPN + killswitch + REST API + dashboard. One contain
 
 Drop your VPN config, `docker compose up`, and you can see everything — what IP you're on, where you're exiting, transfer stats, killswitch state, qBittorrent health. From your Homepage dashboard, from Home Assistant, from Prometheus, from the built-in UI, from `curl`. No guessing. No SSH-ing in.
 
-Works with **any WireGuard or OpenVPN provider**. Native integrations for [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), [PIA](https://privateinternetaccess.com), [ProtonVPN](https://protonvpn.com), [NordVPN](https://nordvpn.com), [Windscribe](https://windscribe.com), [AirVPN](https://airvpn.org), [Surfshark](https://surfshark.com), [ExpressVPN](https://expressvpn.com), and [19 more](CHANGELOG.md) — server browsing, rotation, port forwarding, connection monitoring. Or bring your own config from any provider. Built-in DNS (DoT, ad-blocking), HTTP CONNECT proxy, and SOCKS5/Shadowsocks proxy.
+Works with **any WireGuard or OpenVPN provider**. Native integrations for [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), [PIA](https://privateinternetaccess.com), [ProtonVPN](https://protonvpn.com), [NordVPN](https://nordvpn.com), [Windscribe](https://windscribe.com), [AirVPN](https://airvpn.org), [Surfshark](https://surfshark.com), [ExpressVPN](https://expressvpn.com), and [16 more](CHANGELOG.md) — server browsing, rotation, port forwarding, connection monitoring. Or bring your own config from any provider. Built-in DNS (DoT, ad-blocking), HTTP CONNECT proxy, and SOCKS5/Shadowsocks proxy.
 
 <p align="center">
   <img src="images/screenshot-dashboard.png" alt="TunnelVision Dashboard" width="700">
@@ -231,7 +231,7 @@ admin_user: admin
 admin_pass: changeme
 auth_proxy_header: Remote-User
 vpn_provider: custom
-health_check_interval: "30"
+health_check_interval: "15"
 ```
 
 ## Configuration
@@ -291,12 +291,14 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `HTTP_PROXY_PORT` | `8888` | HTTP proxy listen port |
 | `SOCKS_PROXY_ENABLED` | `false` | Enable SOCKS5 proxy |
 | `SOCKS_PROXY_PORT` | `1080` | SOCKS5 proxy listen port |
-| `SHADOWSOCKS_ENABLED` | `false` | Enable Shadowsocks AEAD encryption on SOCKS5 |
+| `SHADOWSOCKS_ENABLED` | `false` | Enable Shadowsocks AEAD proxy |
+| `SHADOWSOCKS_PORT` | `8388` | Shadowsocks proxy listen port |
+| `SHADOWSOCKS_PASSWORD` | *(empty)* | Shadowsocks password (required when enabled) |
 | `SHADOWSOCKS_CIPHER` | `aes-256-gcm` | Shadowsocks cipher (`aes-256-gcm` or `chacha20-ietf-poly1305`) |
 | `PUID` | `1000` | User ID for file permissions |
 | `PGID` | `1000` | Group ID for file permissions |
 | `TZ` | `America/Chicago` | Container timezone |
-| `HEALTH_CHECK_INTERVAL` | `30` | Seconds between health checks |
+| `HEALTH_CHECK_INTERVAL` | `15` | Seconds between health checks |
 | `SERVER_LIST_AUTO_UPDATE` | `true` | Automatically refresh provider server lists in the background |
 | `SERVER_LIST_UPDATE_INTERVAL` | `3600` | Seconds between server list refreshes |
 
@@ -388,7 +390,7 @@ Interactive docs at `http://localhost:8081/api/docs` (Swagger) when running.
 │           │    s6-overlay (process supervision)  │         │
 │           └───────────────────┼─────────────────┘         │
 │                               │                           │
-│  init-environment ──► init-wireguard ──► init-killswitch  │
+│  init-environment ──► init-vpn ──► init-killswitch        │
 │           │                                     │         │
 │           └──► svc-qbittorrent    svc-api    svc-health   │
 │                                                           │

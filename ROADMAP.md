@@ -9,17 +9,18 @@ What's coming. No promises on timelines — this is built for the love of blinke
 ## Future
 
 - [ ] Multi-architecture builds — armv6, i686, ppc64le (arm/v7 ✓ in v3.4.0)
-- [ ] Config export/import — encrypted archive for migration
 - [ ] Per-torrent VPN binding (pause individual torrents on VPN drop)
 - [ ] Bandwidth scheduling (speed limits by time of day)
 - [ ] HACS default store listing (pending review)
 - [ ] Native Homepage widget type (not customapi)
-- [ ] WireGuard key generation in setup wizard (no copy-paste needed)
 - [ ] Tailscale exit node support
 - [ ] IPv6 tunnel support (when providers catch up)
 
 ## Done
 
+- [x] Shadowsocks AEAD proxy server, settings panel UX overhaul — toggles, collapsible sections, number inputs (v3.4.8)
+- [x] Server rotation geographic diversity, no-filter random country selection (v3.4.7)
+- [x] SSE real-time reliability, all configurable constants exposed in settings UI (v3.4.6)
 - [x] Multi-architecture — linux/arm/v7 support, Alpine-native cryptography for all arches (v3.4.0)
 - [x] Provider health dashboard — API reachability, cache freshness, account expiry, CI test pipeline (v3.3.0)
 - [x] Smart server selection — load+speed scoring, top-5 jitter, rotation avoidance, key generation in wizard (v3.2.0)
