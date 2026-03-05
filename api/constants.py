@@ -78,7 +78,7 @@ PIA_TOKEN_CACHE_TTL = 43200     # 12 hours — PIA auth tokens
 # Intervals (seconds) — configurable via settings, these are defaults
 # =============================================================================
 
-HEALTH_CHECK_INTERVAL = 30
+HEALTH_CHECK_INTERVAL = 15
 PORT_FORWARD_INTERVAL = 900         # PIA/Proton port keep-alive (15 min)
 DNS_BLOCKLIST_REFRESH = 86400       # Blocklist re-download (24 hours)
 DNS_STATS_INTERVAL = 60             # Write DNS stats to state files
