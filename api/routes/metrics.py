@@ -109,4 +109,10 @@ async def prometheus_metrics(request: Request):
         metrics.append(_metric("tunnelvision_socks_proxy_up", 1 if socks_proxy_state == ServiceState.RUNNING else 0,
                                "Whether the SOCKS5 proxy is running"))
 
+    # Shadowsocks
+    shadowsocks_state = state_mgr.shadowsocks_state
+    if shadowsocks_state != ServiceState.DISABLED:
+        metrics.append(_metric("tunnelvision_shadowsocks_up", 1 if shadowsocks_state == ServiceState.RUNNING else 0,
+                               "Whether the Shadowsocks proxy is running"))
+
     return "\n\n".join(metrics) + "\n"

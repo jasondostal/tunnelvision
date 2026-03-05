@@ -191,6 +191,12 @@ class StateManager:
     def socks_proxy_state(self) -> str:
         return self.read("socks_proxy_state", "disabled")
 
+    # --- Shadowsocks ---
+
+    @property
+    def shadowsocks_state(self) -> str:
+        return self.read("shadowsocks_state", "disabled")
+
     # --- Watchdog ---
 
     @property
@@ -224,4 +230,5 @@ class StateManager:
             "dns_blocked_total": self.dns_blocked_total,
             "http_proxy_state": self.http_proxy_state,
             "socks_proxy_state": self.socks_proxy_state,
+            "shadowsocks_state": self.shadowsocks_state,
         }

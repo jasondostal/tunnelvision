@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
     from api.services.watchdog import get_watchdog_service
     from api.services.http_proxy import get_http_proxy_service
     from api.services.socks_proxy import get_socks_proxy_service
+    from api.services.shadowsocks import get_shadowsocks_service
     from api.services.server_updater import get_server_list_updater
 
     app.state.config = load_config()
@@ -43,6 +44,10 @@ async def lifespan(app: FastAPI):
     socks_proxy_svc = get_socks_proxy_service(app.state.config, app.state.state)
     socks_proxy_svc.start()
 
+    # Start Shadowsocks proxy if configured
+    shadowsocks_svc = get_shadowsocks_service(app.state.config, app.state.state)
+    shadowsocks_svc.start()
+
     # Start server list auto-updater
     server_updater_svc = get_server_list_updater(app.state.config)
     server_updater_svc.start()
@@ -51,6 +56,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     server_updater_svc.stop()
+    shadowsocks_svc.stop()
     socks_proxy_svc.stop()
     http_proxy_svc.stop()
     watchdog_svc.stop()

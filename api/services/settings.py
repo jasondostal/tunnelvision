@@ -18,6 +18,7 @@ from api.constants import (
     PROVIDER_CACHE_TTL,
     RECONNECT_THRESHOLD,
     SETTINGS_PATH,
+    SHADOWSOCKS_PORT,
     SOCKS_PROXY_PORT,
     WEBUI_PORT,
 )
@@ -103,6 +104,7 @@ CONFIGURABLE_FIELDS = {
     "socks_proxy_user": {"env": "SOCKS_PROXY_USER", "default": "", "secret": False},
     "socks_proxy_pass": {"env": "SOCKS_PROXY_PASS", "default": "", "secret": True},
     "shadowsocks_enabled": {"env": "SHADOWSOCKS_ENABLED", "default": "false", "secret": False},
+    "shadowsocks_port": {"env": "SHADOWSOCKS_PORT", "default": str(SHADOWSOCKS_PORT), "secret": False},
     "shadowsocks_password": {"env": "SHADOWSOCKS_PASSWORD", "default": "", "secret": True},
     "shadowsocks_cipher": {"env": "SHADOWSOCKS_CIPHER", "default": "aes-256-gcm", "secret": False},
     # Container / general (env var reference — displayed in UI, some require compose update)

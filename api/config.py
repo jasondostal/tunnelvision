@@ -16,6 +16,7 @@ from api.constants import (
     PORT_FORWARD_INTERVAL,
     PROVIDER_CACHE_TTL,
     RECONNECT_THRESHOLD,
+    SHADOWSOCKS_PORT,
     SOCKS_PROXY_PORT,
     WEBUI_PORT,
 )
@@ -147,6 +148,7 @@ class Config:
     socks_proxy_user: str = field(default_factory=lambda: os.getenv("SOCKS_PROXY_USER", ""))
     socks_proxy_pass: str = field(default_factory=lambda: _secret_or_env("SOCKS_PROXY_PASS"))
     shadowsocks_enabled: bool = field(default_factory=lambda: os.getenv("SHADOWSOCKS_ENABLED", "false").lower() == "true")
+    shadowsocks_port: int = field(default_factory=lambda: int(os.getenv("SHADOWSOCKS_PORT", str(SHADOWSOCKS_PORT))))
     shadowsocks_password: str = field(default_factory=lambda: _secret_or_env("SHADOWSOCKS_PASSWORD"))
     shadowsocks_cipher: str = field(default_factory=lambda: os.getenv("SHADOWSOCKS_CIPHER", "aes-256-gcm"))
 

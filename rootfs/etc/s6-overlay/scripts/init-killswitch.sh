@@ -22,6 +22,8 @@ HTTP_PROXY_ENABLED=${HTTP_PROXY_ENABLED:-false}
 HTTP_PROXY_PORT=${HTTP_PROXY_PORT:-8888}
 SOCKS_PROXY_ENABLED=${SOCKS_PROXY_ENABLED:-false}
 SOCKS_PROXY_PORT=${SOCKS_PROXY_PORT:-1080}
+SHADOWSOCKS_ENABLED=${SHADOWSOCKS_ENABLED:-false}
+SHADOWSOCKS_PORT=${SHADOWSOCKS_PORT:-8388}
 
 # Skip in setup mode
 SETUP_REQUIRED=$(cat /var/run/tunnelvision/setup_required 2>/dev/null || echo "false")
@@ -164,6 +166,14 @@ if [ "$SOCKS_PROXY_ENABLED" = "true" ]; then
     echo "[tunnelvision] Firewall: allowing SOCKS proxy port ${SOCKS_PROXY_PORT}"
 fi
 
+SHADOWSOCKS_INPUT_RULE=""
+SHADOWSOCKS_OUTPUT_RULE=""
+if [ "$SHADOWSOCKS_ENABLED" = "true" ]; then
+    SHADOWSOCKS_INPUT_RULE="ip saddr @allowed_networks tcp dport ${SHADOWSOCKS_PORT} accept"
+    SHADOWSOCKS_OUTPUT_RULE="ip daddr @allowed_networks tcp sport ${SHADOWSOCKS_PORT} accept"
+    echo "[tunnelvision] Firewall: allowing Shadowsocks port ${SHADOWSOCKS_PORT}"
+fi
+
 # --- Apply nftables rules ---
 # NOTE: Do NOT 'flush ruleset' — wg-quick adds nft rules for fwmark routing
 # that we need to keep. Only delete/recreate our own tables.
@@ -213,6 +223,8 @@ table ip tunnelvision {
         ${HTTP_PROXY_INPUT_RULE}
         # SOCKS Proxy from allowed networks (Phase 6)
         ${SOCKS_PROXY_INPUT_RULE}
+        # Shadowsocks from allowed networks
+        ${SHADOWSOCKS_INPUT_RULE}
 
         icmp type { destination-unreachable, time-exceeded, echo-request } accept
     }
@@ -249,6 +261,8 @@ table ip tunnelvision {
         ${HTTP_PROXY_OUTPUT_RULE}
         # SOCKS Proxy responses (Phase 6)
         ${SOCKS_PROXY_OUTPUT_RULE}
+        # Shadowsocks responses
+        ${SHADOWSOCKS_OUTPUT_RULE}
 
         icmp type { destination-unreachable, time-exceeded, echo-reply } accept
     }

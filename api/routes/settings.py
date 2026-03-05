@@ -83,6 +83,7 @@ class SettingsUpdate(BaseModel):
     socks_proxy_user: str | None = None
     socks_proxy_pass: str | None = None
     shadowsocks_enabled: str | None = None
+    shadowsocks_port: str | None = None
     shadowsocks_password: str | None = None
     shadowsocks_cipher: str | None = None
     # Container / general

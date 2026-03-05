@@ -1,4 +1,4 @@
-"""Tests for SOCKS5 proxy and Shadowsocks encryption (Phase 6)."""
+"""Tests for SOCKS5 proxy, Shadowsocks encryption, and Shadowsocks server."""
 
 import asyncio
 import struct
@@ -14,6 +14,8 @@ from api.services.socks_proxy import (
 from api.services.shadowsocks import (
     AEADCipher, derive_key, _evp_bytes_to_key, create_encryptor,
     create_decryptor, CIPHERS, TAG_SIZE, MAX_PAYLOAD,
+    ShadowsocksService, _parse_address, ATYP_IPV4 as SS_ATYP_IPV4,
+    ATYP_DOMAIN as SS_ATYP_DOMAIN, ATYP_IPV6 as SS_ATYP_IPV6,
 )
 from api.services.state import StateManager
 
@@ -417,3 +419,283 @@ class TestSocksSingleton:
         svc2 = socks_proxy.get_socks_proxy_service()
         assert svc1 is svc2
         socks_proxy._service = None
+
+
+# =============================================================================
+# Shadowsocks server tests
+# =============================================================================
+
+
+def _make_ss_config(**overrides):
+    defaults = {
+        "shadowsocks_enabled": True,
+        "shadowsocks_port": 18388,
+        "shadowsocks_password": "test-password",
+        "shadowsocks_cipher": "aes-256-gcm",
+    }
+    defaults.update(overrides)
+    config = MagicMock()
+    for k, v in defaults.items():
+        setattr(config, k, v)
+    return config
+
+
+class TestShadowsocksParseAddress:
+    """Tests for Shadowsocks target address parsing."""
+
+    def test_parse_ipv4(self):
+        data = bytes([SS_ATYP_IPV4, 93, 184, 216, 34]) + struct.pack("!H", 443)
+        host, port, consumed = _parse_address(data)
+        assert host == "93.184.216.34"
+        assert port == 443
+        assert consumed == 7
+
+    def test_parse_domain(self):
+        domain = b"example.com"
+        data = bytes([SS_ATYP_DOMAIN, len(domain)]) + domain + struct.pack("!H", 80)
+        host, port, consumed = _parse_address(data)
+        assert host == "example.com"
+        assert port == 80
+        assert consumed == 4 + len(domain)
+
+    def test_parse_ipv6(self):
+        ipv6_bytes = b"\x00" * 15 + b"\x01"
+        data = bytes([SS_ATYP_IPV6]) + ipv6_bytes + struct.pack("!H", 8080)
+        host, port, consumed = _parse_address(data)
+        assert port == 8080
+        assert consumed == 19
+
+    def test_parse_unsupported_atyp(self):
+        with pytest.raises(ValueError, match="Unsupported address type"):
+            _parse_address(bytes([0xFF, 0, 0, 0]))
+
+    def test_parse_with_trailing_data(self):
+        """Extra data after address should be reported via consumed count."""
+        data = bytes([SS_ATYP_IPV4, 10, 0, 0, 1]) + struct.pack("!H", 80) + b"extra"
+        host, port, consumed = _parse_address(data)
+        assert host == "10.0.0.1"
+        assert port == 80
+        assert consumed == 7
+        assert data[consumed:] == b"extra"
+
+
+class TestShadowsocksServiceLifecycle:
+    """Tests for Shadowsocks service lifecycle."""
+
+    def test_initial_state(self):
+        svc = ShadowsocksService(_make_ss_config())
+        assert svc.active is False
+        assert svc.connections == 0
+
+    def test_start_disabled(self):
+        svc = ShadowsocksService(_make_ss_config(shadowsocks_enabled=False))
+        svc.start()
+        assert svc._server is None
+
+    def test_start_no_password(self):
+        svc = ShadowsocksService(_make_ss_config(shadowsocks_password=""))
+        svc.start()
+        assert svc._server is None
+
+    def test_stop_when_not_started(self, tmp_path):
+        state = StateManager(tmp_path)
+        svc = ShadowsocksService(_make_ss_config(), state_mgr=state)
+        svc.stop()
+        assert svc.active is False
+
+
+class TestShadowsocksConnection:
+    """Tests for Shadowsocks connection handling."""
+
+    @pytest.mark.asyncio
+    async def test_full_connection_flow(self):
+        """Test complete: salt → address → connect → relay."""
+        config = _make_ss_config()
+        svc = ShadowsocksService(config)
+        cipher_name = config.shadowsocks_cipher
+        password = config.shadowsocks_password
+        key_size = CIPHERS[cipher_name]["key_size"]
+
+        # Build the client-side encrypted payload
+        encryptor = create_encryptor(cipher_name, password)
+        # Target: 93.184.216.34:443
+        address_payload = bytes([SS_ATYP_IPV4, 93, 184, 216, 34]) + struct.pack("!H", 443)
+        encrypted_address = encryptor.encrypt_chunk(address_payload)
+
+        # The data the "client" sends: salt + encrypted address chunk
+        client_data = encryptor.salt + encrypted_address
+
+        reader = AsyncMock()
+        writer = AsyncMock()
+        writer.close = MagicMock()
+        writer.write = MagicMock()
+        writer.drain = AsyncMock()
+
+        # Set up reader to return: salt, then encrypted length, then encrypted payload
+        # Then EOF on the relay
+        read_pos = 0
+        read_data = client_data
+
+        async def mock_readexactly(n):
+            nonlocal read_pos
+            if read_pos >= len(read_data):
+                raise asyncio.IncompleteReadError(b"", n)
+            result = read_data[read_pos:read_pos + n]
+            read_pos += n
+            return result
+
+        reader.readexactly = mock_readexactly
+
+        target_reader = AsyncMock()
+        target_writer = AsyncMock()
+        target_writer.close = MagicMock()
+        target_writer.write = MagicMock()
+        target_writer.drain = AsyncMock()
+        target_reader.read = AsyncMock(return_value=b"")
+        reader.read = AsyncMock(return_value=b"")
+
+        with patch("asyncio.open_connection", return_value=(target_reader, target_writer)) as mock_conn:
+            await svc._handle_client(reader, writer)
+
+        # Verify connected to the right target
+        mock_conn.assert_called_once()
+        assert mock_conn.call_args[0] == ("93.184.216.34", 443)
+
+        # Verify server sent its salt back (key_size bytes)
+        first_write = writer.write.call_args_list[0][0][0]
+        assert len(first_write) == key_size
+
+    @pytest.mark.asyncio
+    async def test_domain_address(self):
+        """Test connection to domain name target."""
+        config = _make_ss_config()
+        svc = ShadowsocksService(config)
+        cipher_name = config.shadowsocks_cipher
+        password = config.shadowsocks_password
+        key_size = CIPHERS[cipher_name]["key_size"]
+
+        encryptor = create_encryptor(cipher_name, password)
+        domain = b"example.com"
+        address_payload = bytes([SS_ATYP_DOMAIN, len(domain)]) + domain + struct.pack("!H", 80)
+        encrypted_address = encryptor.encrypt_chunk(address_payload)
+
+        client_data = encryptor.salt + encrypted_address
+        read_pos = 0
+
+        reader = AsyncMock()
+        writer = AsyncMock()
+        writer.close = MagicMock()
+        writer.write = MagicMock()
+        writer.drain = AsyncMock()
+
+        async def mock_readexactly(n):
+            nonlocal read_pos
+            if read_pos >= len(client_data):
+                raise asyncio.IncompleteReadError(b"", n)
+            result = client_data[read_pos:read_pos + n]
+            read_pos += n
+            return result
+
+        reader.readexactly = mock_readexactly
+
+        target_reader = AsyncMock()
+        target_writer = AsyncMock()
+        target_writer.close = MagicMock()
+        target_writer.write = MagicMock()
+        target_writer.drain = AsyncMock()
+        target_reader.read = AsyncMock(return_value=b"")
+        reader.read = AsyncMock(return_value=b"")
+
+        with patch("asyncio.open_connection", return_value=(target_reader, target_writer)) as mock_conn:
+            await svc._handle_client(reader, writer)
+
+        mock_conn.assert_called_once()
+        assert mock_conn.call_args[0] == ("example.com", 80)
+
+    @pytest.mark.asyncio
+    async def test_connection_refused(self):
+        """Connection failure should be handled gracefully."""
+        config = _make_ss_config()
+        svc = ShadowsocksService(config)
+        cipher_name = config.shadowsocks_cipher
+        password = config.shadowsocks_password
+
+        encryptor = create_encryptor(cipher_name, password)
+        address_payload = bytes([SS_ATYP_IPV4, 127, 0, 0, 1]) + struct.pack("!H", 1)
+        encrypted_address = encryptor.encrypt_chunk(address_payload)
+        client_data = encryptor.salt + encrypted_address
+        read_pos = 0
+
+        reader = AsyncMock()
+        writer = AsyncMock()
+        writer.close = MagicMock()
+        writer.write = MagicMock()
+        writer.drain = AsyncMock()
+
+        async def mock_readexactly(n):
+            nonlocal read_pos
+            if read_pos >= len(client_data):
+                raise asyncio.IncompleteReadError(b"", n)
+            result = client_data[read_pos:read_pos + n]
+            read_pos += n
+            return result
+
+        reader.readexactly = mock_readexactly
+
+        with patch("asyncio.open_connection", side_effect=ConnectionRefusedError):
+            await svc._handle_client(reader, writer)
+
+        # Should not crash, connection count returns to 0
+        assert svc.connections == 0
+
+    @pytest.mark.asyncio
+    async def test_invalid_salt_handled(self):
+        """Truncated salt should be handled gracefully."""
+        config = _make_ss_config()
+        svc = ShadowsocksService(config)
+
+        reader = AsyncMock()
+        writer = AsyncMock()
+        writer.close = MagicMock()
+
+        # Send truncated data — EOF before full salt
+        reader.readexactly = AsyncMock(
+            side_effect=asyncio.IncompleteReadError(b"\x00" * 5, 32)
+        )
+
+        await svc._handle_client(reader, writer)
+        assert svc.connections == 0
+
+
+class TestShadowsocksConfigWiring:
+    """Test Shadowsocks config/settings wiring."""
+
+    def test_shadowsocks_port_in_configurable_fields(self):
+        from api.services.settings import CONFIGURABLE_FIELDS
+        assert "shadowsocks_port" in CONFIGURABLE_FIELDS
+        assert CONFIGURABLE_FIELDS["shadowsocks_port"]["env"] == "SHADOWSOCKS_PORT"
+
+    def test_shadowsocks_enabled_in_configurable_fields(self):
+        from api.services.settings import CONFIGURABLE_FIELDS
+        assert "shadowsocks_enabled" in CONFIGURABLE_FIELDS
+
+    def test_shadowsocks_password_is_secret(self):
+        from api.services.settings import CONFIGURABLE_FIELDS
+        assert CONFIGURABLE_FIELDS["shadowsocks_password"]["secret"] is True
+
+    def test_shadowsocks_port_default(self):
+        from api.constants import SHADOWSOCKS_PORT
+        assert SHADOWSOCKS_PORT == 8388
+
+
+class TestShadowsocksSingleton:
+    """Test singleton pattern."""
+
+    def test_get_service_returns_same_instance(self):
+        from api.services import shadowsocks
+        shadowsocks._service = None
+        config = _make_ss_config()
+        svc1 = shadowsocks.get_shadowsocks_service(config)
+        svc2 = shadowsocks.get_shadowsocks_service()
+        assert svc1 is svc2
+        shadowsocks._service = None

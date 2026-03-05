@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, Save, RotateCcw, Zap, RefreshCw } from "lucide-react";
+import { X, Save, RotateCcw, Zap, RefreshCw, ChevronDown } from "lucide-react";
 
 interface FieldMeta {
   secret: boolean;
@@ -15,14 +15,15 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
-const FIELD_GROUPS: { label: string; fields: string[] }[] = [
-  {
-    label: "Authentication",
-    fields: ["admin_user", "admin_pass", "auth_proxy_header", "api_key"],
-  },
+const FIELD_GROUPS: { label: string; fields: string[]; defaultOpen?: boolean }[] = [
   {
     label: "VPN",
     fields: ["vpn_enabled", "vpn_type", "vpn_provider", "vpn_country", "vpn_city", "vpn_dns", "wireguard_dns", "killswitch_enabled", "auto_reconnect"],
+    defaultOpen: true,
+  },
+  {
+    label: "Authentication",
+    fields: ["admin_user", "admin_pass", "auth_proxy_header", "api_key"],
   },
   {
     label: "WireGuard",
@@ -37,8 +38,39 @@ const FIELD_GROUPS: { label: string; fields: string[] }[] = [
     fields: ["pia_user", "pia_pass", "port_forward_enabled"],
   },
   {
+    label: "ProtonVPN",
+    fields: ["proton_user", "proton_pass"],
+  },
+  {
     label: "qBittorrent",
     fields: ["qbt_enabled", "webui_port"],
+  },
+  {
+    label: "DNS",
+    fields: [
+      "dns_enabled", "dns_upstream", "dns_dot_enabled", "dns_cache_enabled",
+      "dns_block_ads", "dns_block_malware", "dns_block_surveillance", "dns_custom_blocklist_url",
+    ],
+  },
+  {
+    label: "Firewall",
+    fields: ["firewall_vpn_input_ports", "firewall_outbound_subnets", "firewall_custom_rules_file"],
+  },
+  {
+    label: "HTTP Proxy",
+    fields: ["http_proxy_enabled", "http_proxy_port", "http_proxy_user", "http_proxy_pass"],
+  },
+  {
+    label: "SOCKS5 Proxy",
+    fields: [
+      "socks_proxy_enabled", "socks_proxy_port", "socks_proxy_user", "socks_proxy_pass",
+    ],
+  },
+  {
+    label: "Shadowsocks",
+    fields: [
+      "shadowsocks_enabled", "shadowsocks_port", "shadowsocks_password", "shadowsocks_cipher",
+    ],
   },
   {
     label: "MQTT",
@@ -49,32 +81,6 @@ const FIELD_GROUPS: { label: string; fields: string[] }[] = [
     fields: ["notify_webhook_url", "notify_gotify_url", "notify_gotify_token"],
   },
   {
-    label: "Firewall",
-    fields: ["firewall_vpn_input_ports", "firewall_outbound_subnets", "firewall_custom_rules_file"],
-  },
-  {
-    label: "DNS",
-    fields: [
-      "dns_enabled", "dns_upstream", "dns_dot_enabled", "dns_cache_enabled",
-      "dns_block_ads", "dns_block_malware", "dns_block_surveillance", "dns_custom_blocklist_url",
-    ],
-  },
-  {
-    label: "ProtonVPN",
-    fields: ["proton_user", "proton_pass"],
-  },
-  {
-    label: "HTTP Proxy",
-    fields: ["http_proxy_enabled", "http_proxy_port", "http_proxy_user", "http_proxy_pass"],
-  },
-  {
-    label: "SOCKS5 Proxy",
-    fields: [
-      "socks_proxy_enabled", "socks_proxy_port", "socks_proxy_user", "socks_proxy_pass",
-      "shadowsocks_enabled", "shadowsocks_password", "shadowsocks_cipher",
-    ],
-  },
-  {
     label: "Watchdog",
     fields: ["health_check_interval", "handshake_stale_seconds", "reconnect_threshold", "cooldown_seconds"],
   },
@@ -83,6 +89,22 @@ const FIELD_GROUPS: { label: string; fields: string[] }[] = [
     fields: ["ui_enabled", "tz", "allowed_networks"],
   },
 ];
+
+/** Fields rendered as toggle switches instead of text inputs. */
+const BOOLEAN_FIELDS = new Set([
+  "vpn_enabled", "killswitch_enabled", "auto_reconnect", "qbt_enabled",
+  "mqtt_enabled", "ui_enabled", "port_forward_enabled", "server_list_auto_update",
+  "dns_enabled", "dns_dot_enabled", "dns_cache_enabled",
+  "dns_block_ads", "dns_block_malware", "dns_block_surveillance",
+  "http_proxy_enabled", "socks_proxy_enabled", "shadowsocks_enabled",
+]);
+
+/** Fields rendered as number inputs. */
+const NUMBER_FIELDS = new Set([
+  "mqtt_port", "webui_port", "http_proxy_port", "socks_proxy_port", "shadowsocks_port",
+  "health_check_interval", "handshake_stale_seconds", "reconnect_threshold", "cooldown_seconds",
+  "port_forward_interval", "dns_blocklist_refresh_interval", "server_list_update_interval",
+]);
 
 const FIELD_LABELS: Record<string, string> = {
   admin_user: "Admin Username",
@@ -110,11 +132,9 @@ const FIELD_LABELS: Record<string, string> = {
   mqtt_pass: "MQTT Password",
   health_check_interval: "Health Check Interval (s)",
   ui_enabled: "Dashboard UI",
-  // Firewall
   firewall_vpn_input_ports: "VPN Input Ports",
   firewall_outbound_subnets: "Outbound Subnets (bypass VPN)",
   firewall_custom_rules_file: "Custom Rules File",
-  // DNS
   dns_enabled: "DNS Server",
   dns_upstream: "Upstream DNS",
   dns_dot_enabled: "DNS-over-TLS",
@@ -123,37 +143,30 @@ const FIELD_LABELS: Record<string, string> = {
   dns_block_malware: "Block Malware",
   dns_block_surveillance: "Block Surveillance",
   dns_custom_blocklist_url: "Custom Blocklist URL",
-  // ProtonVPN
   proton_user: "Proton Username",
   proton_pass: "Proton Password",
-  // HTTP Proxy
   http_proxy_enabled: "HTTP Proxy",
   http_proxy_port: "HTTP Proxy Port",
   http_proxy_user: "HTTP Proxy User",
   http_proxy_pass: "HTTP Proxy Password",
-  // SOCKS5
   socks_proxy_enabled: "SOCKS5 Proxy",
   socks_proxy_port: "SOCKS5 Port",
   socks_proxy_user: "SOCKS5 User",
   socks_proxy_pass: "SOCKS5 Password",
   shadowsocks_enabled: "Shadowsocks",
+  shadowsocks_port: "Shadowsocks Port",
   shadowsocks_password: "Shadowsocks Password",
   shadowsocks_cipher: "Shadowsocks Cipher",
-  // Watchdog
   handshake_stale_seconds: "Handshake Stale Threshold (s)",
   reconnect_threshold: "Reconnect Threshold",
   cooldown_seconds: "Cooldown Duration (s)",
-  // VPN extras
   vpn_enabled: "VPN Enabled",
   vpn_type: "VPN Protocol",
   wireguard_dns: "WireGuard DNS Override",
-  // qBittorrent
   qbt_enabled: "qBittorrent Enabled",
   webui_port: "qBittorrent WebUI Port",
-  // MQTT extras
   mqtt_topic_prefix: "MQTT Topic Prefix",
   mqtt_discovery_prefix: "HA Discovery Prefix",
-  // General
   tz: "Timezone",
   allowed_networks: "Allowed Networks",
 };
@@ -163,12 +176,10 @@ const FIELD_HINTS: Record<string, string> = {
   auth_proxy_header: "e.g. Remote-User, X-Forwarded-User",
   api_key: "For Homepage, HACS, Prometheus",
   vpn_provider: "custom, mullvad, ivpn, pia, or gluetun",
-  auto_reconnect: "true or false",
   wireguard_private_key: "Base64 private key for Mullvad/IVPN",
   wireguard_addresses: "e.g. 10.66.0.1/32",
   pia_user: "PIA username (p1234567)",
   pia_pass: "PIA password",
-  port_forward_enabled: "true or false (PIA only)",
   gluetun_url: "e.g. http://gluetun:8000",
   gluetun_api_key: "Gluetun API key (if auth enabled)",
   notify_webhook_url: "Discord, Slack, or generic webhook URL",
@@ -177,55 +188,32 @@ const FIELD_HINTS: Record<string, string> = {
   vpn_country: "e.g. ch, us, de",
   vpn_city: "e.g. zurich, new-york",
   vpn_dns: "Override DNS (default: provider DNS)",
-  killswitch_enabled: "true or false",
-  mqtt_enabled: "true or false",
-  ui_enabled: "true or false",
-  // Firewall
   firewall_vpn_input_ports: "Comma-separated ports (e.g. 51413,6881)",
   firewall_outbound_subnets: "CIDRs that bypass VPN (e.g. 192.168.1.0/24)",
   firewall_custom_rules_file: "Path to nftables rules file",
-  // DNS
-  dns_enabled: "true or false",
   dns_upstream: "Comma-separated IPs (e.g. 1.1.1.1,1.0.0.1)",
-  dns_dot_enabled: "true or false",
-  dns_cache_enabled: "true or false",
-  dns_block_ads: "true or false (StevenBlack hosts)",
-  dns_block_malware: "true or false (URLhaus)",
-  dns_block_surveillance: "true or false",
   dns_custom_blocklist_url: "URL to hosts-format blocklist",
-  // ProtonVPN
   proton_user: "ProtonVPN username",
   proton_pass: "ProtonVPN password",
-  // HTTP Proxy
-  http_proxy_enabled: "true or false",
   http_proxy_port: "Default: 8888",
   http_proxy_user: "Leave blank for no auth",
   http_proxy_pass: "Leave blank for no auth",
-  // SOCKS5
-  socks_proxy_enabled: "true or false",
   socks_proxy_port: "Default: 1080",
   socks_proxy_user: "Leave blank for no auth",
   socks_proxy_pass: "Leave blank for no auth",
-  shadowsocks_enabled: "true or false",
+  shadowsocks_port: "Default: 8388",
   shadowsocks_password: "Encryption password",
   shadowsocks_cipher: "aes-256-gcm or chacha20-ietf-poly1305",
-  // Watchdog
-  handshake_stale_seconds: "WireGuard handshake age before tunnel considered stale (default 180)",
-  reconnect_threshold: "Consecutive failures before triggering reconnect (default 3)",
-  cooldown_seconds: "Seconds to wait when all configs are exhausted (default 300)",
-  // VPN extras
-  vpn_enabled: "true or false — disable to run in API-only mode",
+  handshake_stale_seconds: "Default: 180",
+  reconnect_threshold: "Default: 3",
+  cooldown_seconds: "Default: 300",
   vpn_type: "auto, wireguard, or openvpn",
-  wireguard_dns: "Override WireGuard peer DNS (e.g. 10.64.0.1) — requires restart",
-  // qBittorrent
-  qbt_enabled: "true or false — requires compose update + restart",
-  webui_port: "Default: 8080 — requires compose update + restart",
-  // MQTT
+  wireguard_dns: "Override WireGuard peer DNS (e.g. 10.64.0.1)",
+  webui_port: "Default: 8080",
   mqtt_topic_prefix: "Default: tunnelvision",
   mqtt_discovery_prefix: "Default: homeassistant",
-  // General
-  tz: "Container timezone (e.g. America/New_York) — requires restart",
-  allowed_networks: "CIDR allow-list for WebUI/API access (e.g. 192.168.1.0/24)",
+  tz: "e.g. America/New_York",
+  allowed_networks: "CIDR allow-list (e.g. 192.168.1.0/24)",
 };
 
 /** Fields that take effect immediately without container restart. */
@@ -245,6 +233,26 @@ const HOT_RELOAD_FIELDS = new Set([
   "dns_block_surveillance",
 ]);
 
+function Toggle({ checked, onChange, dirty }: { checked: boolean; onChange: (v: boolean) => void; dirty: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+        checked ? "bg-amber-500" : "bg-surface-border"
+      } ${dirty ? "ring-1 ring-amber-500/50" : ""}`}
+    >
+      <span
+        className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
+          checked ? "translate-x-[18px]" : "translate-x-[3px]"
+        }`}
+      />
+    </button>
+  );
+}
+
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [data, setData] = useState<SettingsData | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -252,6 +260,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [needsRestart, setNeedsRestart] = useState(false);
+  // Track user overrides: true = explicitly opened, false = explicitly closed, absent = default
+  const [sectionOverrides, setSectionOverrides] = useState<Record<string, boolean>>({});
 
   /** Which fields have been edited since last save/load. */
   const dirtyFields = useMemo(() => {
@@ -265,6 +275,22 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   }, [form, savedForm]);
 
   const isDirty = dirtyFields.size > 0;
+
+  const isSectionOpen = (group: { label: string; fields: string[]; defaultOpen?: boolean }) => {
+    // User override wins
+    if (group.label in sectionOverrides) return sectionOverrides[group.label];
+    // Auto-open if default or has dirty fields
+    if (group.defaultOpen) return true;
+    return group.fields.some((k) => dirtyFields.has(k));
+  };
+
+  const toggleSection = (label: string) => {
+    setSectionOverrides((prev) => {
+      const group = FIELD_GROUPS.find((g) => g.label === label)!;
+      const currentlyOpen = isSectionOpen(group);
+      return { ...prev, [label]: !currentlyOpen };
+    });
+  };
 
   useEffect(() => {
     fetch("/api/v1/settings")
@@ -337,62 +363,102 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             Env vars are used as defaults when a field isn't set here.
           </p>
 
-          {FIELD_GROUPS.map((group) => (
-            <div key={group.label} className="mb-5">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
-                {group.label}
-              </h3>
-              <div className="space-y-2.5">
-                {group.fields.map((key) => {
-                  const meta = data.fields[key];
-                  if (!meta) return null;
-                  const fieldDirty = dirtyFields.has(key);
-                  const isHotReload = HOT_RELOAD_FIELDS.has(key);
-                  return (
-                    <div key={key}>
-                      <div className="mb-1 flex items-center gap-1.5">
-                        <label className="text-xs text-text-secondary">
-                          {FIELD_LABELS[key] || key}
-                          <span className="ml-2 font-mono text-text-muted">
-                            ${meta.env}
-                          </span>
-                        </label>
-                        {fieldDirty && (
-                          <span
-                            className="flex items-center gap-0.5 text-[10px]"
-                            title={
-                              isHotReload
-                                ? "Takes effect immediately"
-                                : "Requires container restart"
-                            }
-                          >
-                            {isHotReload ? (
-                              <Zap className="h-2.5 w-2.5 text-status-up" />
-                            ) : (
-                              <RefreshCw className="h-2.5 w-2.5 text-amber-400" />
+          {FIELD_GROUPS.map((group) => {
+            const isOpen = isSectionOpen(group);
+            const groupDirty = group.fields.some((k) => dirtyFields.has(k));
+            return (
+              <div key={group.label} className="mb-1">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(group.label)}
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-card"
+                >
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+                      {group.label}
+                    </h3>
+                    {groupDirty && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    )}
+                  </div>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 text-text-muted transition-transform ${
+                      isOpen ? "rotate-0" : "-rotate-90"
+                    }`}
+                  />
+                </button>
+                {isOpen && (
+                  <div className="space-y-2.5 px-2 pb-3 pt-1">
+                    {group.fields.map((key) => {
+                      const meta = data.fields[key];
+                      if (!meta) return null;
+                      const fieldDirty = dirtyFields.has(key);
+                      const isHotReload = HOT_RELOAD_FIELDS.has(key);
+                      const isBool = BOOLEAN_FIELDS.has(key);
+                      const isNum = NUMBER_FIELDS.has(key);
+                      const boolValue = (form[key] || "").toLowerCase() === "true";
+
+                      return (
+                        <div key={key}>
+                          <div className="mb-1 flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <label className="text-xs text-text-secondary">
+                                {FIELD_LABELS[key] || key}
+                              </label>
+                              <span className="font-mono text-[10px] text-text-muted">
+                                {meta.env}
+                              </span>
+                              {fieldDirty && (
+                                <span
+                                  className="flex items-center gap-0.5 text-[10px]"
+                                  title={
+                                    isHotReload
+                                      ? "Takes effect immediately"
+                                      : "Requires container restart"
+                                  }
+                                >
+                                  {isHotReload ? (
+                                    <Zap className="h-2.5 w-2.5 text-status-up" />
+                                  ) : (
+                                    <RefreshCw className="h-2.5 w-2.5 text-amber-400" />
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                            {isBool && (
+                              <Toggle
+                                checked={boolValue}
+                                onChange={(v) =>
+                                  setForm({ ...form, [key]: v ? "true" : "false" })
+                                }
+                                dirty={fieldDirty}
+                              />
                             )}
-                          </span>
-                        )}
-                      </div>
-                      <input
-                        type={meta.secret ? "password" : "text"}
-                        value={form[key] || ""}
-                        onChange={(e) =>
-                          setForm({ ...form, [key]: e.target.value })
-                        }
-                        placeholder={FIELD_HINTS[key] || ""}
-                        className={`w-full rounded-lg border bg-surface-card px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none transition-colors focus:border-amber-500/50 ${
-                          fieldDirty
-                            ? "border-amber-500/50"
-                            : "border-surface-border"
-                        }`}
-                      />
-                    </div>
-                  );
-                })}
+                          </div>
+                          {!isBool && (
+                            <input
+                              type={meta.secret ? "password" : isNum ? "number" : "text"}
+                              inputMode={isNum ? "numeric" : undefined}
+                              value={form[key] || ""}
+                              onChange={(e) =>
+                                setForm({ ...form, [key]: e.target.value })
+                              }
+                              placeholder={FIELD_HINTS[key] || ""}
+                              className={`w-full rounded-lg border bg-surface-card px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none transition-colors focus:border-amber-500/50 ${
+                                fieldDirty
+                                  ? "border-amber-500/50"
+                                  : "border-surface-border"
+                              }`}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Footer */}
