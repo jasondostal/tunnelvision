@@ -328,6 +328,14 @@ async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
     """Tear down and bring up VPN."""
     try:
         if vpn_type == "wireguard":
+            # Sync config to /etc/wireguard/ so wg-quick reads the current version.
+            # init-wireguard.sh only runs once at startup; rotate/connect write to
+            # /config/wireguard/wg0.conf which wg-quick doesn't read directly.
+            if WG_CONF_PATH.exists():
+                import shutil
+                Path("/etc/wireguard").mkdir(parents=True, exist_ok=True)
+                shutil.copy2(WG_CONF_PATH, "/etc/wireguard/wg0.conf")
+                os.chmod("/etc/wireguard/wg0.conf", 0o600)
             subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
             result = subprocess.run(["wg-quick", "up", "wg0"], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG)
             if result.returncode != 0:
