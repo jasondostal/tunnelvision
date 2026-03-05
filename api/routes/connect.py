@@ -111,7 +111,14 @@ async def reconnect(request: Request):
 async def rotate_server(request: Request):
     """Pick a new server and reconnect, avoiding the current one.
 
-    Mullvad: scored selection (load + speed) from pool, excluding current server.
+    Mullvad/API providers (no country filter set): picks a random country first
+    (excluding the current one), then score-selects within that country. This
+    ensures geographic diversity — without it, the highest-scoring country wins
+    every rotation.
+
+    Mullvad/API providers (country/city filter set): score-selects within the
+    filtered pool, excluding current server.
+
     Custom: pick different config file from /config/wireguard/ or /config/openvpn/.
 
     Re-reads country/city from settings YAML so rotation filters are hot-reloadable.
@@ -128,6 +135,22 @@ async def rotate_server(request: Request):
         country = config.vpn_country or None
         city = config.vpn_city or None
     current = state_mgr.vpn_server_hostname or ""
+
+    # No filter set + API provider: pick a random country to ensure diversity.
+    # Without this, the globally highest-scoring country wins every rotation.
+    provider = get_provider(config.vpn_provider, config)
+    if not country and not city and provider.meta.supports_server_list:
+        try:
+            all_servers = await provider.list_servers()
+            current_country = next(
+                (s.country for s in all_servers if s.hostname == current), ""
+            )
+            countries = list({s.country for s in all_servers} - {current_country})
+            if countries:
+                country = random.choice(countries)
+        except Exception:
+            pass  # Fall through to unfiltered scored selection
+
     return await connect_to_server(ConnectRequest(country=country, city=city, exclude_hostname=current), request)
 
 
