@@ -406,7 +406,7 @@ class WatchdogService:
                 subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
                 await asyncio.sleep(2)
                 result = subprocess.run(
-                    ["/etc/s6-overlay/scripts/init-wireguard.sh"],
+                    ["/etc/s6-overlay/scripts/init-vpn.sh"],
                     capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
                 )
                 if result.returncode != 0:

@@ -1,7 +1,7 @@
 """Tests for WG_USERSPACE setting — userspace WireGuard fallback.
 
 Validates the three-way sync (Config / CONFIGURABLE_FIELDS / SettingsUpdate)
-and the auto-detection logic patterns used by init-wireguard.sh.
+and the auto-detection logic patterns used by init-vpn.sh.
 """
 
 import os
@@ -58,7 +58,7 @@ class TestWgUserspaceSettings:
 
 
 class TestWgUserspaceDetectionLogic:
-    """Verify the auto-detection logic patterns from init-wireguard.sh.
+    """Verify the auto-detection logic patterns from init-vpn.sh.
 
     These test the decision logic without running the actual shell script.
     """
@@ -66,7 +66,7 @@ class TestWgUserspaceDetectionLogic:
     VALID_MODES = {"auto", "kernel", "userspace"}
 
     def _resolve_implementation(self, wg_userspace: str, kernel_available: bool) -> str:
-        """Replicate the init-wireguard.sh decision logic."""
+        """Replicate the init-vpn.sh decision logic."""
         if wg_userspace == "userspace":
             return "userspace"
         elif wg_userspace == "kernel":

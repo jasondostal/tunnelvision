@@ -203,7 +203,7 @@ async def activate_config(name: str, request: Request):
             import asyncio
             await asyncio.sleep(2)
             result = subprocess.run(
-                ["/etc/s6-overlay/scripts/init-wireguard.sh"],
+                ["/etc/s6-overlay/scripts/init-vpn.sh"],
                 capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
             )
             if result.returncode != 0:
@@ -329,7 +329,7 @@ async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
     try:
         if vpn_type == "wireguard":
             # Sync config to /etc/wireguard/ so wg-quick reads the current version.
-            # init-wireguard.sh only runs once at startup; rotate/connect write to
+            # init-vpn.sh only runs once at startup; rotate/connect write to
             # /config/wireguard/wg0.conf which wg-quick doesn't read directly.
             if WG_CONF_PATH.exists():
                 import shutil
@@ -346,7 +346,7 @@ async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
             import asyncio
             await asyncio.sleep(2)
             result = subprocess.run(
-                ["/etc/s6-overlay/scripts/init-wireguard.sh"],
+                ["/etc/s6-overlay/scripts/init-vpn.sh"],
                 capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
             )
             if result.returncode != 0:

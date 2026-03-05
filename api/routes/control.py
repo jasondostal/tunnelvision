@@ -73,7 +73,7 @@ def do_vpn_restart(state_mgr: StateManager) -> ActionResponse:
         ok, msg = _run(["wg-quick", "up", "wg0"])
     else:
         _run(["killall", "openvpn"], timeout=SUBPROCESS_TIMEOUT_QUICK)
-        ok, msg = _run(["/etc/s6-overlay/scripts/init-wireguard.sh"], timeout=SUBPROCESS_TIMEOUT_VPN)
+        ok, msg = _run(["/etc/s6-overlay/scripts/init-vpn.sh"], timeout=SUBPROCESS_TIMEOUT_VPN)
 
     if ok:
         state_mgr.vpn_state = VpnState.UP
