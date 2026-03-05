@@ -1,6 +1,6 @@
 # Changelog
 
-## v3.4.9 — Code quality + CI lint pipeline (2026-03-05)
+## v3.4.9 — Code quality + CI security pipeline (2026-03-05)
 
 ### Code quality
 - **Zero Ruff findings** — removed 12 unused imports, 2 stale f-prefixes, 1 identity test
@@ -8,14 +8,17 @@
 - **Zero mypy errors** — type annotations for all unchecked assignments, `ServiceState.STOPPED` added to enum,
   None-guard on MQTT publish, pydantic mypy plugin (`mypy.ini`) for Pydantic model validation
 - **Zero ShellCheck findings** — quoted variable expansion in init-vpn.sh
-- **Zero pip-audit CVEs** — all dependencies clean
+- **Zero pip-audit CVEs** — all Python dependencies clean
+- **Zero npm audit findings** — all frontend dependencies clean
+- **Zero Hadolint findings** — Dockerfile best practices verified, redundant chmod removed
+- **Zero Trivy CVEs** — container image scanned for OS-level vulnerabilities (CRITICAL/HIGH)
 - `HEALTH_CHECK_INTERVAL` default corrected to 15 in Dockerfile (was still 30)
 
 ### CI pipeline
-- New **lint** job runs in parallel with tests — Ruff, Bandit (high), mypy, ShellCheck, pip-audit,
-  Hadolint (Dockerfile), npm audit (frontend deps)
-- New **scan** job — Trivy scans the built container image for OS-level CVEs (Alpine apk packages,
-  system libraries) at CRITICAL and HIGH severity
+- New **lint** job (8 tools) runs in parallel with tests — Ruff, Bandit, mypy, ShellCheck,
+  pip-audit, Hadolint, npm audit
+- New **scan** job — Trivy scans the built container image for Alpine apk package and
+  system library CVEs at CRITICAL and HIGH severity
 - Build gates on both `lint` and `test`; smoke gates on `build` and `scan`
 - Total pipeline: lint (8 tools) + test (734 tests) → build (3 arches) → scan (Trivy) → smoke
 
