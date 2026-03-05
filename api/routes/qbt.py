@@ -34,9 +34,9 @@ async def qbt_status(request: Request):
                 up_speed = data.get("up_info_speed", 0)
                 state = ServiceState.RUNNING
             else:
-                state = "stopped"
+                state = ServiceState.STOPPED
         except Exception:
-            state = "stopped"
+            state = ServiceState.STOPPED
 
         # App version
         try:

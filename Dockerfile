@@ -57,7 +57,7 @@ ENV TZ=America/Chicago \
     # UI
     UI_ENABLED=true \
     # Health
-    HEALTH_CHECK_INTERVAL=30 \
+    HEALTH_CHECK_INTERVAL=15 \
     # s6
     S6_KEEP_ENV=1 \
     S6_BEHAVIOUR_IF_STAGE2_FAILS=0 \

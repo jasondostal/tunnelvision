@@ -44,7 +44,7 @@ async def event_stream(request: Request):
     async def generate():
         try:
             # Send initial keepalive
-            yield f": connected\n\n"
+            yield ": connected\n\n"
 
             while True:
                 try:
@@ -52,7 +52,7 @@ async def event_stream(request: Request):
                     yield f"event: {payload['event']}\ndata: {json.dumps(payload['data'])}\n\n"
                 except asyncio.TimeoutError:
                     # Keepalive to prevent connection drop
-                    yield f": keepalive\n\n"
+                    yield ": keepalive\n\n"
         except asyncio.CancelledError:
             pass
         finally:

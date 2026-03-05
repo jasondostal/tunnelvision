@@ -10,7 +10,6 @@ Uses Last Will and Testament (LWT) for availability tracking.
 import asyncio
 import json
 import logging
-from pathlib import Path
 
 import paho.mqtt.client as mqtt
 
@@ -326,7 +325,8 @@ class MQTTService:
             "device": device,
             "availability": availability,
         }
-        self.client.publish(topic, json.dumps(payload), qos=1, retain=True)
+        if self.client:
+            self.client.publish(topic, json.dumps(payload), qos=1, retain=True)
 
 
 # Singleton

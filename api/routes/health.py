@@ -39,9 +39,9 @@ async def health_check(request: Request):
         try:
             async with http_client(timeout=TIMEOUT_QUICK) as client:
                 resp = await client.get(f"http://localhost:{config.webui_port}")
-            qbt_state = ServiceState.RUNNING if resp.status_code < 500 else "stopped"
+            qbt_state = ServiceState.RUNNING if resp.status_code < 500 else ServiceState.STOPPED
         except Exception:
-            qbt_state = "stopped"
+            qbt_state = ServiceState.STOPPED
     else:
         qbt_state = ServiceState.DISABLED
 

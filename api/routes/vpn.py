@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
-from api.constants import KillswitchState, VpnState
+from api.constants import VpnState
 from api.models import VPNStatusResponse, VPNIPResponse
 from api.routes.events import broadcast
 

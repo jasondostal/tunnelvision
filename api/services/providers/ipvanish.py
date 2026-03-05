@@ -80,7 +80,7 @@ class IPVanishProvider(VPNProvider):
         servers = []
         for feature in data.get("features", []):
             props = feature.get("properties", {})
-            if not props.get("online", True) is False and not props.get("hostname"):
+            if props.get("online", True) is not False and not props.get("hostname"):
                 continue
 
             hostname = props.get("hostname", "")

@@ -6,7 +6,7 @@ import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Request, UploadFile, File
+from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import StreamingResponse
 
 from api.constants import OPENVPN_DIR, SETTINGS_PATH, WIREGUARD_DIR

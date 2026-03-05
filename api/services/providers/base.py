@@ -210,7 +210,7 @@ class VPNProvider(ABC):
         """
         if "_meta_cache" not in cls.__dict__:
             instance = cls.__new__(cls)
-            cls._meta_cache = cls.meta.fget(instance)  # type: ignore[union-attr]
+            cls._meta_cache = cls.meta.fget(instance)  # type: ignore[attr-defined, union-attr]
         return cls._meta_cache  # type: ignore[attr-defined]
 
     @abstractmethod

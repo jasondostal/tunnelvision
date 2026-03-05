@@ -163,7 +163,7 @@ elif [ "$VPN_TYPE" = "openvpn" ]; then
         --log /var/run/tunnelvision/openvpn.log \
         --writepid /var/run/tunnelvision/openvpn.pid \
         --script-security 2 \
-        $AUTH_FILE
+        "$AUTH_FILE"
 
     # Wait for tun interface (up to 30s)
     TRIES=0

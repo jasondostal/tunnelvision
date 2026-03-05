@@ -127,6 +127,7 @@ class KillswitchState(str, Enum):
 class ServiceState(str, Enum):
     """Generic service state (DNS, proxies, etc.)."""
     RUNNING = "running"
+    STOPPED = "stopped"
     DISABLED = "disabled"
     ERROR = "error"
 

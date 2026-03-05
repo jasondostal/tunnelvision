@@ -12,6 +12,35 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint tools
+        run: pip install --quiet ruff bandit mypy pip-audit cryptography -r api/requirements.txt
+
+      - name: Ruff (lint)
+        run: ruff check api/
+
+      - name: Bandit (security — high severity)
+        run: bandit -r api/ -lll -q
+
+      - name: Mypy (type check)
+        run: mypy api/ --ignore-missing-imports
+
+      - name: ShellCheck
+        run: shellcheck rootfs/etc/s6-overlay/scripts/*.sh
+
+      - name: pip-audit (dependency vulnerabilities)
+        run: pip-audit -r api/requirements.txt
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -32,7 +61,7 @@ jobs:
         run: pytest tests/ -q --tb=short
 
   build:
-    needs: test
+    needs: [lint, test]
     runs-on: ubuntu-latest
     permissions:
       contents: read

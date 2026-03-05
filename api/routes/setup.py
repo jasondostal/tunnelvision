@@ -126,7 +126,7 @@ async def _validate_pia_creds(body: CredentialsRequest) -> CredentialsResponse |
         object.__setattr__(temp_config, "pia_user", body.pia_user)
         object.__setattr__(temp_config, "pia_pass", body.pia_pass)
         pia_provider = get_provider("pia", temp_config)
-        token = await pia_provider.get_token()
+        token = await pia_provider.get_token()  # type: ignore[attr-defined]
         if not token:
             return CredentialsResponse(success=False, error="PIA authentication failed — check username and password")
     except Exception:
@@ -446,7 +446,7 @@ async def setup_credentials(body: CredentialsRequest, request: Request):
 @router.post("/setup/server")
 async def setup_server(body: ServerSelectRequest, request: Request):
     """Select a server and generate WireGuard config. Reuses connect logic."""
-    from api.routes.connect import ConnectRequest, ConnectResponse, connect_to_server
+    from api.routes.connect import ConnectRequest, connect_to_server
     result = await connect_to_server(ConnectRequest(hostname=body.hostname), request)
     return result
 

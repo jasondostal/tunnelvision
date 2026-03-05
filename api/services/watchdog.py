@@ -18,8 +18,6 @@ from pathlib import Path
 from api.config import Config
 from api.constants import (
     SCRIPT_INIT_VPN,
-    SUBPROCESS_TIMEOUT_DEFAULT,
-    SUBPROCESS_TIMEOUT_LONG,
     SUBPROCESS_TIMEOUT_QUICK,
     SUBPROCESS_TIMEOUT_VPN,
     TIMEOUT_QUICK,

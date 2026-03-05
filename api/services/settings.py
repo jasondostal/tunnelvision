@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from api.constants import (
     COOLDOWN_SECONDS,
@@ -146,7 +146,7 @@ def get_all_configurable_fields() -> dict[str, dict]:
 
 def load_settings() -> dict[str, Any]:
     """Load settings: YAML file wins, env var is fallback."""
-    file_settings = {}
+    file_settings: dict[str, Any] = {}
     if SETTINGS_PATH.exists():
         try:
             with open(SETTINGS_PATH) as f:

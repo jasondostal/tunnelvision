@@ -1,10 +1,9 @@
 """Settings management — read/write persistent YAML config."""
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
-from api.services.settings import get_public_settings, save_settings, load_settings, CONFIGURABLE_FIELDS, get_all_configurable_fields
+from api.services.settings import get_public_settings, save_settings, get_all_configurable_fields
 
 router = APIRouter()
 

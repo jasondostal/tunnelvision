@@ -10,7 +10,6 @@ Runs as a separate process under s6 supervision. Provides:
 import asyncio
 import logging
 import os
-import struct
 import time
 from pathlib import Path
 from typing import Optional
@@ -226,8 +225,8 @@ class DNSProtocol(asyncio.DatagramProtocol):
         self.server = server
         self.transport: asyncio.DatagramTransport | None = None
 
-    def connection_made(self, transport: asyncio.DatagramTransport) -> None:
-        self.transport = transport
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:  # type: ignore[override]
+        self.transport = transport  # type: ignore[assignment]
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
         asyncio.ensure_future(self._handle(data, addr))
@@ -274,11 +273,11 @@ class DNSServer:
 
         # Upstream resolution
         if self.resolver:
-            response = await self.resolver.resolve(data)
-            if response:
-                ttl = _extract_ttl(response)
-                self.cache.put(cache_key, response, ttl)
-                return response
+            resolved = await self.resolver.resolve(data)
+            if resolved:
+                ttl = _extract_ttl(resolved)
+                self.cache.put(cache_key, resolved, ttl)
+                return resolved
 
         return _build_nxdomain(data)
 
@@ -289,7 +288,7 @@ class DNSServer:
             (state_dir / "dns_queries_total").write_text(str(self._queries_total))
             (state_dir / "dns_cache_hits").write_text(str(self._cache_hits))
             (state_dir / "dns_blocked_total").write_text(str(self._blocked_total))
-            (state_dir / "dns_state").write_text(ServiceState.RUNNING if self._running else "stopped")
+            (state_dir / "dns_state").write_text(ServiceState.RUNNING if self._running else ServiceState.STOPPED)
         except Exception:
             pass
 

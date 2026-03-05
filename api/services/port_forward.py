@@ -8,9 +8,7 @@ import asyncio
 import base64
 import json
 import logging
-import os
 import ssl
-from pathlib import Path
 
 from api.config import Config
 from api.constants import PORT_FORWARD_INTERVAL, http_client

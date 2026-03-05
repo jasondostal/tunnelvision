@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.4.9 — Code quality + CI lint pipeline (2026-03-05)
+
+### Code quality
+- **Zero Ruff findings** — removed 12 unused imports, 2 stale f-prefixes, 1 identity test
+- **Zero Bandit high-severity** — added `usedforsecurity=False` to Shadowsocks MD5 (protocol-required, not security)
+- **Zero mypy errors** — type annotations for all unchecked assignments, `ServiceState.STOPPED` added to enum,
+  None-guard on MQTT publish, proper `type: ignore` for protocol-required dynamic dispatch
+- **Zero ShellCheck findings** — quoted variable expansion in init-vpn.sh
+- **Zero pip-audit CVEs** — all dependencies clean
+- `HEALTH_CHECK_INTERVAL` default corrected to 15 in Dockerfile (was still 30)
+
+### CI pipeline
+- New **lint** job runs in parallel with tests — Ruff, Bandit (high), mypy, ShellCheck, pip-audit
+- Build now gates on both `lint` and `test` passing
+- Total CI checks: lint (5 tools) → test (734 tests) → build (3 arches) → smoke
+
+---
+
 ## v3.4.8 — Shadowsocks server + settings panel UX (2026-03-05)
 
 ### Shadowsocks proxy

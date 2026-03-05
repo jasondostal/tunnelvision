@@ -54,10 +54,10 @@ def derive_key(password: str, salt: bytes, key_size: int = 32) -> bytes:
 
 def _evp_bytes_to_key(password: bytes, key_size: int) -> bytes:
     """OpenSSL EVP_BytesToKey with MD5 — Shadowsocks master key derivation."""
-    m = []
+    m: list[bytes] = []
     while len(b"".join(m)) < key_size:
         data = password if not m else m[-1] + password
-        m.append(hashlib.md5(data).digest())
+        m.append(hashlib.md5(data, usedforsecurity=False).digest())  # noqa: S324 — protocol spec
     return b"".join(m)[:key_size]
 
 
