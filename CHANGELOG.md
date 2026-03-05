@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.4.1 — Rotate fix + build hardening (2026-03-05)
+
+### Bug fixes
+- **Server rotation now works** — rotate/connect was writing the new WireGuard config to
+  `/config/wireguard/wg0.conf` but `wg-quick` was reading the stale `/etc/wireguard/wg0.conf`
+  copied once at startup. `_reconnect_vpn` now syncs the config before every `wg-quick up`.
+- **arm/v7 builds fixed** — `lightningcss` (Tailwind v4's Rust CSS compiler) has no
+  arm-musl binary. The UI builder stage is now pinned to `linux/amd64`; the output
+  (static HTML/CSS/JS) is architecture-agnostic.
+
+### Housekeeping
+- `init-wireguard.sh` → `init-vpn.sh` — the script handles both WireGuard and OpenVPN;
+  the old name was misleading. All s6 dependency tokens and Python references updated.
+- `tests/test_s6_service_graph.py` — new pure-filesystem validator catches dangling s6
+  service references after renames (exactly the class of bug this rename introduced).
+
+### Tests
+- 706 total (up from 698): 4 reconnect-sync tests, 4 s6 graph-validator tests
+
+---
+
 ## v3.4.0 — Multi-Architecture: linux/arm/v7 (2026-03-04)
 
 ### Multi-architecture builds
