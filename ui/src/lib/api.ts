@@ -48,6 +48,10 @@ export interface AuthResponse {
   login_required?: boolean;
 }
 
+export function invalidateCache(...paths: string[]): void {
+  paths.forEach((p) => cache.delete(p));
+}
+
 export const api = {
   health: () => get<HealthResponse>("/api/v1/health"),
   vpnStatus: () => get<VPNStatusResponse>("/api/v1/vpn/status"),

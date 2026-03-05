@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, Globe, LogOut, Settings } from "lucide-react";
 import { Logo } from "@/components/logo";
-import { api } from "@/lib/api";
+import { api, invalidateCache } from "@/lib/api";
 import type { AuthResponse } from "@/lib/api";
 import { usePoll } from "@/lib/use-poll";
 import { VPNStatus } from "@/components/vpn-status";
@@ -52,8 +52,11 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
   const [sseRefresh, setSSERefresh] = useState(0);
   const [providerHealthRefresh, setProviderHealthRefresh] = useState(0);
 
-  // SSE — instant refresh on VPN state changes
-  useSSE(() => setSSERefresh((n) => n + 1));
+  // SSE — instant refresh on VPN state changes (invalidate cache first so we get fresh data)
+  useSSE(() => {
+    invalidateCache("/api/v1/vpn/status", "/api/v1/health", "/api/v1/vpn/history");
+    setSSERefresh((n) => n + 1);
+  });
 
   const health = usePoll(useCallback(() => api.health(), []), POLL_INTERVAL, sseRefresh);
   const vpn = usePoll(useCallback(() => api.vpnStatus(), []), POLL_INTERVAL, sseRefresh);

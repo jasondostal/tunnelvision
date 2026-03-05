@@ -2,6 +2,17 @@
 
 import { useEffect, useRef } from "react";
 
+// All event types that should trigger a UI refresh
+const SSE_REFRESH_EVENTS = [
+  "vpn_status",
+  "vpn_state",
+  "watchdog_recovered",
+  "watchdog_reconnecting",
+  "watchdog_failover",
+  "watchdog_degraded",
+  "watchdog_cooldown",
+];
+
 export function useSSE(onEvent: () => void) {
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
@@ -18,13 +29,11 @@ export function useSSE(onEvent: () => void) {
         retryDelay = 2000; // Reset on successful connect
       };
 
-      es.addEventListener("vpn_status", () => {
-        onEventRef.current();
-      });
-
-      es.addEventListener("vpn_state", () => {
-        onEventRef.current();
-      });
+      for (const event of SSE_REFRESH_EVENTS) {
+        es.addEventListener(event, () => {
+          onEventRef.current();
+        });
+      }
 
       es.onerror = () => {
         es?.close();
