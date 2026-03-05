@@ -148,6 +148,23 @@ class HealthState(str, Enum):
 # Helpers
 # =============================================================================
 
+# =============================================================================
+# Script paths — s6 service scripts invoked by the API
+# =============================================================================
+
+SCRIPTS_DIR = Path("/etc/s6-overlay/scripts")
+SCRIPT_INIT_VPN = SCRIPTS_DIR / "init-vpn.sh"
+SCRIPT_KILLSWITCH = SCRIPTS_DIR / "init-killswitch.sh"
+
+
+# =============================================================================
+# WireGuard runtime paths (managed by wg-quick, distinct from /config/)
+# =============================================================================
+
+WG_RUNTIME_DIR = Path("/etc/wireguard")
+WG_RUNTIME_CONF = WG_RUNTIME_DIR / "wg0.conf"
+
+
 def activate_wg_config(config_path: Path) -> None:
     """Symlink a WireGuard config to wg0.conf.
 

@@ -22,7 +22,11 @@ from api.constants import (
     HANDSHAKE_STALE_SECONDS,
     OPENVPN_DIR,
     RECONNECT_THRESHOLD,
+    SCRIPT_INIT_VPN,
+    SCRIPT_KILLSWITCH,
     SUBPROCESS_TIMEOUT_DEFAULT,
+    WG_RUNTIME_CONF,
+    WG_RUNTIME_DIR,
     SUBPROCESS_TIMEOUT_LONG,
     SUBPROCESS_TIMEOUT_QUICK,
     SUBPROCESS_TIMEOUT_VPN,
@@ -381,10 +385,9 @@ class WatchdogService:
                 subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
 
                 # Write new config
-                wg_conf = Path("/etc/wireguard/wg0.conf")
-                os.makedirs("/etc/wireguard", exist_ok=True)
-                wg_conf.write_text(clean_content)
-                os.chmod(wg_conf, 0o600)
+                WG_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+                WG_RUNTIME_CONF.write_text(clean_content)
+                os.chmod(WG_RUNTIME_CONF, 0o600)
 
                 # Bring up
                 result = subprocess.run(
@@ -398,7 +401,7 @@ class WatchdogService:
                 # Re-apply killswitch (nftables rules hardcode endpoint IP)
                 if self.config.killswitch_enabled:
                     subprocess.run(
-                        ["/etc/s6-overlay/scripts/init-killswitch.sh"],
+                        [str(SCRIPT_KILLSWITCH)],
                         capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
                     )
 
@@ -406,7 +409,7 @@ class WatchdogService:
                 subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
                 await asyncio.sleep(2)
                 result = subprocess.run(
-                    ["/etc/s6-overlay/scripts/init-vpn.sh"],
+                    [str(SCRIPT_INIT_VPN)],
                     capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
                 )
                 if result.returncode != 0:

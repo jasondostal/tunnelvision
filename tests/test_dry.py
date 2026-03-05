@@ -247,6 +247,47 @@ class TestSettingsAlignment:
             )
 
 
+# ── Script paths ─────────────────────────────────────────────────────────────
+
+class TestNoHardcodedScriptPaths:
+    """Script paths should come from SCRIPT_* constants, not be hardcoded."""
+
+    BANNED_SCRIPTS = [
+        '"/etc/s6-overlay/scripts/init-killswitch.sh"',
+        '"/etc/s6-overlay/scripts/init-vpn.sh"',
+        '"/etc/s6-overlay/scripts/init-wireguard.sh"',
+    ]
+
+    def test_no_hardcoded_script_paths(self):
+        for path, source in _source_files():
+            for banned in self.BANNED_SCRIPTS:
+                assert banned not in source, (
+                    f"{path} has hardcoded script path {banned} "
+                    f"— use SCRIPT_* constants from api.constants"
+                )
+
+
+# ── WireGuard runtime paths ───────────────────────────────────────────────────
+
+class TestNoHardcodedWgRuntimePaths:
+    """WireGuard runtime paths (/etc/wireguard/) should use WG_RUNTIME_* constants."""
+
+    BANNED_PATHS = [
+        '"/etc/wireguard/wg0.conf"',
+        '"/etc/wireguard"',
+        "'/etc/wireguard/wg0.conf'",
+        "'/etc/wireguard'",
+    ]
+
+    def test_no_hardcoded_wg_runtime_paths(self):
+        for path, source in _source_files():
+            for banned in self.BANNED_PATHS:
+                assert banned not in source, (
+                    f"{path} has hardcoded WireGuard runtime path {banned} "
+                    f"— use WG_RUNTIME_CONF / WG_RUNTIME_DIR from api.constants"
+                )
+
+
 # ── WireGuard symlink dedup ─────────────────────────────────────────────────
 
 class TestNoWgSymlinkDuplication:

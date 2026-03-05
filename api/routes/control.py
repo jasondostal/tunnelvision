@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from api.config import Config
 from api.constants import (
     KillswitchState,
+    SCRIPT_INIT_VPN,
+    SCRIPT_KILLSWITCH,
     SUBPROCESS_TIMEOUT_DEFAULT,
     SUBPROCESS_TIMEOUT_LONG,
     SUBPROCESS_TIMEOUT_QUICK,
@@ -73,7 +75,7 @@ def do_vpn_restart(state_mgr: StateManager) -> ActionResponse:
         ok, msg = _run(["wg-quick", "up", "wg0"])
     else:
         _run(["killall", "openvpn"], timeout=SUBPROCESS_TIMEOUT_QUICK)
-        ok, msg = _run(["/etc/s6-overlay/scripts/init-vpn.sh"], timeout=SUBPROCESS_TIMEOUT_VPN)
+        ok, msg = _run([str(SCRIPT_INIT_VPN)], timeout=SUBPROCESS_TIMEOUT_VPN)
 
     if ok:
         state_mgr.vpn_state = VpnState.UP
@@ -88,7 +90,7 @@ def do_vpn_restart(state_mgr: StateManager) -> ActionResponse:
 
 
 def do_killswitch_enable() -> ActionResponse:
-    ok, msg = _run(["/etc/s6-overlay/scripts/init-killswitch.sh"], timeout=SUBPROCESS_TIMEOUT_DEFAULT)
+    ok, msg = _run([str(SCRIPT_KILLSWITCH)], timeout=SUBPROCESS_TIMEOUT_DEFAULT)
     return ActionResponse(
         success=ok,
         action="killswitch_enable",

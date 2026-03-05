@@ -15,11 +15,15 @@ from pydantic import BaseModel
 
 from api.constants import (
     OPENVPN_DIR,
+    SCRIPT_INIT_VPN,
+    SCRIPT_KILLSWITCH,
     SUBPROCESS_TIMEOUT_DEFAULT,
     SUBPROCESS_TIMEOUT_LONG,
     SUBPROCESS_TIMEOUT_QUICK,
     SUBPROCESS_TIMEOUT_VPN,
     WG_CONF_PATH,
+    WG_RUNTIME_CONF,
+    WG_RUNTIME_DIR,
     WIREGUARD_DIR,
     activate_wg_config,
 )
@@ -181,10 +185,9 @@ async def activate_config(name: str, request: Request):
 
             subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
 
-            os.makedirs("/etc/wireguard", exist_ok=True)
-            wg_conf = Path("/etc/wireguard/wg0.conf")
-            wg_conf.write_text("\n".join(clean_lines))
-            os.chmod(wg_conf, 0o600)
+            WG_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+            WG_RUNTIME_CONF.write_text("\n".join(clean_lines))
+            os.chmod(WG_RUNTIME_CONF, 0o600)
 
             result = subprocess.run(
                 ["wg-quick", "up", "wg0"],
@@ -195,7 +198,7 @@ async def activate_config(name: str, request: Request):
 
             if config.killswitch_enabled:
                 subprocess.run(
-                    ["/etc/s6-overlay/scripts/init-killswitch.sh"],
+                    [str(SCRIPT_KILLSWITCH)],
                     capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
                 )
         else:
@@ -203,7 +206,7 @@ async def activate_config(name: str, request: Request):
             import asyncio
             await asyncio.sleep(2)
             result = subprocess.run(
-                ["/etc/s6-overlay/scripts/init-vpn.sh"],
+                [str(SCRIPT_INIT_VPN)],
                 capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
             )
             if result.returncode != 0:
@@ -342,18 +345,18 @@ async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
             # /config/wireguard/wg0.conf which wg-quick doesn't read directly.
             if WG_CONF_PATH.exists():
                 import shutil
-                Path("/etc/wireguard").mkdir(parents=True, exist_ok=True)
-                shutil.copy2(WG_CONF_PATH, "/etc/wireguard/wg0.conf")
-                os.chmod("/etc/wireguard/wg0.conf", 0o600)
+                WG_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(WG_CONF_PATH, WG_RUNTIME_CONF)
+                os.chmod(WG_RUNTIME_CONF, 0o600)
             subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
             result = subprocess.run(["wg-quick", "up", "wg0"], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG)
             if result.returncode != 0:
                 return ConnectResponse(success=False, error=result.stderr.strip())
             # Re-run killswitch after wg-quick up so nftables allows the new
-            # server's endpoint. init-killswitch.sh reads the endpoint from
+            # server's endpoint. SCRIPT_KILLSWITCH reads the endpoint from
             # `wg show wg0` — must run AFTER wg-quick up configures the peer.
             subprocess.run(
-                ["/etc/s6-overlay/scripts/init-killswitch.sh"],
+                [str(SCRIPT_KILLSWITCH)],
                 capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
             )
         elif vpn_type == "openvpn":
@@ -366,11 +369,11 @@ async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
             # file (grep ^remote), so this can run before the daemon starts —
             # unlike WireGuard which needs the interface up first.
             subprocess.run(
-                ["/etc/s6-overlay/scripts/init-killswitch.sh"],
+                [str(SCRIPT_KILLSWITCH)],
                 capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
             )
             result = subprocess.run(
-                ["/etc/s6-overlay/scripts/init-vpn.sh"],
+                [str(SCRIPT_INIT_VPN)],
                 capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
             )
             if result.returncode != 0:
