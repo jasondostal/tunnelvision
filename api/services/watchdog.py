@@ -17,9 +17,6 @@ from pathlib import Path
 
 from api.config import Config
 from api.constants import (
-    COOLDOWN_SECONDS,
-    HANDSHAKE_STALE_SECONDS,
-    RECONNECT_THRESHOLD,
     SCRIPT_INIT_VPN,
     SUBPROCESS_TIMEOUT_DEFAULT,
     SUBPROCESS_TIMEOUT_LONG,
@@ -193,7 +190,8 @@ class WatchdogService:
                     if handshake_ts == 0:
                         return False
                     age = int(time.time()) - handshake_ts
-                    return age < HANDSHAKE_STALE_SECONDS
+                    stale = int(self._load_setting("handshake_stale_seconds", str(self.config.handshake_stale_seconds)))
+                    return age < stale
             return False
         except Exception:
             return False
@@ -251,7 +249,8 @@ class WatchdogService:
     def _on_unhealthy(self) -> None:
         """VPN unhealthy in sidecar mode — can only observe."""
         self._consecutive_failures += 1
-        if self._consecutive_failures >= RECONNECT_THRESHOLD:
+        threshold = int(self._load_setting("reconnect_threshold", str(self.config.reconnect_threshold)))
+        if self._consecutive_failures >= threshold:
             self._set_state(WatchdogState.DEGRADED)
             self._broadcast("watchdog_degraded", {
                 "consecutive_failures": self._consecutive_failures,
@@ -264,13 +263,14 @@ class WatchdogService:
     async def _on_unhealthy_standalone(self) -> None:
         """VPN unhealthy in standalone mode — escalate through state machine."""
         self._consecutive_failures += 1
-        log.warning(f"VPN health check failed ({self._consecutive_failures}/{RECONNECT_THRESHOLD})")
+        threshold = int(self._load_setting("reconnect_threshold", str(self.config.reconnect_threshold)))
+        log.warning(f"VPN health check failed ({self._consecutive_failures}/{threshold})")
 
-        if self._consecutive_failures < RECONNECT_THRESHOLD:
+        if self._consecutive_failures < threshold:
             self._set_state(WatchdogState.DEGRADED)
             self._broadcast("watchdog_degraded", {
                 "consecutive_failures": self._consecutive_failures,
-                "threshold": RECONNECT_THRESHOLD,
+                "threshold": threshold,
             })
             return
 
@@ -393,19 +393,20 @@ class WatchdogService:
     async def _enter_cooldown(self) -> None:
         """All configs exhausted — pause qBit, notify, wait."""
         self._set_state(WatchdogState.COOLDOWN)
-        self._cooldown_until = time.time() + COOLDOWN_SECONDS
+        cooldown = int(self._load_setting("cooldown_seconds", str(self.config.cooldown_seconds)))
+        self._cooldown_until = time.time() + cooldown
 
         self._broadcast("watchdog_cooldown", {
-            "duration_seconds": COOLDOWN_SECONDS,
+            "duration_seconds": cooldown,
             "tried_configs": list(self._tried_configs),
         })
         self._log_history("watchdog_cooldown", {
-            "duration": COOLDOWN_SECONDS,
+            "duration": cooldown,
             "tried": list(self._tried_configs),
         })
         self._notify_async(
             "vpn_cooldown",
-            f"All VPN configs failed — pausing torrents, retrying in {COOLDOWN_SECONDS // 60}min",
+            f"All VPN configs failed — pausing torrents, retrying in {cooldown // 60}min",
         )
 
         # Pause qBittorrent to prevent leaks

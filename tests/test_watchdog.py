@@ -9,12 +9,10 @@ import pytest
 
 from api.config import Config
 from api.services.state import StateManager
+from api.constants import COOLDOWN_SECONDS, HANDSHAKE_STALE_SECONDS, RECONNECT_THRESHOLD
 from api.services.watchdog import (
     WatchdogService,
     WatchdogState,
-    RECONNECT_THRESHOLD,
-    COOLDOWN_SECONDS,
-    HANDSHAKE_STALE_SECONDS,
     get_watchdog_service,
 )
 

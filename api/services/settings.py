@@ -7,15 +7,19 @@ from typing import Any
 import yaml
 
 from api.constants import (
+    COOLDOWN_SECONDS,
     GLUETUN_DEFAULT_URL,
+    HANDSHAKE_STALE_SECONDS,
     HEALTH_CHECK_INTERVAL,
     HTTP_PROXY_PORT,
     MQTT_PORT,
     PORT_FORWARD_INTERVAL,
     DNS_BLOCKLIST_REFRESH,
     PROVIDER_CACHE_TTL,
+    RECONNECT_THRESHOLD,
     SETTINGS_PATH,
     SOCKS_PROXY_PORT,
+    WEBUI_PORT,
 )
 
 def _read_secret_file(env_name: str) -> str | None:
@@ -61,6 +65,10 @@ CONFIGURABLE_FIELDS = {
     "port_forward_interval": {"env": "PORT_FORWARD_INTERVAL", "default": str(PORT_FORWARD_INTERVAL), "secret": False},
     "port_forward_hook": {"env": "PORT_FORWARD_HOOK", "default": "", "secret": False},
     "auto_reconnect": {"env": "AUTO_RECONNECT", "default": "true", "secret": False},
+    # Watchdog tuning (hot-reloadable)
+    "handshake_stale_seconds": {"env": "HANDSHAKE_STALE_SECONDS", "default": str(HANDSHAKE_STALE_SECONDS), "secret": False},
+    "reconnect_threshold": {"env": "RECONNECT_THRESHOLD", "default": str(RECONNECT_THRESHOLD), "secret": False},
+    "cooldown_seconds": {"env": "COOLDOWN_SECONDS", "default": str(COOLDOWN_SECONDS), "secret": False},
     # Server list
     "server_list_auto_update": {"env": "SERVER_LIST_AUTO_UPDATE", "default": "true", "secret": False},
     "server_list_update_interval": {"env": "SERVER_LIST_UPDATE_INTERVAL", "default": str(PROVIDER_CACHE_TTL), "secret": False},
@@ -97,6 +105,16 @@ CONFIGURABLE_FIELDS = {
     "shadowsocks_enabled": {"env": "SHADOWSOCKS_ENABLED", "default": "false", "secret": False},
     "shadowsocks_password": {"env": "SHADOWSOCKS_PASSWORD", "default": "", "secret": True},
     "shadowsocks_cipher": {"env": "SHADOWSOCKS_CIPHER", "default": "aes-256-gcm", "secret": False},
+    # Container / general (env var reference — displayed in UI, some require compose update)
+    "tz": {"env": "TZ", "default": "UTC", "secret": False},
+    "vpn_enabled": {"env": "VPN_ENABLED", "default": "true", "secret": False},
+    "vpn_type": {"env": "VPN_TYPE", "default": "auto", "secret": False},
+    "wireguard_dns": {"env": "WIREGUARD_DNS", "default": "", "secret": False},
+    "qbt_enabled": {"env": "QBT_ENABLED", "default": "true", "secret": False},
+    "webui_port": {"env": "WEBUI_PORT", "default": str(WEBUI_PORT), "secret": False},
+    "mqtt_topic_prefix": {"env": "MQTT_TOPIC_PREFIX", "default": "tunnelvision", "secret": False},
+    "mqtt_discovery_prefix": {"env": "MQTT_DISCOVERY_PREFIX", "default": "homeassistant", "secret": False},
+    "allowed_networks": {"env": "WEBUI_ALLOWED_NETWORKS", "default": "", "secret": False},
 }
 
 

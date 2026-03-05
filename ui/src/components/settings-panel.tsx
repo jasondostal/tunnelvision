@@ -22,7 +22,7 @@ const FIELD_GROUPS: { label: string; fields: string[] }[] = [
   },
   {
     label: "VPN",
-    fields: ["vpn_provider", "vpn_country", "vpn_city", "vpn_dns", "killswitch_enabled", "auto_reconnect"],
+    fields: ["vpn_enabled", "vpn_type", "vpn_provider", "vpn_country", "vpn_city", "vpn_dns", "wireguard_dns", "killswitch_enabled", "auto_reconnect"],
   },
   {
     label: "WireGuard",
@@ -37,8 +37,12 @@ const FIELD_GROUPS: { label: string; fields: string[] }[] = [
     fields: ["pia_user", "pia_pass", "port_forward_enabled"],
   },
   {
+    label: "qBittorrent",
+    fields: ["qbt_enabled", "webui_port"],
+  },
+  {
     label: "MQTT",
-    fields: ["mqtt_enabled", "mqtt_broker", "mqtt_port", "mqtt_user", "mqtt_pass"],
+    fields: ["mqtt_enabled", "mqtt_broker", "mqtt_port", "mqtt_user", "mqtt_pass", "mqtt_topic_prefix", "mqtt_discovery_prefix"],
   },
   {
     label: "Notifications",
@@ -71,8 +75,12 @@ const FIELD_GROUPS: { label: string; fields: string[] }[] = [
     ],
   },
   {
+    label: "Watchdog",
+    fields: ["health_check_interval", "handshake_stale_seconds", "reconnect_threshold", "cooldown_seconds"],
+  },
+  {
     label: "General",
-    fields: ["health_check_interval", "ui_enabled"],
+    fields: ["ui_enabled", "tz", "allowed_networks"],
   },
 ];
 
@@ -131,6 +139,23 @@ const FIELD_LABELS: Record<string, string> = {
   shadowsocks_enabled: "Shadowsocks",
   shadowsocks_password: "Shadowsocks Password",
   shadowsocks_cipher: "Shadowsocks Cipher",
+  // Watchdog
+  handshake_stale_seconds: "Handshake Stale Threshold (s)",
+  reconnect_threshold: "Reconnect Threshold",
+  cooldown_seconds: "Cooldown Duration (s)",
+  // VPN extras
+  vpn_enabled: "VPN Enabled",
+  vpn_type: "VPN Protocol",
+  wireguard_dns: "WireGuard DNS Override",
+  // qBittorrent
+  qbt_enabled: "qBittorrent Enabled",
+  webui_port: "qBittorrent WebUI Port",
+  // MQTT extras
+  mqtt_topic_prefix: "MQTT Topic Prefix",
+  mqtt_discovery_prefix: "HA Discovery Prefix",
+  // General
+  tz: "Timezone",
+  allowed_networks: "Allowed Networks",
 };
 
 const FIELD_HINTS: Record<string, string> = {
@@ -184,12 +209,32 @@ const FIELD_HINTS: Record<string, string> = {
   shadowsocks_enabled: "true or false",
   shadowsocks_password: "Encryption password",
   shadowsocks_cipher: "aes-256-gcm or chacha20-ietf-poly1305",
+  // Watchdog
+  handshake_stale_seconds: "WireGuard handshake age before tunnel considered stale (default 180)",
+  reconnect_threshold: "Consecutive failures before triggering reconnect (default 3)",
+  cooldown_seconds: "Seconds to wait when all configs are exhausted (default 300)",
+  // VPN extras
+  vpn_enabled: "true or false — disable to run in API-only mode",
+  vpn_type: "auto, wireguard, or openvpn",
+  wireguard_dns: "Override WireGuard peer DNS (e.g. 10.64.0.1) — requires restart",
+  // qBittorrent
+  qbt_enabled: "true or false — requires compose update + restart",
+  webui_port: "Default: 8080 — requires compose update + restart",
+  // MQTT
+  mqtt_topic_prefix: "Default: tunnelvision",
+  mqtt_discovery_prefix: "Default: homeassistant",
+  // General
+  tz: "Container timezone (e.g. America/New_York) — requires restart",
+  allowed_networks: "CIDR allow-list for WebUI/API access (e.g. 192.168.1.0/24)",
 };
 
 /** Fields that take effect immediately without container restart. */
 const HOT_RELOAD_FIELDS = new Set([
   "auto_reconnect",
   "health_check_interval",
+  "handshake_stale_seconds",
+  "reconnect_threshold",
+  "cooldown_seconds",
   "vpn_country",
   "vpn_city",
   "notify_webhook_url",

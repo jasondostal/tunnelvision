@@ -43,6 +43,10 @@ class SettingsUpdate(BaseModel):
     port_forward_enabled: str | None = None
     port_forward_hook: str | None = None
     auto_reconnect: str | None = None
+    # Watchdog tuning
+    handshake_stale_seconds: str | None = None
+    reconnect_threshold: str | None = None
+    cooldown_seconds: str | None = None
     # Server list
     server_list_auto_update: str | None = None
     server_list_update_interval: str | None = None
@@ -81,6 +85,16 @@ class SettingsUpdate(BaseModel):
     shadowsocks_enabled: str | None = None
     shadowsocks_password: str | None = None
     shadowsocks_cipher: str | None = None
+    # Container / general
+    tz: str | None = None
+    vpn_enabled: str | None = None
+    vpn_type: str | None = None
+    wireguard_dns: str | None = None
+    qbt_enabled: str | None = None
+    webui_port: str | None = None
+    mqtt_topic_prefix: str | None = None
+    mqtt_discovery_prefix: str | None = None
+    allowed_networks: str | None = None
 
 
 @router.get("/settings")
@@ -111,16 +125,19 @@ async def update_settings(body: SettingsUpdate, request: Request):
 
     # These fields are re-read from settings YAML at runtime — no restart needed
     hot_reload_fields = {
-        "auto_reconnect",       # watchdog re-reads each tick
-        "health_check_interval",  # watchdog re-reads each tick
-        "vpn_country",          # rotate endpoint re-reads
-        "vpn_city",             # rotate endpoint re-reads
-        "notify_webhook_url",   # notifications re-read on send
-        "notify_gotify_url",    # notifications re-read on send
-        "notify_gotify_token",  # notifications re-read on send
-        "dns_block_ads",        # blocklist manager re-reads periodically
-        "dns_block_malware",    # blocklist manager re-reads periodically
-        "dns_block_surveillance",  # blocklist manager re-reads periodically
+        "auto_reconnect",           # watchdog re-reads each tick
+        "health_check_interval",    # watchdog re-reads each tick
+        "handshake_stale_seconds",  # watchdog re-reads each tick
+        "reconnect_threshold",      # watchdog re-reads each tick
+        "cooldown_seconds",         # watchdog re-reads each tick
+        "vpn_country",              # rotate endpoint re-reads
+        "vpn_city",                 # rotate endpoint re-reads
+        "notify_webhook_url",       # notifications re-read on send
+        "notify_gotify_url",        # notifications re-read on send
+        "notify_gotify_token",      # notifications re-read on send
+        "dns_block_ads",            # blocklist manager re-reads periodically
+        "dns_block_malware",        # blocklist manager re-reads periodically
+        "dns_block_surveillance",   # blocklist manager re-reads periodically
     }
     needs_restart = bool(set(updates.keys()) - hot_reload_fields)
 

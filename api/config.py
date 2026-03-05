@@ -6,13 +6,16 @@ from pathlib import Path
 
 from api.constants import (
     API_PORT,
+    COOLDOWN_SECONDS,
     DNS_BLOCKLIST_REFRESH,
     GLUETUN_DEFAULT_URL,
+    HANDSHAKE_STALE_SECONDS,
     HEALTH_CHECK_INTERVAL,
     HTTP_PROXY_PORT,
     MQTT_PORT,
     PORT_FORWARD_INTERVAL,
     PROVIDER_CACHE_TTL,
+    RECONNECT_THRESHOLD,
     SOCKS_PROXY_PORT,
     WEBUI_PORT,
 )
@@ -101,9 +104,12 @@ class Config:
     notify_gotify_url: str = field(default_factory=lambda: os.getenv("NOTIFY_GOTIFY_URL", ""))
     notify_gotify_token: str = field(default_factory=lambda: _secret_or_env("NOTIFY_GOTIFY_TOKEN"))
 
-    # Health
+    # Health / Watchdog
     health_check_interval: int = field(default_factory=lambda: int(os.getenv("HEALTH_CHECK_INTERVAL", str(HEALTH_CHECK_INTERVAL))))
     auto_reconnect: bool = field(default_factory=lambda: os.getenv("AUTO_RECONNECT", "true").lower() == "true")
+    handshake_stale_seconds: int = field(default_factory=lambda: int(os.getenv("HANDSHAKE_STALE_SECONDS", str(HANDSHAKE_STALE_SECONDS))))
+    reconnect_threshold: int = field(default_factory=lambda: int(os.getenv("RECONNECT_THRESHOLD", str(RECONNECT_THRESHOLD))))
+    cooldown_seconds: int = field(default_factory=lambda: int(os.getenv("COOLDOWN_SECONDS", str(COOLDOWN_SECONDS))))
 
     # Server list
     server_list_auto_update: bool = field(default_factory=lambda: os.getenv("SERVER_LIST_AUTO_UPDATE", "true").lower() == "true")
