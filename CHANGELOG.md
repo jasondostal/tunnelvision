@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.4.2 — Fix killswitch blocking rotate/reconnect (2026-03-05)
+
+### Bug fix
+- **Rotate/reconnect now works with killswitch enabled** — `_reconnect_vpn` wasn't re-running
+  `init-killswitch.sh` after `wg-quick up`. The killswitch locks nftables to the previous
+  server's endpoint IP, so WireGuard handshake packets to the new server were silently dropped
+  (interface up, 0 B received). `init-killswitch.sh` now runs after every `wg-quick up`,
+  updating the allowed endpoint to match the new server. `activate_config` already did this
+  correctly; `_reconnect_vpn` now matches.
+
+---
+
 ## v3.4.1 — Rotate fix + build hardening (2026-03-05)
 
 ### Bug fixes
