@@ -154,8 +154,7 @@ class Config:
         try:
             from api.services.vpn import PROVIDERS
             for provider_cls in PROVIDERS.values():
-                instance = provider_cls.__new__(provider_cls)
-                meta = provider_cls.meta.fget(instance)  # type: ignore[union-attr]
+                meta = provider_cls.get_meta()
                 for cred in meta.credentials:
                     if cred.key == name:
                         env_var = cred.env_var or name.upper()

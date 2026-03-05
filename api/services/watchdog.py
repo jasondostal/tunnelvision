@@ -18,22 +18,18 @@ from pathlib import Path
 from api.config import Config
 from api.constants import (
     COOLDOWN_SECONDS,
-    GLUETUN_DEFAULT_URL,
     HANDSHAKE_STALE_SECONDS,
-    OPENVPN_DIR,
     RECONNECT_THRESHOLD,
     SCRIPT_INIT_VPN,
-    SCRIPT_KILLSWITCH,
     SUBPROCESS_TIMEOUT_DEFAULT,
-    WG_RUNTIME_CONF,
-    WG_RUNTIME_DIR,
     SUBPROCESS_TIMEOUT_LONG,
     SUBPROCESS_TIMEOUT_QUICK,
     SUBPROCESS_TIMEOUT_VPN,
     TIMEOUT_QUICK,
-    WIREGUARD_DIR,
     WatchdogState,
+    bring_up_wireguard_file,
     http_client,
+    list_config_files,
 )
 from api.services.state import StateManager
 
@@ -107,8 +103,7 @@ class WatchdogService:
 
     def _is_sidecar_mode(self) -> bool:
         """Check if we're running in sidecar mode (gluetun manages VPN)."""
-        return bool(self.config.gluetun_url and self.config.gluetun_url != GLUETUN_DEFAULT_URL) or \
-            self.state.read("vpn_mode") == "sidecar"
+        return self.config.vpn_provider == "gluetun"
 
     async def _run(self) -> None:
         """Main watchdog loop."""
@@ -365,46 +360,14 @@ class WatchdogService:
 
     async def _activate_config(self, config_file: Path) -> bool:
         """Switch to a different VPN config file and connect."""
-        import os
-
         vpn_type = "openvpn" if config_file.suffix == ".ovpn" else "wireguard"
 
         try:
             if vpn_type == "wireguard":
-                # Read config, strip PostUp/PostDown (we manage routing ourselves)
-                content = config_file.read_text()
-                clean_lines = []
-                for line in content.splitlines():
-                    stripped = line.strip().lower()
-                    if stripped.startswith("postup") or stripped.startswith("postdown"):
-                        continue
-                    clean_lines.append(line)
-                clean_content = "\n".join(clean_lines)
-
-                # Tear down current
-                subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
-
-                # Write new config
-                WG_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
-                WG_RUNTIME_CONF.write_text(clean_content)
-                os.chmod(WG_RUNTIME_CONF, 0o600)
-
-                # Bring up
-                result = subprocess.run(
-                    ["wg-quick", "up", "wg0"],
-                    capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
-                )
-                if result.returncode != 0:
-                    log.error(f"wg-quick up failed: {result.stderr}")
+                ok, err = bring_up_wireguard_file(config_file, killswitch_enabled=self.config.killswitch_enabled)
+                if not ok:
+                    log.error(f"wg-quick up failed: {err}")
                     return False
-
-                # Re-apply killswitch (nftables rules hardcode endpoint IP)
-                if self.config.killswitch_enabled:
-                    subprocess.run(
-                        [str(SCRIPT_KILLSWITCH)],
-                        capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
-                    )
-
             elif vpn_type == "openvpn":
                 subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
                 await asyncio.sleep(2)
@@ -454,7 +417,7 @@ class WatchdogService:
             return
         try:
             from api.routes.control import do_qbt_pause
-            do_qbt_pause(self.config)
+            await do_qbt_pause(self.config)
         except Exception as e:
             log.error(f"Failed to pause qBittorrent: {e}")
 
@@ -464,19 +427,13 @@ class WatchdogService:
             return
         try:
             from api.routes.control import do_qbt_resume
-            do_qbt_resume(self.config)
+            await do_qbt_resume(self.config)
         except Exception as e:
             log.error(f"Failed to resume qBittorrent: {e}")
 
     def _list_available_configs(self) -> list[Path]:
         """Find all VPN config files available for failover."""
-        files: list[Path] = []
-        if WIREGUARD_DIR.exists():
-            files.extend(WIREGUARD_DIR.glob("*.conf"))
-        if OPENVPN_DIR.exists():
-            files.extend(OPENVPN_DIR.glob("*.ovpn"))
-            files.extend(OPENVPN_DIR.glob("*.conf"))
-        return sorted(files)
+        return list_config_files()
 
     def _broadcast(self, event: str, data: dict) -> None:
         """Push SSE event to connected clients."""

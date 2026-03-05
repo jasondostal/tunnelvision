@@ -4,6 +4,8 @@ Every magic number, path, port default, timeout, and state string lives here.
 Import from this module. Do not hardcode values elsewhere.
 """
 
+import os
+import subprocess
 from enum import Enum
 from pathlib import Path
 
@@ -174,6 +176,53 @@ def activate_wg_config(config_path: Path) -> None:
     WG_CONF_PATH.parent.mkdir(parents=True, exist_ok=True)
     WG_CONF_PATH.unlink(missing_ok=True)
     WG_CONF_PATH.symlink_to(config_path)
+
+
+def list_config_files() -> list[Path]:
+    """Return all VPN config files available for rotation, sorted by name."""
+    files: list[Path] = []
+    if WIREGUARD_DIR.exists():
+        files.extend(WIREGUARD_DIR.glob("*.conf"))
+    if OPENVPN_DIR.exists():
+        files.extend(OPENVPN_DIR.glob("*.ovpn"))
+        files.extend(OPENVPN_DIR.glob("*.conf"))
+    return sorted(files)
+
+
+def bring_up_wireguard_file(config_file: Path, killswitch_enabled: bool = False) -> tuple[bool, str]:
+    """Strip PostUp/PostDown hooks, write to /etc/wireguard/wg0.conf, bring WireGuard up.
+
+    This is the single place for config-file-based WireGuard activation.
+    Used by both the connect route (activate_config) and the watchdog failover.
+
+    Returns (success, error_message).
+    """
+    content = config_file.read_text()
+    clean_lines = [
+        line for line in content.splitlines()
+        if not line.strip().lower().startswith(("postup", "postdown"))
+    ]
+
+    subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
+
+    WG_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    WG_RUNTIME_CONF.write_text("\n".join(clean_lines))
+    os.chmod(WG_RUNTIME_CONF, 0o600)
+
+    result = subprocess.run(
+        ["wg-quick", "up", "wg0"],
+        capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
+    )
+    if result.returncode != 0:
+        return False, result.stderr.strip()
+
+    if killswitch_enabled:
+        subprocess.run(
+            [str(SCRIPT_KILLSWITCH)],
+            capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
+        )
+
+    return True, ""
 
 
 def http_client(

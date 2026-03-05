@@ -1,5 +1,43 @@
 # Changelog
 
+## v3.4.4 — Internal code quality pass (2026-03-05)
+
+### Refactoring
+- **Eliminated duplicated WireGuard activation logic** — `bring_up_wireguard_file()` is now
+  a single shared utility in `constants.py`. Previously the PostUp/PostDown strip + wg-quick
+  sequence existed independently in both `connect.py` and `watchdog.py`, with subtle divergence
+  in killswitch handling.
+- **Eliminated duplicated config-file enumeration** — `list_config_files()` moved to
+  `constants.py`; both `connect.py` and `watchdog.py` now share it.
+- **Provider metadata no longer allocates on every access** — `VPNProvider.get_meta()` is a
+  new classmethod that caches `ProviderMeta` per class. The previous pattern of
+  `cls.__new__(cls)` + `cls.meta.fget(instance)` appeared in 5 places; all replaced.
+- **Server cache refresh properly encapsulated** — `VPNProvider.refresh_cache()` is a new
+  base-class method. The server-list updater no longer reaches into `_server_cache`/
+  `_cache_time` from outside the class.
+- **Sidecar mode detection unified** — watchdog was checking `gluetun_url != default`,
+  status route was checking `vpn_provider == "gluetun"`. Both now use the same condition.
+- **`_select_server()` scores precomputed once** — previously scored each server 2N+1 times
+  (sort + top-score check + uniform check); now computed once and reused.
+- **qBittorrent API calls no longer block the event loop** — `do_qbt_pause/resume` converted
+  from blocking subprocess curl to async httpx. Same for the qBittorrent health check and
+  geo-IP check in the setup wizard.
+- **Setup wizard handles all WireGuard providers generically** — `setup_credentials()`
+  previously hardcoded `("mullvad", "ivpn")` for WireGuard credential validation. Now
+  checks `provider_meta.supports_wireguard` — NordVPN, Windscribe, Surfshark, AirVPN, etc.
+  correctly save private key + address through the wizard.
+- **PIA key exchange uses `self.WG_PORT`** — hardcoded `1337` in the URL replaced with
+  the class constant.
+- **`forwarded_port` setter accepts `None` to delete** — consistent with StateManager's
+  property pattern; `delete_forwarded_port()` delegates to it.
+- Deferred stdlib imports (`asyncio`, `shutil`, `subprocess`) moved to module level.
+
+### Tests
+- 709 passed (unchanged — test patches updated to follow `bring_up_wireguard_file`
+  moving from watchdog to constants)
+
+---
+
 ## v3.4.3 — Fix server selection bias + killswitch on rotate (2026-03-05)
 
 ### Bug fixes

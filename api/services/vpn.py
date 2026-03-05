@@ -38,9 +38,7 @@ def _discover_providers() -> dict[str, type[VPNProvider]]:
                 and hasattr(cls, "meta")
             ):
                 try:
-                    # Instantiate temporarily to read meta.id
-                    instance = cls.__new__(cls)
-                    meta = cls.meta.fget(instance)  # type: ignore[union-attr]
+                    meta = cls.get_meta()
                     providers[meta.id] = cls
                 except Exception:
                     log.warning("Failed to read meta from %s", cls.__name__, exc_info=True)
@@ -74,8 +72,7 @@ def get_all_provider_meta() -> list[dict]:
     result = []
     for provider_cls in PROVIDERS.values():
         try:
-            instance = provider_cls.__new__(provider_cls)
-            meta = provider_cls.meta.fget(instance)  # type: ignore[union-attr]
+            meta = provider_cls.get_meta()
             result.append({
                 "id": meta.id,
                 "name": meta.display_name,
@@ -129,29 +126,16 @@ async def refresh_provider_server_list(name: str) -> int:
     """Force-refresh the cached server list for a named provider.
 
     Bypasses TTL — intended for background auto-updater use only.
-    Returns count of servers refreshed, or 0 if provider has no instance or no list.
+    Only refreshes providers that have live instances (accessed at least once
+    this session). Returns count of servers refreshed, or 0 otherwise.
     """
-    from datetime import datetime, timezone
-
     provider = _instances.get(name)
     if provider is None:
         return 0
-
-    try:
-        meta = provider.meta
-        if not meta.supports_server_list:
-            return 0
-    except Exception:
-        return 0
-
-    try:
-        servers = await provider._fetch_servers()
-        provider._server_cache = servers
-        provider._cache_time = datetime.now(timezone.utc)
-        return len(servers)
-    except Exception:
-        log.warning("Server list refresh failed for %s", name, exc_info=True)
-        return 0
+    count = await provider.refresh_cache()
+    if count == 0 and provider.meta.supports_server_list:
+        log.warning("Server list refresh returned 0 for %s", name)
+    return count
 
 
 def get_server_list_providers() -> list[str]:
@@ -159,9 +143,7 @@ def get_server_list_providers() -> list[str]:
     result = []
     for name, cls in PROVIDERS.items():
         try:
-            instance = cls.__new__(cls)
-            meta = cls.meta.fget(instance)  # type: ignore[union-attr]
-            if meta.supports_server_list:
+            if cls.get_meta().supports_server_list:
                 result.append(name)
         except Exception:
             pass

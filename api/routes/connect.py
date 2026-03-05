@@ -5,16 +5,16 @@ Two rotation modes:
 2. Config-file rotation: drop multiple .conf/.ovpn files, we pick randomly
 """
 
+import asyncio
 import os
 import random
+import shutil
 import subprocess
-from pathlib import Path
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from api.constants import (
-    OPENVPN_DIR,
     SCRIPT_INIT_VPN,
     SCRIPT_KILLSWITCH,
     SUBPROCESS_TIMEOUT_DEFAULT,
@@ -26,14 +26,18 @@ from api.constants import (
     WG_RUNTIME_DIR,
     WIREGUARD_DIR,
     activate_wg_config,
+    bring_up_wireguard_file,
+    list_config_files,
 )
-from api.services.providers.base import ConnectError, ServerFilter
+from api.services.providers.base import ConnectError, ServerFilter, ServerInfo
 from api.services.state import StateManager
 from api.services.vpn import get_provider
 from api.services.history import log_event
 from api.routes.events import broadcast
 
 router = APIRouter()
+
+# list_config_files() lives in constants — imported above. No local duplicate.
 
 
 class ConnectRequest(BaseModel):
@@ -59,17 +63,6 @@ class ConnectResponse(BaseModel):
     error: str = ""
 
 
-def _list_config_files() -> list[Path]:
-    """Find all VPN config files for rotation."""
-    files: list[Path] = []
-    if WIREGUARD_DIR.exists():
-        files.extend(WIREGUARD_DIR.glob("*.conf"))
-    if OPENVPN_DIR.exists():
-        files.extend(OPENVPN_DIR.glob("*.ovpn"))
-        files.extend(OPENVPN_DIR.glob("*.conf"))
-    return sorted(files)
-
-
 @router.post("/vpn/connect", response_model=ConnectResponse)
 async def connect_to_server(body: ConnectRequest, request: Request):
     """Connect to a VPN server.
@@ -87,7 +80,7 @@ async def connect_to_server(body: ConnectRequest, request: Request):
         return await _connect_provider(body, provider, state_mgr, config)
 
     # --- Config-file rotation (custom/other providers) ---
-    configs = _list_config_files()
+    configs = list_config_files()
     if not configs:
         return ConnectResponse(success=False, error="No VPN config files found")
 
@@ -141,7 +134,7 @@ async def rotate_server(request: Request):
 @router.get("/vpn/configs")
 async def list_configs(request: Request):
     """List available VPN config files (for config-file rotation)."""
-    configs = _list_config_files()
+    configs = list_config_files()
     active = request.app.state.state.active_config
 
     return {
@@ -164,7 +157,7 @@ async def list_configs(request: Request):
 @router.post("/vpn/configs/{name}/activate", response_model=ConnectResponse)
 async def activate_config(name: str, request: Request):
     """Switch VPN to a specific config file by name."""
-    configs = _list_config_files()
+    configs = list_config_files()
     matching = [f for f in configs if f.name == name]
     if not matching:
         return ConnectResponse(success=False, error=f"Config '{name}' not found")
@@ -176,34 +169,11 @@ async def activate_config(name: str, request: Request):
 
     try:
         if vpn_type == "wireguard":
-            # Read config, strip PostUp/PostDown (we manage routing)
-            content = config_file.read_text()
-            clean_lines = [
-                line for line in content.splitlines()
-                if not line.strip().lower().startswith(("postup", "postdown"))
-            ]
-
-            subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
-
-            WG_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
-            WG_RUNTIME_CONF.write_text("\n".join(clean_lines))
-            os.chmod(WG_RUNTIME_CONF, 0o600)
-
-            result = subprocess.run(
-                ["wg-quick", "up", "wg0"],
-                capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
-            )
-            if result.returncode != 0:
-                return ConnectResponse(success=False, error=result.stderr.strip())
-
-            if config.killswitch_enabled:
-                subprocess.run(
-                    [str(SCRIPT_KILLSWITCH)],
-                    capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
-                )
+            ok, err = bring_up_wireguard_file(config_file, killswitch_enabled=config.killswitch_enabled)
+            if not ok:
+                return ConnectResponse(success=False, error=err)
         else:
             subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
-            import asyncio
             await asyncio.sleep(2)
             result = subprocess.run(
                 [str(SCRIPT_INIT_VPN)],
@@ -223,7 +193,7 @@ async def activate_config(name: str, request: Request):
         return ConnectResponse(success=False, error=str(e))
 
 
-def _select_server(servers, exclude_hostname: str = ""):
+def _select_server(servers: list[ServerInfo], exclude_hostname: str = "") -> ServerInfo:
     """Score servers by load and speed; pick randomly from the top tier.
 
     Scoring:
@@ -236,8 +206,6 @@ def _select_server(servers, exclude_hostname: str = ""):
     If the current server is the only option (e.g. forced by country/city
     filter), it's allowed through so the caller doesn't get stuck.
     """
-    from api.services.providers.base import ServerInfo
-
     candidates = [s for s in servers if s.hostname != exclude_hostname]
     if not candidates:
         candidates = list(servers)
@@ -248,16 +216,18 @@ def _select_server(servers, exclude_hostname: str = ""):
         speed_score = min((s.speed_gbps or 0) / 20.0, 1.0)
         return load_score * 0.7 + speed_score * 0.3
 
-    ranked = sorted(candidates, key=_score, reverse=True)
+    # Precompute scores once — sort + uniform check reuse the same values.
+    scored = [(s, _score(s)) for s in candidates]
+    scored.sort(key=lambda x: x[1], reverse=True)
 
     # If all scores are equal (e.g. provider doesn't expose load), the top-N
     # cut would just be the first N alphabetically — pick from the full pool.
-    top_score = _score(ranked[0])
-    if all(_score(s) == top_score for s in ranked):
-        return random.choice(ranked)
+    top_score = scored[0][1]
+    if all(score == top_score for _, score in scored):
+        return random.choice(candidates)
 
-    pool_size = max(5, min(25, len(ranked) // 5))
-    return random.choice(ranked[:pool_size])
+    pool_size = max(5, min(25, len(scored) // 5))
+    return random.choice([s for s, _ in scored[:pool_size]])
 
 
 async def _connect_provider(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:
@@ -344,7 +314,6 @@ async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
             # init-vpn.sh only runs once at startup; rotate/connect write to
             # /config/wireguard/wg0.conf which wg-quick doesn't read directly.
             if WG_CONF_PATH.exists():
-                import shutil
                 WG_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(WG_CONF_PATH, WG_RUNTIME_CONF)
                 os.chmod(WG_RUNTIME_CONF, 0o600)
@@ -362,7 +331,6 @@ async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
         elif vpn_type == "openvpn":
             subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
             # Give it a moment to clean up
-            import asyncio
             await asyncio.sleep(2)
             # Re-run killswitch before starting daemon so nftables allows the
             # new server's endpoint. OpenVPN reads endpoint from the config

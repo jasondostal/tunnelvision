@@ -389,8 +389,8 @@ class TestConfigActivation:
             return MagicMock(returncode=0, stdout="", stderr="")
 
         with patch("subprocess.run", side_effect=mock_run), \
-             patch("api.services.watchdog.WG_RUNTIME_CONF", wg_conf), \
-             patch("api.services.watchdog.WG_RUNTIME_DIR", wg_dir), \
+             patch("api.constants.WG_RUNTIME_CONF", wg_conf), \
+             patch("api.constants.WG_RUNTIME_DIR", wg_dir), \
              patch("os.chmod"), \
              patch.object(watchdog, "_check_vpn_health", return_value=True):
 
@@ -417,8 +417,8 @@ class TestConfigActivation:
             return MagicMock(returncode=0, stdout="", stderr="")
 
         with patch("subprocess.run", side_effect=mock_run), \
-             patch("api.services.watchdog.WG_RUNTIME_CONF", wg_conf), \
-             patch("api.services.watchdog.WG_RUNTIME_DIR", wg_dir), \
+             patch("api.constants.WG_RUNTIME_CONF", wg_conf), \
+             patch("api.constants.WG_RUNTIME_DIR", wg_dir), \
              patch("os.chmod"), \
              patch.object(watchdog, "_check_vpn_health", return_value=True):
             await watchdog._activate_config(config_file)

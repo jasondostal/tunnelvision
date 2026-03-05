@@ -1,12 +1,11 @@
 """Health endpoint — comprehensive container health."""
 
-import subprocess
 import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
-from api.constants import HealthState, ServiceState, SUBPROCESS_TIMEOUT_QUICK, VpnState
+from api.constants import HealthState, ServiceState, TIMEOUT_QUICK, VpnState, http_client
 from api.models import HealthResponse
 
 router = APIRouter()
@@ -38,12 +37,9 @@ async def health_check(request: Request):
     # Check qBittorrent (if enabled)
     if config.qbt_enabled:
         try:
-            result = subprocess.run(
-                ["curl", "-sf", "-o", "/dev/null", "--max-time", "3",
-                 f"http://localhost:{config.webui_port}"],
-                capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK,
-            )
-            qbt_state = ServiceState.RUNNING if result.returncode == 0 else "stopped"
+            async with http_client(timeout=TIMEOUT_QUICK) as client:
+                resp = await client.get(f"http://localhost:{config.webui_port}")
+            qbt_state = ServiceState.RUNNING if resp.status_code < 500 else "stopped"
         except Exception:
             qbt_state = "stopped"
     else:

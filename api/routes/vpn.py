@@ -21,6 +21,7 @@ async def vpn_status(request: Request):
     state_mgr = request.app.state.state
 
     # Sidecar mode: read all VPN state from gluetun
+    gluetun = None
     if config.vpn_provider == "gluetun":
         from api.services.providers.gluetun import GluetunProvider
         gluetun = GluetunProvider(config)
@@ -87,9 +88,7 @@ async def vpn_status(request: Request):
 
     # Port forwarding (PIA or gluetun)
     forwarded_port = None
-    if config.vpn_provider == "gluetun":
-        from api.services.providers.gluetun import GluetunProvider
-        gluetun = GluetunProvider(config)
+    if gluetun is not None:
         forwarded_port = await gluetun.get_forwarded_port()
     else:
         pf_str = state_mgr.forwarded_port

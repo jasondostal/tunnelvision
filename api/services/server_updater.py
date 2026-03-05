@@ -64,6 +64,9 @@ class ServerListUpdater:
     async def _refresh_all(self):
         from api.services.vpn import get_server_list_providers, refresh_provider_server_list
 
+        # Only refreshes providers that have live singleton instances — i.e. the
+        # active provider has been used at least once this session. Providers that
+        # support server lists but haven't been accessed yet are skipped (count=0).
         providers = get_server_list_providers()
         for name in providers:
             count = await refresh_provider_server_list(name)

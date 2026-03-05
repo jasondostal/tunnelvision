@@ -108,11 +108,14 @@ class StateManager:
         return self.read("forwarded_port")
 
     @forwarded_port.setter
-    def forwarded_port(self, value: str) -> None:
-        self.write("forwarded_port", value)
+    def forwarded_port(self, value: str | None) -> None:
+        if value is None:
+            self.delete("forwarded_port")
+        else:
+            self.write("forwarded_port", value)
 
     def delete_forwarded_port(self) -> None:
-        self.delete("forwarded_port")
+        self.forwarded_port = None
 
     # --- Killswitch ---
 

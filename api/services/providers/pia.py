@@ -15,6 +15,7 @@ Endpoints used:
 """
 
 import ssl
+import subprocess
 from datetime import datetime, timezone
 
 from api.constants import PIA_TOKEN_CACHE_TTL, TIMEOUT_FETCH, http_client
@@ -125,7 +126,6 @@ class PIAProvider(VPNProvider):
 
     async def resolve_connect(self, server: ServerInfo, config) -> PeerConfig:
         """PIA: authenticate, generate ephemeral WG keys, exchange with server."""
-        import subprocess as _sp
         from api.constants import SUBPROCESS_TIMEOUT_QUICK
 
         token = await self.get_token()
@@ -138,9 +138,9 @@ class PIAProvider(VPNProvider):
 
         # Generate ephemeral WireGuard keypair
         try:
-            privkey_result = _sp.run(["wg", "genkey"], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
+            privkey_result = subprocess.run(["wg", "genkey"], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
             private_key = privkey_result.stdout.strip()
-            pubkey_result = _sp.run(["wg", "pubkey"], input=private_key, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
+            pubkey_result = subprocess.run(["wg", "pubkey"], input=private_key, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
             public_key = pubkey_result.stdout.strip()
         except Exception as e:
             raise ConnectError(f"Key generation failed: {e}")
@@ -149,7 +149,7 @@ class PIAProvider(VPNProvider):
         try:
             async with http_client(verify=False) as client:
                 resp = await client.get(
-                    f"https://{server_ip}:1337/addKey",
+                    f"https://{server_ip}:{self.WG_PORT}/addKey",
                     params={"pt": token, "pubkey": public_key},
                 )
                 resp.raise_for_status()

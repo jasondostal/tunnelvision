@@ -1,7 +1,7 @@
 """Setup wizard API — first-run configuration flow."""
 
+import asyncio
 import base64
-import json
 import os
 import re
 import subprocess
@@ -18,6 +18,7 @@ from api.constants import (
     SUBPROCESS_TIMEOUT_DEFAULT,
     SUBPROCESS_TIMEOUT_LONG,
     SUBPROCESS_TIMEOUT_QUICK,
+    TIMEOUT_FETCH,
     WG_CONF_PATH,
     WIREGUARD_DIR,
     activate_wg_config,
@@ -212,19 +213,16 @@ async def upload_wireguard_config(body: WireGuardConfigRequest):
     return {"success": True, "path": str(WG_CONF_PATH), "next": "needs_verify"}
 
 
-def _geo_ip_check() -> tuple[str, str, str]:
-    """Run a geo-IP check and return (public_ip, country, city). Empty strings on failure."""
-    ip_result = subprocess.run(
-        ["curl", "-sf", "--max-time", "8", "https://ipwho.is/"],
-        capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG,
-    )
-    if ip_result.returncode == 0:
-        try:
-            data = json.loads(ip_result.stdout)
-            return data.get("ip", ""), data.get("country", ""), data.get("city", "")
-        except json.JSONDecodeError:
-            pass
-    return "", "", ""
+async def _geo_ip_check() -> tuple[str, str, str]:
+    """Geo-IP check — returns (public_ip, country, city). Empty strings on failure."""
+    try:
+        async with http_client(timeout=TIMEOUT_FETCH) as client:
+            resp = await client.get("https://ipwho.is/")
+            resp.raise_for_status()
+            data = resp.json()
+        return data.get("ip", ""), data.get("country", ""), data.get("city", "")
+    except Exception:
+        return "", "", ""
 
 
 @router.post("/setup/generate-keypair")
@@ -308,7 +306,7 @@ async def _verify_wireguard() -> VerifyResponse:
                 error=f"WireGuard failed to start: {result.stderr.strip()}"
             )
 
-        public_ip, country, city = _geo_ip_check()
+        public_ip, country, city = await _geo_ip_check()
 
         # Always tear down — setup/complete will bring it up for real
         subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
@@ -354,7 +352,6 @@ async def _verify_openvpn() -> VerifyResponse:
         subprocess.run(cmd, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG)
 
         # Poll for tun0 (up to 30s)
-        import asyncio
         tun_up = False
         for _ in range(30):
             check = subprocess.run(["ip", "link", "show", "tun0"], capture_output=True)
@@ -370,7 +367,7 @@ async def _verify_openvpn() -> VerifyResponse:
                 error="OpenVPN started but tun0 interface never appeared — check your config",
             )
 
-        public_ip, country, city = _geo_ip_check()
+        public_ip, country, city = await _geo_ip_check()
         _teardown()
 
         if not public_ip:
@@ -388,26 +385,14 @@ async def _verify_openvpn() -> VerifyResponse:
 @router.post("/setup/credentials", response_model=CredentialsResponse)
 async def setup_credentials(body: CredentialsRequest, request: Request):
     """Validate and persist provider-specific credentials."""
+    from api.services.vpn import PROVIDERS
+
     provider = body.provider.lower()
     state_mgr: StateManager = request.app.state.state
     state_mgr.setup_provider = provider
 
-    if provider in ("mullvad", "ivpn"):
-        err = _validate_wireguard_creds(body)
-        if err:
-            return err
-
-        settings: dict = {
-            "vpn_provider": provider,
-            "wireguard_private_key": body.private_key.strip(),  # type: ignore[union-attr]
-            "wireguard_addresses": body.addresses.strip(),  # type: ignore[union-attr]
-        }
-        if body.dns:
-            settings["vpn_dns"] = body.dns.strip()
-        save_settings(settings)
-        return CredentialsResponse(success=True, next="server")
-
-    elif provider == "pia":
+    # PIA: unique token-exchange auth flow
+    if provider == "pia":
         err = await _validate_pia_creds(body)
         if err:
             return err
@@ -420,21 +405,42 @@ async def setup_credentials(body: CredentialsRequest, request: Request):
         })
         return CredentialsResponse(success=True, next="server")
 
-    elif provider == "gluetun":
+    # Gluetun sidecar
+    if provider == "gluetun":
         err = await _validate_gluetun(body)
         if err:
             return err
 
         url = (body.gluetun_url or GLUETUN_DEFAULT_URL).rstrip("/")
-        settings = {"vpn_provider": "gluetun", "gluetun_url": url}
+        settings: dict = {"vpn_provider": "gluetun", "gluetun_url": url}
         if body.gluetun_api_key:
             settings["gluetun_api_key"] = body.gluetun_api_key
         save_settings(settings)
         return CredentialsResponse(success=True, next="done")
 
-    else:
-        save_settings({"vpn_provider": provider})
-        return CredentialsResponse(success=True, next="config")
+    # WireGuard ACCOUNT providers — any provider with supports_wireguard=True
+    # (Mullvad, IVPN, NordVPN, Windscribe, Surfshark, AirVPN, etc.)
+    provider_cls = PROVIDERS.get(provider)
+    if provider_cls is not None:
+        meta = provider_cls.get_meta()
+        if meta.supports_wireguard:
+            err = _validate_wireguard_creds(body)
+            if err:
+                return err
+
+            settings = {
+                "vpn_provider": provider,
+                "wireguard_private_key": body.private_key.strip(),  # type: ignore[union-attr]
+                "wireguard_addresses": body.addresses.strip(),  # type: ignore[union-attr]
+            }
+            if body.dns:
+                settings["vpn_dns"] = body.dns.strip()
+            save_settings(settings)
+            return CredentialsResponse(success=True, next="server")
+
+    # PASTE / OPENVPN providers — just persist provider selection
+    save_settings({"vpn_provider": provider})
+    return CredentialsResponse(success=True, next="config")
 
 
 @router.post("/setup/server")

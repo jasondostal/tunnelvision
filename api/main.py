@@ -80,8 +80,6 @@ app.add_middleware(
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     """Authentication: local login, proxy header bypass, or API key."""
-    from api.routes.auth import check_auth
-
     config = getattr(request.app.state, "config", None)
     if not config:
         return await call_next(request)
@@ -105,7 +103,7 @@ async def auth_middleware(request: Request, call_next):
 
     # Check login auth (proxy header, session cookie)
     if config.login_required:
-        user = check_auth(request)
+        user = auth.check_auth(request)
         if user is None:
             return JSONResponse(status_code=401, content={"detail": "Authentication required"})
 

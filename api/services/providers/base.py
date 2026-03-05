@@ -201,6 +201,18 @@ class VPNProvider(ABC):
         """Provider metadata — capabilities, credentials, setup type."""
         ...
 
+    @classmethod
+    def get_meta(cls) -> ProviderMeta:
+        """Get provider metadata without requiring a full instance.
+
+        Caches the result per class — ProviderMeta is immutable and
+        constructed identically on every call, no need to reallocate.
+        """
+        if "_meta_cache" not in cls.__dict__:
+            instance = cls.__new__(cls)
+            cls._meta_cache = cls.meta.fget(instance)  # type: ignore[union-attr]
+        return cls._meta_cache  # type: ignore[attr-defined]
+
     @abstractmethod
     async def check_connection(self) -> ConnectionCheck:
         """Verify VPN connection and get public IP info."""
@@ -291,6 +303,22 @@ class VPNProvider(ABC):
 
     async def post_connect(self, server: ServerInfo, config, peer: PeerConfig) -> None:
         """Optional post-connect actions (port forwarding, etc.)."""
+
+    async def refresh_cache(self) -> int:
+        """Force-refresh the server list cache, bypassing TTL.
+
+        Returns the number of servers fetched, or 0 if unsupported / failed.
+        Intended for the background server-list updater.
+        """
+        if not self.meta.supports_server_list:
+            return 0
+        try:
+            servers = await self._fetch_servers()
+            self._server_cache = servers
+            self._cache_time = datetime.now(timezone.utc)
+            return len(servers)
+        except Exception:
+            return 0
 
     async def _fetch_servers(self) -> list[ServerInfo]:
         """Fetch the raw server list from the provider API.

@@ -18,7 +18,9 @@ from api.constants import (
     SUBPROCESS_TIMEOUT_LONG,
     SUBPROCESS_TIMEOUT_QUICK,
     SUBPROCESS_TIMEOUT_VPN,
+    TIMEOUT_QUICK,
     VpnState,
+    http_client,
 )
 from api.routes.events import broadcast
 from api.services.state import StateManager
@@ -124,12 +126,19 @@ def do_qbt_restart(config: Config) -> ActionResponse:
     )
 
 
-def do_qbt_pause(config: Config) -> ActionResponse:
+async def do_qbt_pause(config: Config) -> ActionResponse:
     if not config.qbt_enabled:
         return ActionResponse(success=False, action="qbt_pause", error="qBittorrent is disabled")
-    ok, msg = _run(["curl", "-sf", "-X", "POST",
-                     f"http://localhost:{config.webui_port}/api/v2/torrents/pause",
-                     "-d", "hashes=all"])
+    try:
+        async with http_client(timeout=TIMEOUT_QUICK) as client:
+            resp = await client.post(
+                f"http://localhost:{config.webui_port}/api/v2/torrents/pause",
+                data={"hashes": "all"},
+            )
+        ok = resp.status_code == 200
+        msg = "" if ok else resp.text
+    except Exception as e:
+        ok, msg = False, str(e)
     return ActionResponse(
         success=ok,
         action="qbt_pause",
@@ -138,12 +147,19 @@ def do_qbt_pause(config: Config) -> ActionResponse:
     )
 
 
-def do_qbt_resume(config: Config) -> ActionResponse:
+async def do_qbt_resume(config: Config) -> ActionResponse:
     if not config.qbt_enabled:
         return ActionResponse(success=False, action="qbt_resume", error="qBittorrent is disabled")
-    ok, msg = _run(["curl", "-sf", "-X", "POST",
-                     f"http://localhost:{config.webui_port}/api/v2/torrents/resume",
-                     "-d", "hashes=all"])
+    try:
+        async with http_client(timeout=TIMEOUT_QUICK) as client:
+            resp = await client.post(
+                f"http://localhost:{config.webui_port}/api/v2/torrents/resume",
+                data={"hashes": "all"},
+            )
+        ok = resp.status_code == 200
+        msg = "" if ok else resp.text
+    except Exception as e:
+        ok, msg = False, str(e)
     return ActionResponse(
         success=ok,
         action="qbt_resume",
@@ -187,10 +203,10 @@ async def qbt_restart(request: Request):
 @router.post("/qbt/pause", response_model=ActionResponse)
 async def qbt_pause_all(request: Request):
     """Pause all torrents."""
-    return do_qbt_pause(request.app.state.config)
+    return await do_qbt_pause(request.app.state.config)
 
 
 @router.post("/qbt/resume", response_model=ActionResponse)
 async def qbt_resume_all(request: Request):
     """Resume all torrents."""
-    return do_qbt_resume(request.app.state.config)
+    return await do_qbt_resume(request.app.state.config)
