@@ -1,5 +1,27 @@
 # Changelog
 
+## v3.4.3 — Fix server selection bias + killswitch on rotate (2026-03-05)
+
+### Bug fixes
+- **Rotate now picks genuinely random servers** — when a provider returns no load data
+  (Mullvad: `load=null` for all 567 servers), all scores were equal and Python's stable
+  sort meant the "top 5" was always the first 5 alphabetically (Albania + Argentina every
+  time). Fixed: uniform scores now pick from the full candidate pool. Pool size is also
+  dynamic — 20% of candidates, min 5, max 25 — rather than a hard-coded 5.
+- **Speed normalization cap raised to 20 Gbps** — providers with 10 and 20 Gbps tiers
+  were both capping at 1.0 (10 Gbps was the old ceiling), making speed useless as a
+  signal. 20 Gbps = max now differentiates the tiers.
+- **Killswitch no longer blocks WireGuard handshake after rotate/reconnect** *(from v3.4.2)*
+  — `_reconnect_vpn` now re-runs `init-killswitch.sh` after `wg-quick up` so nftables
+  allows the new server's endpoint. Previously the old server's IP was locked in, silently
+  dropping all handshake packets (interface up, 0 B received).
+
+### Tests
+- `test_uniform_scores_pick_from_full_pool` — verifies >5 distinct servers appear across
+  200 rotations when all scores are equal
+
+---
+
 ## v3.4.2 — Fix killswitch blocking rotate/reconnect (2026-03-05)
 
 ### Bug fix
