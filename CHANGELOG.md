@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Bug fixes
+- **Sidecar mode watchdog**: health check was hitting `/v1/openvpn/status` — gluetun's
+  unified status endpoint is `/v1/vpn/status`. Every sidecar health check was returning
+  `unknown` (404) and being treated as a failure. Fixed.
+
+### Documentation
+- **Gluetun provider docstring**: removed misleading "inherits all 30+ providers" claim.
+  Sidecar mode reads gluetun's status — it does not inherit gluetun's provider logic.
+- **Sidecar → native migration guide**: README "Migrating from other setups" now includes
+  a step-by-step guide for moving from sidecar mode to a fully native TunnelVision setup
+  (required capabilities, credentials, removing gluetun from the stack).
+- **Sidecar mode positioning**: clarified that sidecar mode is an evaluation/parallel lane
+  (read-only monitoring) rather than an intermediate adoption step. Gluetun remains in
+  charge of the tunnel; TunnelVision adds dashboard, HA, Prometheus, and webhooks on top.
+
+---
+
 ## v3.4.9 — Code quality + CI security pipeline (2026-03-05)
 
 ### Code quality

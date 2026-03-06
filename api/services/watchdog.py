@@ -213,7 +213,7 @@ class WatchdogService:
                 if self.config.gluetun_api_key:
                     headers["X-API-Key"] = self.config.gluetun_api_key
                 resp = await client.get(
-                    f"{self.config.gluetun_url}/v1/openvpn/status",
+                    f"{self.config.gluetun_url}/v1/vpn/status",
                     headers=headers,
                 )
                 if resp.status_code == 200:

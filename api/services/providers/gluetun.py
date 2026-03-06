@@ -1,7 +1,8 @@
 """Gluetun sidecar provider — reads VPN state from gluetun's control server.
 
 TunnelVision becomes the observability layer; gluetun handles the tunnel.
-Inherits all 30+ providers that gluetun supports.
+Works alongside any gluetun-managed VPN — TunnelVision adds the dashboard,
+API, Home Assistant integration, and monitoring without touching the tunnel.
 
 Endpoints used:
 - http://<gluetun>:8000/v1/vpn/status — VPN running/stopped

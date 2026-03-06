@@ -367,7 +367,26 @@ Interactive docs at `http://localhost:8081/api/docs` (Swagger) when running.
 
 **From a separate VPN container + qBittorrent:** Copy your qBittorrent config and WireGuard/OpenVPN config, point the volumes, done. TunnelVision manages the tunnel, the killswitch, and qBittorrent in a single container.
 
-**Not ready for a full switch?** TunnelVision can also run in **sidecar mode** alongside your existing VPN container — it adds the dashboard, API, Home Assistant integration, and monitoring without touching your tunnel. Set `VPN_PROVIDER=gluetun` and point `GLUETUN_URL` at your existing container's API. Try it risk-free, migrate when you're ready.
+**Not ready for a full switch?** TunnelVision can run in **sidecar mode** alongside your existing gluetun container — it adds the dashboard, API, Home Assistant integration, and Prometheus metrics without touching your tunnel. Set `VPN_PROVIDER=gluetun` and point `GLUETUN_URL` at your existing container's API.
+
+In sidecar mode, TunnelVision is read-only: it monitors your VPN's state and surfaces it everywhere (HA, Prometheus, dashboard, webhooks), but gluetun remains in charge of the tunnel and reconnection. It's an evaluation lane — run them side-by-side with zero risk while you decide if you want to go fully native.
+
+**When you're ready to go native** (TunnelVision manages the tunnel directly):
+
+1. Make sure your provider is on the [native provider list](#native-providers). If not, use `VPN_PROVIDER=custom` with your own config file.
+2. Add the required Docker capabilities to your TunnelVision service:
+   ```yaml
+   cap_add:
+     - NET_ADMIN
+   devices:
+     - /dev/net/tun
+   sysctls:
+     - net.ipv4.conf.all.src_valid_mark=1
+     - net.ipv6.conf.all.disable_ipv6=1
+   ```
+3. Set `VPN_PROVIDER` to your provider (e.g. `mullvad`, `pia`, `custom`) and configure credentials.
+4. Remove gluetun from your stack (or keep it running other containers — TunnelVision is now independent).
+5. Restart. TunnelVision takes over the tunnel, killswitch, auto-reconnect, and rotation.
 
 **From Trigus42/qbittorrentvpn:** Same config structure — mount `/config` and `/config/wireguard` the same way.
 
