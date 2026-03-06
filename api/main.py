@@ -4,8 +4,6 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-log = logging.getLogger(__name__)
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,6 +13,8 @@ from api import __version__
 from api.config import load_config
 from api.services.state import StateManager
 from api.routes import auth, health, vpn, qbt, system, config as config_routes, provider, setup, connect, metrics, control, settings, speedtest, backup, events
+
+log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
