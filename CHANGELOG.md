@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+---
+
+## v3.5.0 — Security hardening + bug fixes (2026-03-06)
+
 ### Security
 - **`TRUSTED_PROXY_IPS` — reverse proxy auth hardening**: `AUTH_PROXY_HEADER` previously
   accepted the configured header from any client on an allowed network. Any LAN host could

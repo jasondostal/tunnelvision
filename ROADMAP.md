@@ -18,6 +18,7 @@ What's coming. No promises on timelines — this is built for the love of blinke
 
 ## Done
 
+- [x] Security hardening — `TRUSTED_PROXY_IPS` CIDR validation for reverse proxy auth, wizard fixes (PASTE providers, Mullvad account, gluetun endpoint) (v3.5.0)
 - [x] Code quality pass + CI security pipeline — 8-tool lint gate, Trivy container scan, full type safety (v3.4.9)
 - [x] Shadowsocks AEAD proxy server, settings panel UX overhaul — toggles, collapsible sections, number inputs (v3.4.8)
 - [x] Server rotation geographic diversity, no-filter random country selection (v3.4.7)
