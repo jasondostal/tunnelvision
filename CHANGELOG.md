@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Security
+- **`TRUSTED_PROXY_IPS` — reverse proxy auth hardening**: `AUTH_PROXY_HEADER` previously
+  accepted the configured header from any client on an allowed network. Any LAN host could
+  forge `Remote-User: admin` and bypass authentication. `TRUSTED_PROXY_IPS` (IP or CIDR,
+  comma-separated) restricts which source IPs can set the proxy header — all other sources
+  have the header silently ignored. This is the standard pattern used by Traefik, Gitea,
+  and Grafana for trusted proxy authentication.
+  - If `AUTH_PROXY_HEADER` is set without `TRUSTED_PROXY_IPS`: startup warning logged,
+    `security_warnings` array populated in `GET /api/v1/health`, behavior unchanged
+    (backward compatible).
+  - New env var: `TRUSTED_PROXY_IPS` (e.g. `172.20.0.2` or `172.20.0.0/16`).
+  - `HealthResponse` gains a `security_warnings: list[str]` field — currently reports
+    the proxy auth misconfiguration; extensible for future checks.
+
 ### Bug fixes
 - **Sidecar mode watchdog**: health check was hitting `/v1/openvpn/status` — gluetun's
   unified status endpoint is `/v1/vpn/status`. Every sidecar health check was returning

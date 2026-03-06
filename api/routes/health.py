@@ -66,6 +66,15 @@ async def health_check(request: Request):
     except Exception:
         pass
 
+    # Security misconfiguration warnings
+    security_warnings: list[str] = []
+    if config.auth_proxy_header and not config.trusted_proxy_ips:
+        security_warnings.append(
+            f"AUTH_PROXY_HEADER='{config.auth_proxy_header}' is set without TRUSTED_PROXY_IPS — "
+            "any client on an allowed network can forge this header and bypass authentication. "
+            "Set TRUSTED_PROXY_IPS to your reverse proxy IP/CIDR."
+        )
+
     return HealthResponse(
         healthy=healthy,
         vpn=vpn_state,
@@ -77,4 +86,5 @@ async def health_check(request: Request):
         uptime_seconds=round(uptime, 1),
         checked_at=datetime.now(timezone.utc),
         watchdog=watchdog_snapshot,
+        security_warnings=security_warnings,
     )

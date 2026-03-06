@@ -1,7 +1,10 @@
 """TunnelVision REST API — the visibility layer."""
 
+import logging
 import time
 from contextlib import asynccontextmanager
+
+log = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +30,17 @@ async def lifespan(app: FastAPI):
     app.state.config = load_config()
     app.state.state = StateManager()
     app.state.started_at = time.time()
+
+    # Security: warn if proxy auth header is configured without source IP restriction
+    cfg = app.state.config
+    if cfg.auth_proxy_header and not cfg.trusted_proxy_ips:
+        log.warning(
+            "SECURITY: AUTH_PROXY_HEADER='%s' is set without TRUSTED_PROXY_IPS. "
+            "Any client on an allowed network can forge this header and bypass authentication. "
+            "Set TRUSTED_PROXY_IPS to the IP or CIDR of your reverse proxy (e.g. 172.20.0.2).",
+            cfg.auth_proxy_header,
+        )
+        app.state.state.write("security_warning", "auth_proxy_header_no_trusted_ips")
 
     # Start MQTT if configured
     mqtt_svc = get_mqtt_service(app.state.config, app.state.state)

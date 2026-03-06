@@ -20,6 +20,7 @@ class HealthResponse(BaseModel):
     uptime_seconds: float = 0
     checked_at: datetime
     watchdog: dict | None = Field(None, description="Watchdog state snapshot")
+    security_warnings: list[str] = Field(default_factory=list, description="Active security misconfigurations")
 
 
 class VPNStatusResponse(BaseModel):

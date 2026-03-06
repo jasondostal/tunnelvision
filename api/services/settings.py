@@ -42,6 +42,7 @@ CONFIGURABLE_FIELDS = {
     "admin_user": {"env": "ADMIN_USER", "default": "", "secret": False},
     "admin_pass": {"env": "ADMIN_PASS", "default": "", "secret": True},
     "auth_proxy_header": {"env": "AUTH_PROXY_HEADER", "default": "", "secret": False},
+    "trusted_proxy_ips": {"env": "TRUSTED_PROXY_IPS", "default": "", "secret": False},
     "api_key": {"env": "API_KEY", "default": "", "secret": True},
     "health_check_interval": {"env": "HEALTH_CHECK_INTERVAL", "default": str(HEALTH_CHECK_INTERVAL), "secret": False},
     "vpn_provider": {"env": "VPN_PROVIDER", "default": "custom", "secret": False},

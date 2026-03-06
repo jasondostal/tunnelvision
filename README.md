@@ -195,9 +195,27 @@ Off by default. Three layers, all optional, all additive:
 | **None** (default) | *(nothing set)* | Everything open |
 | **API key** | `API_KEY` | `X-API-Key` header for programmatic access (Homepage, HACS, Prometheus) |
 | **Local login** | `ADMIN_USER` + `ADMIN_PASS` | Login form in the dashboard, session cookie |
-| **Proxy bypass** | `AUTH_PROXY_HEADER` | Trusted header from your reverse proxy (Authentik, Authelia, Traefik, nginx) — skips the login form |
+| **Proxy bypass** | `AUTH_PROXY_HEADER` + `TRUSTED_PROXY_IPS` | Trusted header from your reverse proxy — skips the login form for already-authenticated users |
 
-Set `AUTH_PROXY_HEADER=Remote-User` (or `X-Forwarded-User`, whatever your proxy sends) and users authenticated by your reverse proxy get straight through. Direct users see the login form. API key always works for machine-to-machine.
+### Reverse proxy SSO (Authentik, Authelia, Traefik, nginx)
+
+When your reverse proxy authenticates users and forwards a header like `Remote-User`, TunnelVision can trust it and skip the login form:
+
+```yaml
+environment:
+  - AUTH_PROXY_HEADER=Remote-User          # header your proxy sends
+  - TRUSTED_PROXY_IPS=172.20.0.2          # your Traefik/proxy container IP or CIDR
+  - ADMIN_USER=admin                       # still required for login_required mode
+  - ADMIN_PASS=changeme
+```
+
+**`TRUSTED_PROXY_IPS` is required for secure deployments.** Without it, any client on an allowed network can forge the `Remote-User` header and bypass authentication — because HTTP headers are trivially spoofable. `TRUSTED_PROXY_IPS` restricts which source IPs can set the proxy header; requests from any other IP have the header ignored.
+
+If `AUTH_PROXY_HEADER` is set without `TRUSTED_PROXY_IPS`, TunnelVision logs a startup warning and surfaces it in `GET /api/v1/health` under `security_warnings`. The feature still works (backward compatible), but the security model is weaker than intended.
+
+To find your proxy's container IP: `docker inspect <traefik-container> | grep IPAddress`
+
+API key always works for machine-to-machine regardless of login configuration.
 
 ## Docker Secrets
 
@@ -247,6 +265,7 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `ADMIN_USER` | *(empty)* | Set to enable login (single user) |
 | `ADMIN_PASS` | *(empty)* | Password for ADMIN_USER |
 | `AUTH_PROXY_HEADER` | *(empty)* | Trusted header from reverse proxy (e.g. `Remote-User`) |
+| `TRUSTED_PROXY_IPS` | *(empty)* | IPs or CIDRs of your reverse proxy — required with `AUTH_PROXY_HEADER` for secure deployments (e.g. `172.20.0.2` or `172.20.0.0/16`) |
 | `VPN_ENABLED` | `true` | Enable/disable VPN |
 | `VPN_TYPE` | `auto` | VPN engine: `auto`, `wireguard`, or `openvpn` |
 | `VPN_PROVIDER` | `custom` | VPN provider: `custom`, `mullvad`, `ivpn`, `pia`, `proton`, `gluetun` (sidecar mode), or any of the 25 native providers |

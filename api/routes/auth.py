@@ -1,11 +1,15 @@
 """Authentication — single-user local auth + reverse proxy bypass."""
 
+import ipaddress
+import logging
 import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -21,12 +25,59 @@ class LoginRequest(BaseModel):
     password: str
 
 
+def _is_trusted_proxy(client_ip: str, trusted_ips_str: str) -> bool:
+    """Return True if client_ip matches any entry in the trusted proxy list (IPs or CIDRs)."""
+    try:
+        client = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return False
+    for entry in trusted_ips_str.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        try:
+            if client in ipaddress.ip_network(entry, strict=False):
+                return True
+        except ValueError:
+            pass
+    return False
+
+
+def check_proxy_auth_config(auth_proxy_header: str, trusted_proxy_ips: str) -> bool:
+    """Return True if proxy auth is securely configured (both header and trusted IPs set).
+
+    Called at startup to detect misconfiguration early.
+    """
+    return bool(auth_proxy_header and trusted_proxy_ips)
+
+
 def _check_proxy_header(request: Request) -> str | None:
-    """Check if reverse proxy sent a trusted auth header."""
+    """Check if a trusted reverse proxy sent the configured auth header.
+
+    Security model:
+    - If TRUSTED_PROXY_IPS is configured: only accept the header from those IPs/CIDRs.
+      Requests from any other source have the header ignored regardless of its value.
+    - If TRUSTED_PROXY_IPS is NOT configured: accept from any source (backward compat)
+      but startup emits a warning. This is insecure — any LAN client can forge the header.
+    """
     config = getattr(request.app.state, "config", None)
-    if config and config.auth_proxy_header:
-        return request.headers.get(config.auth_proxy_header)
-    return None
+    if not config or not config.auth_proxy_header:
+        return None
+
+    header_value = request.headers.get(config.auth_proxy_header)
+    if not header_value:
+        return None
+
+    if config.trusted_proxy_ips:
+        client_ip = request.client.host if request.client else ""
+        if not _is_trusted_proxy(client_ip, config.trusted_proxy_ips):
+            log.debug(
+                "Proxy header '%s' ignored — source %s not in TRUSTED_PROXY_IPS",
+                config.auth_proxy_header, client_ip,
+            )
+            return None
+
+    return header_value
 
 
 def _check_session(request: Request) -> str | None:

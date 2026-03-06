@@ -84,6 +84,7 @@ class Config:
     admin_user: str = field(default_factory=lambda: os.getenv("ADMIN_USER", ""))
     admin_pass: str = field(default_factory=lambda: _secret_or_env("ADMIN_PASS"))
     auth_proxy_header: str = field(default_factory=lambda: os.getenv("AUTH_PROXY_HEADER", ""))
+    trusted_proxy_ips: str = field(default_factory=lambda: os.getenv("TRUSTED_PROXY_IPS", ""))
 
     # UI
     ui_enabled: bool = field(default_factory=lambda: os.getenv("UI_ENABLED", "true").lower() == "true")
