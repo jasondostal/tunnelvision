@@ -6,21 +6,36 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/jasondostal/tunnelvision?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/Alpine-3.21-0D597F?style=flat-square&logo=alpine-linux" alt="Alpine">
   <img src="https://img.shields.io/badge/WireGuard-built--in-88171A?style=flat-square&logo=wireguard" alt="WireGuard">
-  <img src="https://img.shields.io/badge/qBittorrent-built--in-2F67BA?style=flat-square" alt="qBittorrent">
+  <img src="https://img.shields.io/badge/OpenVPN-built--in-EA7E20?style=flat-square&logo=openvpn" alt="OpenVPN">
   <img src="https://img.shields.io/badge/Home%20Assistant-native-41BDF5?style=flat-square&logo=home-assistant" alt="Home Assistant">
 </p>
 
 ---
 
-qBittorrent + WireGuard/OpenVPN + killswitch + REST API + dashboard. One container. Full visibility.
+A Docker container that manages your VPN tunnel and everything that depends on it. WireGuard, OpenVPN, nftables killswitch, DNS with DoT and ad-blocking, HTTP/SOCKS5/Shadowsocks proxies, qBittorrent, real-time dashboard, REST API, Home Assistant, Prometheus. One container. Full visibility. Full control.
 
-Drop your VPN config, `docker compose up`, and you can see everything — what IP you're on, where you're exiting, transfer stats, killswitch state, qBittorrent health. From your Homepage dashboard, from Home Assistant, from Prometheus, from the built-in UI, from `curl`. No guessing. No SSH-ing in.
-
-Works with **any WireGuard or OpenVPN provider**. Native integrations for [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), [PIA](https://privateinternetaccess.com), [ProtonVPN](https://protonvpn.com), [NordVPN](https://nordvpn.com), [Windscribe](https://windscribe.com), [AirVPN](https://airvpn.org), [Surfshark](https://surfshark.com), [ExpressVPN](https://expressvpn.com), and [16 more](CHANGELOG.md) — server browsing, rotation, port forwarding, connection monitoring. Or bring your own config from any provider. Built-in DNS (DoT, ad-blocking), HTTP CONNECT proxy, and SOCKS5/Shadowsocks proxy.
+**25 native providers** — [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), [PIA](https://privateinternetaccess.com), [ProtonVPN](https://protonvpn.com), [NordVPN](https://nordvpn.com), [Windscribe](https://windscribe.com), [AirVPN](https://airvpn.org), [Surfshark](https://surfshark.com), [ExpressVPN](https://expressvpn.com), [IPVanish](https://ipvanish.com), [TorGuard](https://torguard.net), [PrivateVPN](https://privatevpn.com), [Perfect Privacy](https://perfect-privacy.com), [CyberGhost](https://cyberghostvpn.com), [Privado](https://privadovpn.com), [PureVPN](https://purevpn.com), [VPN Secure](https://vpnsecure.me), [VPN Unlimited](https://vpnunlimited.com), [VyprVPN](https://vyprvpn.com), [FastestVPN](https://fastestvpn.com), [HideMyAss](https://hidemyass.com), [SlickVPN](https://slickvpn.com), [Giganews](https://giganews.com), and more — with smart server selection, automatic rotation, port forwarding, and connection monitoring. Or bring your own config from any provider.
 
 <p align="center">
   <img src="images/screenshot-dashboard.png" alt="TunnelVision Dashboard" width="700">
 </p>
+
+## What you get
+
+- **VPN tunnel** — WireGuard or OpenVPN, kernel or userspace, with nftables killswitch that blocks all traffic if the tunnel drops
+- **25 native providers** — server browsing, scored selection (load + speed), automatic rotation, multi-config failover
+- **Auto-reconnect watchdog** — detects drops, reconnects, fails over to backup servers, notifies you
+- **Port forwarding** — PIA and ProtonVPN, with hook scripts for automatic qBittorrent integration
+- **Built-in DNS** — DNS-over-TLS, caching, ad/malware/surveillance blocklists
+- **Proxy stack** — HTTP CONNECT, SOCKS5, and Shadowsocks AEAD — route any app through the tunnel
+- **qBittorrent** — built in, pre-wired through the tunnel, killswitch-protected
+- **Real-time dashboard** — React UI with SSE updates, connection history, speed testing
+- **REST API** — 30+ endpoints, Swagger docs, everything scriptable
+- **Home Assistant** — native HACS integration, 30 entities, SSE real-time updates, zero YAML
+- **Prometheus + Grafana** — metrics endpoint, ready-made dashboard
+- **Notifications** — Discord, Slack, Gotify, generic webhooks
+- **Settings UI** — hot-reloadable configuration, no restarts needed
+- **Multi-arch** — linux/amd64, linux/arm64, linux/arm/v7
 
 ## Quick Start
 
@@ -41,35 +56,19 @@ docker compose up -d
 ```
 
 Three things are now running inside one container:
-- **qBittorrent WebUI** on port `8080`
-- **TunnelVision API + Dashboard** on port `8081`
 - **WireGuard/OpenVPN** with nftables killswitch
+- **TunnelVision API + Dashboard** on port `8081`
+- **qBittorrent WebUI** on port `8080`
 
 ```bash
 curl http://localhost:8081/api/v1/health | jq .
 ```
 
-## Already running gluetun?
+## Native Providers
 
-Keep it. TunnelVision can run alongside gluetun in **sidecar mode** — gluetun manages the VPN tunnel, TunnelVision adds the visibility layer. You get the dashboard, API, Home Assistant integration, and monitoring without changing your VPN setup. And you inherit gluetun's 30+ provider support instantly.
+TunnelVision has built-in support for 25 providers. Select your provider in the setup wizard, enter your credentials, pick a server, and you're connected. No config files to find, no manual WireGuard key generation (we do that for you where the provider supports it).
 
-```yaml
-services:
-  gluetun:
-    image: qmcgaw/gluetun
-    # ... your existing gluetun config ...
-
-  tunnelvision:
-    image: ghcr.io/jasondostal/tunnelvision:latest
-    network_mode: "service:gluetun"
-    environment:
-      - VPN_PROVIDER=gluetun
-      - GLUETUN_URL=http://localhost:8000
-    volumes:
-      - ./config:/config
-```
-
-TunnelVision reads gluetun's API for status but never touches the tunnel. Full read-only observability.
+For providers not on the list, use `VPN_PROVIDER=custom` and mount your own WireGuard or OpenVPN config file. Any provider that gives you a `.conf` or `.ovpn` file works.
 
 ## Integrations
 
@@ -85,7 +84,7 @@ Drops right into [Homepage](https://gethomepage.dev) using the `customapi` widge
 - TunnelVision:
     icon: https://raw.githubusercontent.com/jasondostal/tunnelvision/main/images/tunnelvision-mark-dark-512.png
     href: http://your-host:8081
-    description: VPN + qBittorrent
+    description: VPN Management
     widget:
       type: customapi
       url: http://tunnelvision:8081/api/v1/vpn/status
@@ -248,7 +247,7 @@ All via environment variables. Sensible defaults for everything. Settings UI and
 | `AUTH_PROXY_HEADER` | *(empty)* | Trusted header from reverse proxy (e.g. `Remote-User`) |
 | `VPN_ENABLED` | `true` | Enable/disable VPN |
 | `VPN_TYPE` | `auto` | VPN engine: `auto`, `wireguard`, or `openvpn` |
-| `VPN_PROVIDER` | `custom` | VPN provider: `custom`, `mullvad`, `ivpn`, `pia`, `proton`, or `gluetun` (sidecar mode) |
+| `VPN_PROVIDER` | `custom` | VPN provider: `custom`, `mullvad`, `ivpn`, `pia`, `proton`, `gluetun` (sidecar mode), or any of the 25 native providers |
 | `MULLVAD_ACCOUNT` | *(empty)* | Mullvad account number (16-digit) |
 | `PIA_USER` | *(empty)* | PIA username |
 | `PIA_PASS` | *(empty)* | PIA password |
@@ -364,7 +363,9 @@ Interactive docs at `http://localhost:8081/api/docs` (Swagger) when running.
 <details>
 <summary>Migrating from other setups</summary>
 
-**From gluetun + qBittorrent:** Two options. Full migration: copy your qBittorrent config and WireGuard config, point the volumes, done. Gentle option: keep gluetun for the tunnel and add TunnelVision in [sidecar mode](#already-running-gluetun) for visibility — zero risk, try before you switch.
+**From a separate VPN container + qBittorrent:** Copy your qBittorrent config and WireGuard/OpenVPN config, point the volumes, done. TunnelVision manages the tunnel, the killswitch, and qBittorrent in a single container.
+
+**Not ready for a full switch?** TunnelVision can also run in **sidecar mode** alongside your existing VPN container — it adds the dashboard, API, Home Assistant integration, and monitoring without touching your tunnel. Set `VPN_PROVIDER=gluetun` and point `GLUETUN_URL` at your existing container's API. Try it risk-free, migrate when you're ready.
 
 **From Trigus42/qbittorrentvpn:** Same config structure — mount `/config` and `/config/wireguard` the same way.
 
@@ -374,8 +375,6 @@ Interactive docs at `http://localhost:8081/api/docs` (Swagger) when running.
 
 <details>
 <summary>Architecture</summary>
-
-**Standalone mode** — TunnelVision manages everything:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -398,19 +397,6 @@ Interactive docs at `http://localhost:8081/api/docs` (Swagger) when running.
 └──────────────────────────────────────────────────────────┘
          │              │              │
     :8080 (WebUI)  :8081 (API)    wg0 (tunnel)
-```
-
-**Sidecar mode** — gluetun manages the tunnel, TunnelVision adds visibility:
-
-```
-┌─────────────────────┐    ┌──────────────────────────┐
-│  Gluetun Container   │    │  TunnelVision Container   │
-│                      │    │  (network_mode: gluetun)  │
-│  WireGuard/OpenVPN   │◄───│                           │
-│  30+ providers       │ API│  FastAPI + React UI       │
-│  Tunnel management   │    │  MQTT, SSE, Prometheus    │
-│                      │    │  Watchdog (read-only)     │
-└──────────────────────┘    └──────────────────────────┘
 ```
 
 </details>
