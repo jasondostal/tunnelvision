@@ -73,6 +73,7 @@ class CredentialsRequest(BaseModel):
     private_key: str | None = None
     addresses: str | None = None
     dns: str | None = None
+    mullvad_account: str | None = None
     pia_user: str | None = None
     pia_pass: str | None = None
     port_forward: bool = False
@@ -142,7 +143,7 @@ async def _validate_gluetun(body: CredentialsRequest) -> CredentialsResponse | N
         if body.gluetun_api_key:
             headers["X-Api-Key"] = body.gluetun_api_key
         async with http_client() as client:
-            resp = await client.get(f"{url}/v1/openvpn/status", headers=headers)
+            resp = await client.get(f"{url}/v1/vpn/status", headers=headers)
             resp.raise_for_status()
     except Exception:
         return CredentialsResponse(success=False, error=f"Could not connect to gluetun at {url}")
@@ -435,6 +436,8 @@ async def setup_credentials(body: CredentialsRequest, request: Request):
             }
             if body.dns:
                 settings["vpn_dns"] = body.dns.strip()
+            if body.mullvad_account and provider == "mullvad":
+                settings["mullvad_account"] = body.mullvad_account.strip()
             save_settings(settings)
             return CredentialsResponse(success=True, next="server")
 

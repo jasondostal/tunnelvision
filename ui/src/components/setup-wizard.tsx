@@ -95,6 +95,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   const [privateKey, setPrivateKey] = useState("");
   const [addresses, setAddresses] = useState("");
   const [dns, setDns] = useState("");
+  const [mullvadAccount, setMullvadAccount] = useState("");
   const [generatedPublicKey, setGeneratedPublicKey] = useState("");
   const [keyGenLoading, setKeyGenLoading] = useState(false);
   const [keyCopied, setKeyCopied] = useState(false);
@@ -136,8 +137,9 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
       });
       const meta = providers.find((p) => p.id === id);
       const isOvpn = meta?.supports_wireguard === false && meta?.supports_openvpn === true;
+      const isPaste = meta?.setup_type === "paste";
       setIsOpenvpnProvider(isOvpn);
-      if (id === "custom" || id === "proton" || isOvpn) {
+      if (id === "custom" || id === "proton" || isOvpn || isPaste) {
         setStep("config");
       } else {
         setStep("credentials");
@@ -209,6 +211,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
         body.private_key = privateKey;
         body.addresses = addresses;
         if (dns) body.dns = dns;
+        if (selectedProvider === "mullvad" && mullvadAccount) body.mullvad_account = mullvadAccount;
       } else if (selectedProvider === "pia") {
         body.pia_user = piaUser;
         body.pia_pass = piaPass;
@@ -238,7 +241,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedProvider, privateKey, addresses, dns, piaUser, piaPass, portForward, gluetunUrl, gluetunApiKey, doComplete]);
+  }, [selectedProvider, privateKey, addresses, dns, mullvadAccount, piaUser, piaPass, portForward, gluetunUrl, gluetunApiKey, doComplete]);
 
   const submitConfig = useCallback(async () => {
     if (!configText.trim()) {
@@ -509,6 +512,24 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                 className="w-full rounded-xl border border-surface-border bg-surface-card p-2.5 font-mono text-sm text-text-primary placeholder:text-text-muted/50 focus:border-amber-500/50 focus:outline-none"
               />
             </div>
+
+            {selectedProvider === "mullvad" && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-secondary">
+                  Account Number <span className="text-text-muted">(optional — enables account expiry display)</span>
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+                  <input
+                    type="text"
+                    value={mullvadAccount}
+                    onChange={(e) => setMullvadAccount(e.target.value)}
+                    placeholder="1234 5678 9012 3456"
+                    className={inputMonoClass}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <WizardError message={error} />
@@ -672,7 +693,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
         </div>
       )}
 
-      {/* Config Input (WireGuard — custom/proton) */}
+      {/* Config Input (WireGuard — custom/proton/paste providers) */}
       {step === "config" && !isOpenvpnProvider && (
         <div>
           <h2 className="mb-2 text-xl font-bold text-text-primary">
@@ -681,7 +702,9 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
           <p className="mb-1 text-sm text-text-secondary">
             {selectedProvider === "proton"
               ? "Download from account.protonvpn.com → WireGuard"
-              : "Paste the contents of your wg0.conf file"}
+              : selectedProvider === "custom"
+              ? "Paste the contents of your wg0.conf file"
+              : (providers.find((p) => p.id === selectedProvider)?.description ?? "Download your WireGuard config from your provider and paste it below.")}
           </p>
           <p className="mb-4 text-xs text-text-muted">
             Your private key stays on this device — never sent anywhere except your VPN provider.

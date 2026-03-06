@@ -7,6 +7,18 @@
   unified status endpoint is `/v1/vpn/status`. Every sidecar health check was returning
   `unknown` (404) and being treated as a failure. Fixed.
 
+- **Setup wizard gluetun validation**: same endpoint bug as watchdog — `/v1/openvpn/status`
+  → `/v1/vpn/status`. Gluetun sidecar validation in the setup wizard was always failing.
+- **Setup wizard blank screen for PASTE providers**: Surfshark, Windscribe, IPVanish,
+  AirVPN, TorGuard, PrivateVPN, FastestVPN, SlickVPN, Giganews — selecting any of these
+  in the wizard routed to "credentials" step with no form rendered. Now routed to the
+  WireGuard config paste step, with the provider's own setup instructions shown as the
+  description.
+- **Mullvad account number not saved**: wizard collected private key + address for Mullvad
+  but never showed or saved the account number. Account expiry was silently unavailable
+  for all wizard-configured Mullvad users. Account number field added (optional) — when
+  provided, saved to settings and used for expiry display in the health dashboard.
+
 ### Documentation
 - **Gluetun provider docstring**: removed misleading "inherits all 30+ providers" claim.
   Sidecar mode reads gluetun's status — it does not inherit gluetun's provider logic.
