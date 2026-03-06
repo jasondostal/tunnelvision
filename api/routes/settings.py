@@ -19,6 +19,7 @@ class SettingsUpdate(BaseModel):
     admin_user: str | None = None
     admin_pass: str | None = None
     auth_proxy_header: str | None = None
+    trusted_proxy_ips: str | None = None
     api_key: str | None = None
     health_check_interval: str | None = None
     vpn_provider: str | None = None
