@@ -14,7 +14,7 @@
 
 A Docker container that manages your VPN tunnel and everything that depends on it. WireGuard, OpenVPN, nftables killswitch, DNS with DoT and ad-blocking, HTTP/SOCKS5/Shadowsocks proxies, qBittorrent, real-time dashboard, REST API, Home Assistant, Prometheus. One container. Full visibility. Full control.
 
-**25 native providers** — [Mullvad](https://mullvad.net), [IVPN](https://ivpn.net), [PIA](https://privateinternetaccess.com), [ProtonVPN](https://protonvpn.com), [NordVPN](https://nordvpn.com), [Windscribe](https://windscribe.com), [AirVPN](https://airvpn.org), [Surfshark](https://surfshark.com), [ExpressVPN](https://expressvpn.com), [IPVanish](https://ipvanish.com), [TorGuard](https://torguard.net), [PrivateVPN](https://privatevpn.com), [Perfect Privacy](https://perfect-privacy.com), [CyberGhost](https://cyberghostvpn.com), [Privado](https://privadovpn.com), [PureVPN](https://purevpn.com), [VPN Secure](https://vpnsecure.me), [VPN Unlimited](https://vpnunlimited.com), [VyprVPN](https://vyprvpn.com), [FastestVPN](https://fastestvpn.com), [HideMyAss](https://hidemyass.com), [SlickVPN](https://slickvpn.com), [Giganews](https://giganews.com), and more — with smart server selection, automatic rotation, port forwarding, and connection monitoring. Or bring your own config from any provider.
+**25 native providers** — [Mullvad](https://mullvad.net), [ProtonVPN](https://protonvpn.com), [PIA](https://privateinternetaccess.com), [IVPN](https://ivpn.net), [NordVPN](https://nordvpn.com), [Surfshark](https://surfshark.com), and [19 more](#native-providers) — with smart server selection, automatic rotation, port forwarding, and connection monitoring. Or bring your own config from any provider.
 
 <p align="center">
   <img src="images/screenshot-dashboard.png" alt="TunnelVision Dashboard" width="700">
@@ -67,6 +67,8 @@ curl http://localhost:8081/api/v1/health | jq .
 ## Native Providers
 
 TunnelVision has built-in support for 25 providers. Select your provider in the setup wizard, enter your credentials, pick a server, and you're connected. No config files to find, no manual WireGuard key generation (we do that for you where the provider supports it).
+
+[Mullvad](https://mullvad.net) · [ProtonVPN](https://protonvpn.com) · [PIA](https://privateinternetaccess.com) · [IVPN](https://ivpn.net) · [NordVPN](https://nordvpn.com) · [Windscribe](https://windscribe.com) · [AirVPN](https://airvpn.org) · [Surfshark](https://surfshark.com) · [ExpressVPN](https://expressvpn.com) · [IPVanish](https://ipvanish.com) · [TorGuard](https://torguard.net) · [PrivateVPN](https://privatevpn.com) · [Perfect Privacy](https://perfect-privacy.com) · [CyberGhost](https://cyberghostvpn.com) · [Privado](https://privadovpn.com) · [PureVPN](https://purevpn.com) · [VPN Secure](https://vpnsecure.me) · [VPN Unlimited](https://vpnunlimited.com) · [VyprVPN](https://vyprvpn.com) · [FastestVPN](https://fastestvpn.com) · [HideMyAss](https://hidemyass.com) · [SlickVPN](https://slickvpn.com) · [Giganews](https://giganews.com)
 
 For providers not on the list, use `VPN_PROVIDER=custom` and mount your own WireGuard or OpenVPN config file. Any provider that gives you a `.conf` or `.ovpn` file works.
 
