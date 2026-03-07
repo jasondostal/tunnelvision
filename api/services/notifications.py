@@ -6,6 +6,7 @@ Fires on VPN disconnect, reconnect, and port forwarding changes.
 
 import logging
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from api.config import Config
 from api.constants import http_client
@@ -45,7 +46,10 @@ async def notify(event: str, message: str, details: dict | None = None, config: 
         # Discord / Slack webhook (auto-detect by URL)
         if webhook_url:
             try:
-                if "discord.com" in webhook_url:
+                parsed = urlparse(webhook_url)
+                hostname = (parsed.hostname or "").lower()
+
+                if hostname.endswith(".discord.com") or hostname == "discord.com":
                     await client.post(webhook_url, json={
                         "embeds": [{
                             "title": f"TunnelVision — {event}",
@@ -54,7 +58,7 @@ async def notify(event: str, message: str, details: dict | None = None, config: 
                             "timestamp": payload["timestamp"],
                         }]
                     })
-                elif "hooks.slack.com" in webhook_url:
+                elif hostname == "hooks.slack.com":
                     await client.post(webhook_url, json={
                         "text": f"*TunnelVision — {event}*\n{message}",
                     })

@@ -2,9 +2,12 @@
 
 import io
 import json
+import logging
 import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import StreamingResponse
@@ -98,7 +101,8 @@ async def restore_backup(file: UploadFile = File(...)):
                     restored.append(member.name)
 
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.exception("Backup restore failed")
+        return {"success": False, "error": "Backup restore failed — verify the file format and try again"}
 
     return {
         "success": True,

@@ -2,10 +2,13 @@
 
 import asyncio
 import base64
+import logging
 import os
 import re
 import subprocess
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -292,7 +295,8 @@ async def generate_keypair():
     except FileNotFoundError:
         return {"success": False, "error": "wireguard-tools not found — install wg or use an existing key"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.exception("Keypair generation failed")
+        return {"success": False, "error": "Keypair generation failed unexpectedly"}
 
 
 @router.post("/setup/openvpn")
@@ -319,6 +323,8 @@ async def upload_openvpn_config(body: OpenVPNConfigRequest, request: Request):
     os.chmod(OPENVPN_CONF_PATH, 0o600)
 
     if body.username and body.password:
+        # OpenVPN auth-user-pass requires plain-text credentials file.
+        # File permissions (0o600) restrict access to container owner only.
         OPENVPN_CREDS_PATH.write_text(f"{body.username}\n{body.password}\n")
         os.chmod(OPENVPN_CREDS_PATH, 0o600)
 
