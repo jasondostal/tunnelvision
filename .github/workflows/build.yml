@@ -257,7 +257,7 @@ jobs:
           echo "UI: OK"
 
       - name: DAST — Nuclei baseline scan
-        uses: projectdiscovery/nuclei-action@main
+        uses: projectdiscovery/nuclei-action@v3
         with:
           target: http://localhost:8081
           flags: "-severity critical,high,medium -tags cve,exposure,misconfig -exclude-tags dos"
