@@ -6,7 +6,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: Build the React dashboard
 # ---------------------------------------------------------------------------
-FROM --platform=linux/amd64 node:22-alpine AS ui-builder
+FROM --platform=linux/amd64 node:25-alpine AS ui-builder
 
 WORKDIR /build
 COPY ui/package*.json ./
