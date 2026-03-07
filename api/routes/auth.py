@@ -18,6 +18,7 @@ _sessions: dict[str, dict] = {}
 
 SESSION_COOKIE = "tv_session"
 SESSION_MAX_AGE = 86400 * 7  # 7 days
+MAX_SESSIONS = 100
 
 
 class LoginRequest(BaseModel):
@@ -68,14 +69,20 @@ def _check_proxy_header(request: Request) -> str | None:
     if not header_value:
         return None
 
-    if config.trusted_proxy_ips:
-        client_ip = request.client.host if request.client else ""
-        if not _is_trusted_proxy(client_ip, config.trusted_proxy_ips):
-            log.debug(
-                "Proxy header '%s' ignored — source %s not in TRUSTED_PROXY_IPS",
-                config.auth_proxy_header, client_ip,
-            )
-            return None
+    if not config.trusted_proxy_ips:
+        log.warning(
+            "Proxy header '%s' ignored — TRUSTED_PROXY_IPS not configured (fail-closed)",
+            config.auth_proxy_header,
+        )
+        return None
+
+    client_ip = request.client.host if request.client else ""
+    if not _is_trusted_proxy(client_ip, config.trusted_proxy_ips):
+        log.debug(
+            "Proxy header '%s' ignored — source %s not in TRUSTED_PROXY_IPS",
+            config.auth_proxy_header, client_ip,
+        )
+        return None
 
     return header_value
 
@@ -103,7 +110,7 @@ def check_auth(request: Request) -> str | None:
         return proxy_user
 
     # 2. API key (programmatic access)
-    if config.api_key and request.headers.get("X-API-Key") == config.api_key:
+    if config.api_key and secrets.compare_digest(request.headers.get("X-API-Key", ""), config.api_key):
         return "api"
 
     # 3. Session cookie (local login)
@@ -125,10 +132,18 @@ async def login(body: LoginRequest, request: Request):
     if body.username != config.admin_user or body.password != config.admin_pass:
         return JSONResponse(status_code=401, content={"detail": "Invalid credentials"})
 
+    # Clean up expired sessions and enforce max count
+    now = datetime.now(timezone.utc).timestamp()
+    expired = [k for k, v in _sessions.items() if v["expires"] <= now]
+    for k in expired:
+        del _sessions[k]
+    if len(_sessions) >= MAX_SESSIONS:
+        return JSONResponse(status_code=429, content={"detail": "Too many active sessions"})
+
     token = secrets.token_urlsafe(32)
     _sessions[token] = {
         "user": body.username,
-        "expires": datetime.now(timezone.utc).timestamp() + SESSION_MAX_AGE,
+        "expires": now + SESSION_MAX_AGE,
     }
 
     response = JSONResponse(content={"user": body.username})
@@ -138,6 +153,7 @@ async def login(body: LoginRequest, request: Request):
         max_age=SESSION_MAX_AGE,
         httponly=True,
         samesite="lax",
+        secure=bool(config.auth_proxy_header),
         path="/",
     )
     return response

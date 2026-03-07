@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Search, Globe, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ServerEntry } from "@/lib/types";
@@ -8,12 +8,51 @@ interface ServerBrowserProps {
 }
 
 export function ServerBrowser({ onClose }: ServerBrowserProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
   const [servers, setServers] = useState<ServerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [country, setCountry] = useState("");
   const [search, setSearch] = useState("");
   const [connecting, setConnecting] = useState<string | null>(null);
+
+  // Escape key closes modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  // Focus trap: trap Tab / Shift+Tab within modal
+  useEffect(() => {
+    const el = modalRef.current;
+    if (!el) return;
+    const focusable = el.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusable.length) (focusable[0] as HTMLElement).focus();
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !el) return;
+      const nodes = el.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleTab);
+    return () => document.removeEventListener("keydown", handleTab);
+  }, [loading]); // re-run when loading changes (table rows appear)
 
   useEffect(() => {
     setLoading(true);
@@ -65,8 +104,8 @@ export function ServerBrowser({ onClose }: ServerBrowserProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-12">
-      <div className="w-full max-w-2xl rounded-xl border border-surface-border bg-surface-bg shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-12" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div ref={modalRef} className="w-full max-w-2xl rounded-xl border border-surface-border bg-surface-bg shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-surface-border px-5 py-4">
           <div className="flex items-center gap-2.5">
@@ -147,7 +186,11 @@ export function ServerBrowser({ onClose }: ServerBrowserProps) {
                 {filtered.map((s) => (
                   <tr
                     key={s.hostname}
-                    className="border-b border-surface-border/50 transition-colors hover:bg-surface-card/50"
+                    tabIndex={0}
+                    role="button"
+                    aria-label={s.hostname}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleConnect(s.hostname); }}
+                    className="border-b border-surface-border/50 transition-colors hover:bg-surface-card/50 focus:bg-surface-card/50 focus:outline-none focus:ring-1 focus:ring-amber-500/30"
                   >
                     <td className="px-5 py-2 font-mono text-text-primary">
                       {s.hostname}

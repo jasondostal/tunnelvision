@@ -1,6 +1,10 @@
 """Settings management — read/write persistent YAML config."""
 
+import ipaddress
+import re
+
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
 from api.services.settings import get_public_settings, save_settings, get_all_configurable_fields
@@ -121,6 +125,39 @@ async def update_settings(body: SettingsUpdate, request: Request):
 
     if not updates:
         return {"message": "No changes", "settings": get_public_settings()}
+
+    # Validate firewall-related fields
+    if "firewall_vpn_input_ports" in updates:
+        ports_str = updates["firewall_vpn_input_ports"]
+        if ports_str:
+            for port in ports_str.split(","):
+                port = port.strip()
+                if not re.match(r"^\d+$", port) or not (1 <= int(port) <= 65535):
+                    return JSONResponse(
+                        status_code=422,
+                        content={"detail": f"Invalid port: {port} — must be 1-65535"},
+                    )
+
+    if "firewall_outbound_subnets" in updates:
+        subnets_str = updates["firewall_outbound_subnets"]
+        if subnets_str:
+            for subnet in subnets_str.split(","):
+                subnet = subnet.strip()
+                try:
+                    ipaddress.ip_network(subnet, strict=False)
+                except ValueError:
+                    return JSONResponse(
+                        status_code=422,
+                        content={"detail": f"Invalid CIDR subnet: {subnet}"},
+                    )
+
+    if "firewall_custom_rules_file" in updates:
+        rules_path = updates["firewall_custom_rules_file"]
+        if rules_path and (".." in rules_path or not rules_path.startswith("/config/")):
+            return JSONResponse(
+                status_code=422,
+                content={"detail": "Custom rules file must be under /config/ with no '..'"},
+            )
 
     save_settings(updates)
 

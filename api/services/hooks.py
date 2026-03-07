@@ -7,6 +7,7 @@ Non-blocking, failure-tolerant: hook errors are logged but never propagate.
 import asyncio
 import logging
 import shlex
+from pathlib import Path
 
 from api.constants import SUBPROCESS_TIMEOUT_VPN
 
@@ -24,6 +25,9 @@ async def fire_port_change_hook(hook_script: str, port: int) -> None:
 
     try:
         parts = shlex.split(hook_script)
+        if not Path(parts[0]).is_file():
+            logger.warning("port_forward_hook rejected: %s is not a file", parts[0])
+            return
         proc = await asyncio.create_subprocess_exec(
             *parts, str(port),
             stdout=asyncio.subprocess.PIPE,

@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from api.constants import (
@@ -28,6 +29,35 @@ from api.services.settings import save_settings
 from api.services.state import StateManager
 
 router = APIRouter()
+
+
+def _require_setup(request: Request):
+    """Guard: reject mutating setup calls if setup is already complete."""
+    state_mgr: StateManager = request.app.state.state
+    if not state_mgr.setup_required:
+        return JSONResponse(status_code=403, content={"detail": "Setup already complete"})
+    return None
+
+
+# Dangerous OpenVPN directives that allow arbitrary script execution
+_OVPN_DANGEROUS_DIRECTIVES = {
+    "up", "down", "route-up", "route-pre-down", "ipchange",
+    "auth-user-pass-verify", "client-connect", "client-disconnect",
+    "learn-address", "tls-verify", "script-security",
+}
+
+
+def _strip_dangerous_ovpn_directives(config_text: str) -> str:
+    """Remove directives that allow arbitrary script execution from .ovpn configs."""
+    lines = config_text.splitlines()
+    safe_lines = []
+    for line in lines:
+        stripped = line.strip()
+        directive = stripped.split()[0].lower() if stripped and not stripped.startswith("#") else ""
+        if directive in _OVPN_DANGEROUS_DIRECTIVES:
+            continue
+        safe_lines.append(line)
+    return "\n".join(safe_lines)
 
 
 # -- Models --
@@ -189,13 +219,19 @@ async def list_providers():
 @router.post("/setup/provider")
 async def select_provider(body: ProviderSelectRequest, request: Request):
     """Select VPN provider."""
+    gate = _require_setup(request)
+    if gate:
+        return gate
     request.app.state.state.setup_provider = body.provider
     return {"provider": body.provider, "next": "needs_config"}
 
 
 @router.post("/setup/wireguard")
-async def upload_wireguard_config(body: WireGuardConfigRequest):
+async def upload_wireguard_config(body: WireGuardConfigRequest, request: Request):
     """Accept WireGuard config content and write to /config/wireguard/wg0.conf."""
+    gate = _require_setup(request)
+    if gate:
+        return gate
     config_text = body.config.strip()
 
     # Basic validation
@@ -260,8 +296,11 @@ async def generate_keypair():
 
 
 @router.post("/setup/openvpn")
-async def upload_openvpn_config(body: OpenVPNConfigRequest):
+async def upload_openvpn_config(body: OpenVPNConfigRequest, request: Request):
     """Accept OpenVPN config content and write to /config/openvpn/provider.ovpn."""
+    gate = _require_setup(request)
+    if gate:
+        return gate
     config_text = body.config.strip()
 
     # Reject WireGuard configs
@@ -271,6 +310,9 @@ async def upload_openvpn_config(body: OpenVPNConfigRequest):
     # Require at least one OpenVPN directive
     if "remote " not in config_text and "client" not in config_text:
         return {"success": False, "error": "Invalid OpenVPN config — missing 'remote' or 'client' directive"}
+
+    # Strip dangerous directives that allow script execution
+    config_text = _strip_dangerous_ovpn_directives(config_text)
 
     OPENVPN_DIR.mkdir(parents=True, exist_ok=True)
     OPENVPN_CONF_PATH.write_text(config_text + "\n")
@@ -386,6 +428,9 @@ async def _verify_openvpn() -> VerifyResponse:
 @router.post("/setup/credentials", response_model=CredentialsResponse)
 async def setup_credentials(body: CredentialsRequest, request: Request):
     """Validate and persist provider-specific credentials."""
+    gate = _require_setup(request)
+    if gate:
+        return gate
     from api.services.vpn import PROVIDERS
 
     provider = body.provider.lower()

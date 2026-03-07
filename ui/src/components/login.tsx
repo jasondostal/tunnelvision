@@ -44,6 +44,7 @@ export function Login({ onSuccess }: LoginProps) {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Username"
+              aria-label="Username"
               autoComplete="username"
               autoFocus
               className="w-full rounded-lg border border-surface-border bg-surface-card px-4 py-2.5 text-sm text-text-primary placeholder-text-muted outline-none transition-colors focus:border-amber-500/50"
@@ -55,6 +56,7 @@ export function Login({ onSuccess }: LoginProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
+              aria-label="Password"
               autoComplete="current-password"
               className="w-full rounded-lg border border-surface-border bg-surface-card px-4 py-2.5 text-sm text-text-primary placeholder-text-muted outline-none transition-colors focus:border-amber-500/50"
             />

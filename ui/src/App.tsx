@@ -61,6 +61,16 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
   const health = usePoll(useCallback(() => api.health(), []), POLL_INTERVAL, sseRefresh);
   const vpn = usePoll(useCallback(() => api.vpnStatus(), []), POLL_INTERVAL, sseRefresh);
   const qbtEnabled = health.data?.qbittorrent !== "disabled";
+
+  // Dynamic page title based on VPN state
+  useEffect(() => {
+    if (vpn.data) {
+      const state = vpn.data.state === "up" ? "Connected" : vpn.data.state === "down" ? "Disconnected" : vpn.data.state;
+      document.title = `TunnelVision — ${state}`;
+    } else {
+      document.title = "TunnelVision";
+    }
+  }, [vpn.data?.state]);
   const qbt = usePoll(useCallback(() => qbtEnabled ? api.qbtStatus() : Promise.resolve(null), [qbtEnabled]), POLL_INTERVAL, sseRefresh);
   const system = usePoll(useCallback(() => api.system(), []), 30_000);
   const history = usePoll(useCallback(() => api.history(), []), 30_000, sseRefresh);
@@ -110,7 +120,7 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {vpn.data && qbtEnabled && (
             <a
               href={`http://${window.location.hostname}:8080`}

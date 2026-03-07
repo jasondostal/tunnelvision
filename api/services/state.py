@@ -23,8 +23,11 @@ class StateManager:
             return default
 
     def write(self, key: str, value: str) -> None:
-        """Write a state file."""
-        (self._dir / key).write_text(value)
+        """Write a state file atomically (write-tmp-then-rename)."""
+        target = self._dir / key
+        tmp = target.with_suffix(".tmp")
+        tmp.write_text(value)
+        tmp.rename(target)
 
     def delete(self, key: str) -> None:
         """Delete a state file if it exists."""

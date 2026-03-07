@@ -91,7 +91,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write  # cosign keyless signing via Sigstore OIDC
+      id-token: write       # cosign keyless signing via Sigstore OIDC
+      attestations: write   # SLSA provenance attestation
 
     steps:
       - name: Checkout
@@ -161,6 +162,14 @@ jobs:
           cosign attest --yes --predicate sbom.spdx.json --type spdxjson \
             "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
 
+      - name: SLSA provenance attestation
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
   scan:
     needs: build
     runs-on: ubuntu-latest
@@ -178,7 +187,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Trivy (container image vulnerabilities)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.31.0
         with:
           image-ref: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main"
           format: table

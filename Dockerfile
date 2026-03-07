@@ -32,7 +32,7 @@ LABEL maintainer="Jason Dostal"
 LABEL org.opencontainers.image.title="TunnelVision"
 LABEL org.opencontainers.image.description="All-in-one qBittorrent + WireGuard VPN + API container"
 LABEL org.opencontainers.image.source="https://github.com/jasondostal/tunnelvision"
-LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.licenses="GPL-3.0-only"
 
 # s6-overlay version
 ARG S6_OVERLAY_VERSION=3.2.2.0

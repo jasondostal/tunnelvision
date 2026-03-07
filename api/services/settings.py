@@ -178,10 +178,12 @@ def save_settings(updates: dict[str, Any]) -> dict[str, Any]:
     all_fields = get_all_configurable_fields()
     current.update({k: v for k, v in updates.items() if k in all_fields})
 
-    # Write to YAML
+    # Write to YAML atomically (write-tmp-then-rename)
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(SETTINGS_PATH, "w") as f:
+    tmp_path = SETTINGS_PATH.with_suffix(".tmp")
+    with open(tmp_path, "w") as f:
         yaml.dump(current, f, default_flow_style=False, sort_keys=False)
+    tmp_path.rename(SETTINGS_PATH)
 
     return current
 

@@ -66,7 +66,8 @@ class TestFirePortChangeHook:
         mock_proc.returncode = 0
         mock_proc.communicate = AsyncMock(return_value=(b"", b""))
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+        with patch("api.services.hooks.Path.is_file", return_value=True), \
+             patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
             await fire_port_change_hook("/scripts/on_port.sh", 51820)
             mock_exec.assert_called_once_with(
                 "/scripts/on_port.sh", "51820",
@@ -82,7 +83,8 @@ class TestFirePortChangeHook:
         mock_proc.returncode = 0
         mock_proc.communicate = AsyncMock(return_value=(b"", b""))
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+        with patch("api.services.hooks.Path.is_file", return_value=True), \
+             patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
             await fire_port_change_hook("/scripts/on_port.sh", 0)
             mock_exec.assert_called_once_with(
                 "/scripts/on_port.sh", "0",
@@ -98,7 +100,8 @@ class TestFirePortChangeHook:
         mock_proc.returncode = 0
         mock_proc.communicate = AsyncMock(return_value=(b"", b""))
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+        with patch("api.services.hooks.Path.is_file", return_value=True), \
+             patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
             await fire_port_change_hook("/usr/bin/env /scripts/on_port.sh", 12345)
             mock_exec.assert_called_once_with(
                 "/usr/bin/env", "/scripts/on_port.sh", "12345",
@@ -114,7 +117,8 @@ class TestFirePortChangeHook:
         mock_proc.returncode = 1
         mock_proc.communicate = AsyncMock(return_value=(b"", b"error"))
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch("api.services.hooks.Path.is_file", return_value=True), \
+             patch("asyncio.create_subprocess_exec", return_value=mock_proc):
             # Should not raise
             await fire_port_change_hook("/scripts/on_port.sh", 51820)
 
@@ -125,15 +129,25 @@ class TestFirePortChangeHook:
         mock_proc = AsyncMock()
         mock_proc.communicate = AsyncMock(side_effect=asyncio.TimeoutError())
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch("api.services.hooks.Path.is_file", return_value=True), \
+             patch("asyncio.create_subprocess_exec", return_value=mock_proc):
             await fire_port_change_hook("/scripts/slow_hook.sh", 51820)
 
     @pytest.mark.asyncio
     async def test_exception_does_not_raise(self):
         from api.services.hooks import fire_port_change_hook
 
-        with patch("asyncio.create_subprocess_exec", side_effect=FileNotFoundError("not found")):
+        with patch("api.services.hooks.Path.is_file", return_value=True), \
+             patch("asyncio.create_subprocess_exec", side_effect=FileNotFoundError("not found")):
             await fire_port_change_hook("/nonexistent/hook.sh", 51820)
+
+    @pytest.mark.asyncio
+    async def test_rejects_nonexistent_hook_file(self):
+        from api.services.hooks import fire_port_change_hook
+
+        with patch("asyncio.create_subprocess_exec") as mock_exec:
+            await fire_port_change_hook("/nonexistent/hook.sh", 51820)
+            mock_exec.assert_not_called()
 
 
 class TestNatPMPServiceConfig:

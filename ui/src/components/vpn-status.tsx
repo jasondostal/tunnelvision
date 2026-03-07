@@ -11,6 +11,8 @@ import {
   Power,
   Shuffle,
   Loader2,
+  Check,
+  X,
 } from "lucide-react";
 import type { VPNStatusResponse } from "@/lib/types";
 import { humanBytes, humanDuration, cn } from "@/lib/utils";
@@ -54,13 +56,19 @@ function ActionButton({
   variant?: "default" | "danger";
 }) {
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<"success" | "error" | null>(null);
 
   const handleClick = async () => {
     setLoading(true);
+    setFeedback(null);
     try {
       await onClick();
+      setFeedback("success");
+    } catch {
+      setFeedback("error");
     } finally {
-      setTimeout(() => setLoading(false), 1500);
+      setLoading(false);
+      setTimeout(() => setFeedback(null), 2000);
     }
   };
 
@@ -77,12 +85,45 @@ function ActionButton({
     >
       {loading ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : feedback === "success" ? (
+        <Check className="h-3.5 w-3.5 text-status-up" />
+      ) : feedback === "error" ? (
+        <X className="h-3.5 w-3.5 text-status-down" />
       ) : (
         <Icon className="h-3.5 w-3.5" />
       )}
       {label}
     </button>
   );
+}
+
+function formatProvider(id: string): string {
+  const names: Record<string, string> = {
+    pia: "PIA",
+    ivpn: "IVPN",
+    nordvpn: "NordVPN",
+    expressvpn: "ExpressVPN",
+    airvpn: "AirVPN",
+    cyberghost: "CyberGhost",
+    hidemyass: "HideMyAss",
+    purevpn: "PureVPN",
+    vpnsecure: "VPNSecure",
+    vpnunlimited: "VPN Unlimited",
+    vyprvpn: "VyprVPN",
+    surfshark: "Surfshark",
+    windscribe: "Windscribe",
+    torguard: "TorGuard",
+    perfectprivacy: "Perfect Privacy",
+    privatevpn: "PrivateVPN",
+    ipvanish: "IPVanish",
+    fastestvpn: "FastestVPN",
+    slickvpn: "SlickVPN",
+    giganews: "Giganews",
+    proton: "Proton VPN",
+    mullvad: "Mullvad",
+    privado: "Privado",
+  };
+  return names[id] || id.charAt(0).toUpperCase() + id.slice(1);
 }
 
 async function apiPost(path: string) {
@@ -144,7 +185,7 @@ export function VPNStatus({ data }: { data: VPNStatusResponse }) {
           mono
         />
         {data.provider !== "custom" && (
-          <Stat icon={Globe} label="Provider" value={data.provider} />
+          <Stat icon={Globe} label="Provider" value={formatProvider(data.provider)} />
         )}
       </div>
 

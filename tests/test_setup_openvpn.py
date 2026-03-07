@@ -34,7 +34,9 @@ def _init_app_state(tmp_path):
     """Ensure app.state.state is populated for endpoints that need it."""
     state_dir = tmp_path / "state"
     state_dir.mkdir()
-    app.state.state = StateManager(state_dir=state_dir)
+    state_mgr = StateManager(state_dir=state_dir)
+    state_mgr.setup_required = True  # Setup endpoints now require this
+    app.state.state = state_mgr
 
 
 class TestUploadOpenVPNConfig:

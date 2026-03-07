@@ -21,7 +21,7 @@ services:
       # - "1080:1080" # SOCKS5 proxy (uncomment if SOCKS_PROXY_ENABLED=true)
     volumes:
       - ./config:/config
-      - /media/usbdrive/torrents:/downloads
+      - ./downloads:/downloads
       # Mount your WireGuard config
       - ./wireguard:/config/wireguard
     environment:

@@ -463,7 +463,7 @@ cosign verify ghcr.io/jasondostal/tunnelvision:latest \
   --certificate-identity-regexp=github.com/jasondostal/tunnelvision
 ```
 
-The CI pipeline runs 8 static analysis tools, 734 tests, and a Trivy container scan on every push. Nothing ships unless everything passes.
+The CI pipeline runs 8 static analysis tools, 767 tests, and a Trivy container scan on every push. Nothing ships unless everything passes.
 
 ## License
 

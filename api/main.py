@@ -1,6 +1,8 @@
 """TunnelVision REST API — the visibility layer."""
 
 import logging
+import os
+import secrets
 import time
 from contextlib import asynccontextmanager
 
@@ -87,13 +89,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow dashboard access
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS — only enabled when explicitly configured via CORS_ORIGINS env var
+_cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+if _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 # Auth middleware — layered: proxy header → API key → session cookie
@@ -112,7 +116,8 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
 
     # Check API key first (programmatic access — Homepage, HACS, Prometheus)
-    if config.api_key and request.headers.get("X-API-Key") == config.api_key:
+    api_key = config.api_key
+    if api_key and isinstance(api_key, str) and secrets.compare_digest(request.headers.get("X-API-Key", ""), api_key):
         return await call_next(request)
 
     # If API key is required and not provided, reject

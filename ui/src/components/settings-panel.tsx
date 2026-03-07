@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X, Save, RotateCcw, Zap, RefreshCw, ChevronDown } from "lucide-react";
 
 interface FieldMeta {
@@ -233,12 +233,13 @@ const HOT_RELOAD_FIELDS = new Set([
   "dns_block_surveillance",
 ]);
 
-function Toggle({ checked, onChange, dirty }: { checked: boolean; onChange: (v: boolean) => void; dirty: boolean }) {
+function Toggle({ checked, onChange, dirty, ariaLabel }: { checked: boolean; onChange: (v: boolean) => void; dirty: boolean; ariaLabel?: string }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={ariaLabel}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
         checked ? "bg-amber-500" : "bg-surface-border"
@@ -254,6 +255,7 @@ function Toggle({ checked, onChange, dirty }: { checked: boolean; onChange: (v: 
 }
 
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<SettingsData | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [savedForm, setSavedForm] = useState<Record<string, string>>({});
@@ -275,6 +277,50 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   }, [form, savedForm]);
 
   const isDirty = dirtyFields.size > 0;
+
+  // Stable close-with-confirm handler for escape / backdrop
+  const closeWithConfirm = useCallback(() => {
+    if (isDirty && !confirm("You have unsaved changes. Discard?")) return;
+    onClose();
+  }, [isDirty, onClose]);
+
+  // Escape key closes modal (with dirty check)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeWithConfirm();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [closeWithConfirm]);
+
+  // Focus trap: trap Tab / Shift+Tab within modal
+  useEffect(() => {
+    const el = modalRef.current;
+    if (!el) return;
+    const focusable = el.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusable.length) (focusable[0] as HTMLElement).focus();
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !el) return;
+      const nodes = el.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleTab);
+    return () => document.removeEventListener("keydown", handleTab);
+  }, [data]); // re-run when data loads (fields appear)
 
   const isSectionOpen = (group: { label: string; fields: string[]; defaultOpen?: boolean }) => {
     // User override wins
@@ -326,15 +372,15 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
   if (!data) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={(e) => { if (e.target === e.currentTarget) closeWithConfirm(); }}>
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-500/30 border-t-amber-500" />
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-12">
-      <div className="w-full max-w-lg rounded-xl border border-surface-border bg-surface-bg shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-12" onClick={(e) => { if (e.target === e.currentTarget) closeWithConfirm(); }}>
+      <div ref={modalRef} className="w-full max-w-lg rounded-xl border border-surface-border bg-surface-bg shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-surface-border px-5 py-4">
           <div className="flex items-center gap-2.5">
@@ -346,10 +392,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             )}
           </div>
           <button
-            onClick={() => {
-              if (isDirty && !confirm("You have unsaved changes. Discard?")) return;
-              onClose();
-            }}
+            onClick={closeWithConfirm}
             className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-surface-card hover:text-text-primary"
           >
             <X className="h-4 w-4" />
@@ -402,7 +445,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                         <div key={key}>
                           <div className="mb-1 flex items-center justify-between">
                             <div className="flex items-center gap-1.5">
-                              <label className="text-xs text-text-secondary">
+                              <label htmlFor={key} className="text-xs text-text-secondary">
                                 {FIELD_LABELS[key] || key}
                               </label>
                               <span className="font-mono text-[10px] text-text-muted">
@@ -432,11 +475,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                                   setForm({ ...form, [key]: v ? "true" : "false" })
                                 }
                                 dirty={fieldDirty}
+                                ariaLabel={FIELD_LABELS[key] || key}
                               />
                             )}
                           </div>
                           {!isBool && (
                             <input
+                              id={key}
                               type={meta.secret ? "password" : isNum ? "number" : "text"}
                               inputMode={isNum ? "numeric" : undefined}
                               value={form[key] || ""}
