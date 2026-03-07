@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir --target=/install -r requirements.txt
 # ---------------------------------------------------------------------------
 # Stage 3: Runtime
 # ---------------------------------------------------------------------------
-FROM alpine:3.21
+FROM alpine:3.23
 
 LABEL maintainer="Jason Dostal"
 LABEL org.opencontainers.image.title="TunnelVision"
