@@ -17,7 +17,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 2: Install Python API dependencies
 # ---------------------------------------------------------------------------
-FROM python:3.12-alpine AS api-builder
+FROM python:3.14-alpine AS api-builder
 
 WORKDIR /build
 COPY api/requirements.txt ./
