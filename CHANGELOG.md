@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Security — CI/CD hardening
+- **Gitleaks secret scanning** — scans full commit history for leaked API keys, tokens,
+  and passwords. Runs in the lint job before any code analysis. Blocks the pipeline on
+  any detected secret.
+- **CodeQL analysis** — new workflow (`codeql.yml`) runs GitHub's deep dataflow SAST on
+  Python and JavaScript. Catches injection, auth bypass, and taint-flow patterns that
+  Bandit/Ruff miss. Runs on push, PR, and weekly schedule.
+- **Nuclei DAST scan** — dynamic application security testing against the live smoke test
+  container. Scans for CVEs, exposures, and misconfigurations at critical/high/medium
+  severity (DoS templates excluded). Results uploaded to GitHub Security tab via SARIF.
+- **SBOM generation + cosign attestation** — generates SPDX SBOM via Syft for every
+  published image, then attests it with cosign. Enables "are we affected by CVE-X"
+  queries across all released images.
+- **VPN leak test** (`leak-test` job) — spins up the container with a dummy WireGuard
+  config (unreachable endpoint) and killswitch enabled, then verifies:
+  - External HTTP traffic is blocked (wget to 1.1.1.1 must fail)
+  - DNS queries are blocked (no DNS exfiltration)
+  - API remains accessible on loopback despite killswitch
+  - Pipeline fails if any traffic escapes the tunnel
+
 ---
 
 ## v3.5.0 — Security hardening + bug fixes (2026-03-06)
