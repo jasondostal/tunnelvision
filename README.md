@@ -455,7 +455,7 @@ make dev      # Start development environment
 
 ## Supply Chain Security
 
-Every image pushed to GHCR is signed with [cosign](https://docs.sigstore.dev/cosign/overview/) (Sigstore keyless). Verify before you pull:
+Every image pushed to GHCR is signed with [cosign](https://docs.sigstore.dev/cosign/overview/) (Sigstore keyless), includes an SPDX SBOM attestation, and carries SLSA Level 3 build provenance. Verify before you pull:
 
 ```bash
 cosign verify ghcr.io/jasondostal/tunnelvision:latest \
@@ -463,7 +463,7 @@ cosign verify ghcr.io/jasondostal/tunnelvision:latest \
   --certificate-identity-regexp=github.com/jasondostal/tunnelvision
 ```
 
-The CI pipeline runs 8 static analysis tools, 767 tests, and a Trivy container scan on every push. Nothing ships unless everything passes.
+The CI pipeline runs 8 static analysis tools, 767 tests, a Trivy container scan, and a VPN killswitch leak test on every push. Nothing ships unless everything passes.
 
 ## License
 

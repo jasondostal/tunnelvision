@@ -1,26 +1,64 @@
 # Changelog
 
-## Unreleased
+## v3.6.0 — Security audit remediation + accessibility (2026-03-07)
 
-### Security — CI/CD hardening
-- **Gitleaks secret scanning** — scans full commit history for leaked API keys, tokens,
-  and passwords. Runs in the lint job before any code analysis. Blocks the pipeline on
-  any detected secret.
-- **CodeQL analysis** — new workflow (`codeql.yml`) runs GitHub's deep dataflow SAST on
-  Python and JavaScript. Catches injection, auth bypass, and taint-flow patterns that
-  Bandit/Ruff miss. Runs on push, PR, and weekly schedule.
-- **Nuclei DAST scan** — dynamic application security testing against the live smoke test
-  container. Scans for CVEs, exposures, and misconfigurations at critical/high/medium
-  severity (DoS templates excluded). Results uploaded to GitHub Security tab via SARIF.
-- **SBOM generation + cosign attestation** — generates SPDX SBOM via Syft for every
-  published image, then attests it with cosign. Enables "are we affected by CVE-X"
-  queries across all released images.
-- **VPN leak test** (`leak-test` job) — spins up the container with a dummy WireGuard
-  config (unreachable endpoint) and killswitch enabled, then verifies:
-  - External HTTP traffic is blocked (wget to 1.1.1.1 must fail)
-  - DNS queries are blocked (no DNS exfiltration)
-  - API remains accessible on loopback despite killswitch
-  - Pipeline fails if any traffic escapes the tunnel
+### Security (P0 / P1 — full audit remediation)
+- **Atomic file writes** — state files and `tunnelvision.yml` now use write-tmp-then-rename
+  to prevent corruption on crash or power loss.
+- **Constant-time API key comparison** — `secrets.compare_digest()` replaces `==` in both
+  the auth middleware and `check_auth()`, closing timing side-channel.
+- **CORS restricted** — `allow_origins=["*"]` removed. CORS middleware only added when
+  `CORS_ORIGINS` env var is explicitly set.
+- **Setup endpoint gating** — POST endpoints (`/setup/provider`, `/setup/wireguard`,
+  `/setup/openvpn`, `/setup/credentials`) return 403 after setup is complete. Prevents
+  re-running the setup wizard on a configured instance.
+- **OpenVPN directive stripping** — user-uploaded `.ovpn` configs are sanitized: `up`,
+  `down`, `route-up`, `script-security`, `auth-user-pass-verify`, and other directives
+  that allow arbitrary script execution are removed before writing to disk.
+- **Proxy auth fail-closed** — `AUTH_PROXY_HEADER` is now ignored when `TRUSTED_PROXY_IPS`
+  is not configured (previously accepted from any source). Startup warning remains.
+- **Session store bounded** — `MAX_SESSIONS=100`, expired sessions cleaned on login,
+  429 returned on overflow. Prevents unbounded memory growth from session flooding.
+- **Firewall input validation** — ports, subnets, and custom rules file paths are validated
+  before being passed to `save_settings()`. Rejects invalid CIDR, out-of-range ports, and
+  path traversal attempts.
+- **Hook path validation** — port forward hook must point to an existing file before
+  execution. Prevents execution of arbitrary paths.
+- **OpenVPN script-security** — `--script-security 2` → `--script-security 1` in init-vpn.sh.
+- **Secure cookie flag** — session cookie sets `secure=True` when proxy auth is configured.
+
+### UI/UX Accessibility
+- **Modal focus traps** — Settings and Server Browser modals trap Tab/Shift+Tab, close on
+  Escape, and close on backdrop click (with dirty-state confirmation for Settings).
+- **Accessible labels** — `aria-label` on login inputs, `htmlFor`/`id` pairs on all settings
+  inputs, `aria-label` on toggle switches.
+- **Keyboard navigation** — server browser table rows are keyboard-navigable with Enter to
+  connect, `tabIndex`, `role="button"`, and visible focus ring.
+- **Action feedback** — VPN control buttons show success (checkmark) or error (X) icon for
+  2 seconds after action completes, replacing the ambiguous spinner-only pattern.
+- **Provider name formatting** — raw provider IDs (`pia`, `mullvad`) display as proper names
+  (`PIA`, `Mullvad`) throughout the UI.
+- **Dynamic page title** — browser tab shows `TunnelVision — Connected` or `Disconnected`.
+- **Mobile header** — button row wraps on narrow viewports instead of overflowing.
+
+### Tests (+32, total 767)
+- `tests/conftest.py` — shared fixtures for FastAPI test client with mocked config/state.
+- `tests/test_auth.py` — auth middleware, login, session bounds, proxy auth, constant-time.
+- `tests/test_setup_gate.py` — setup endpoint gating, OVPN directive stripping.
+- `tests/test_control.py` — VPN disconnect/restart, killswitch, qBittorrent restart.
+
+### CI/CD
+- **SLSA provenance attestation** — `actions/attest-build-provenance@v2` pushes SLSA Level 3
+  provenance alongside cosign signature and SBOM.
+- **Trivy pinned** — `@master` → `@0.31.0` to avoid tracking a moving target.
+- Gitleaks, CodeQL, Nuclei DAST, SBOM, leak test (carried from unreleased).
+
+### OSS
+- `SECURITY.md` — vulnerability reporting policy via GitHub private advisories.
+- `CONTRIBUTING.md` — dev setup, code style, PR process, architecture overview.
+- `CODE_OF_CONDUCT.md` — Contributor Covenant v2.1.
+- GitHub issue templates — structured bug report and feature request forms.
+- Dockerfile license label corrected to `GPL-3.0-only`.
 
 ---
 
