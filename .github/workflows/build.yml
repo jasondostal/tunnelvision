@@ -301,18 +301,19 @@ jobs:
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_SHA:0:7}"
           # Create a dummy wg0.conf so the container attempts VPN mode
-          mkdir -p /tmp/tv-config
-          cat > /tmp/tv-config/wg0.conf <<'EOF'
-          [Interface]
-          PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-          Address = 10.66.66.2/32
-          DNS = 10.64.0.1
+          # Config must be at /config/wireguard/wg0.conf (init-vpn.sh search path)
+          mkdir -p /tmp/tv-config/wireguard
+          cat > /tmp/tv-config/wireguard/wg0.conf <<'WGCONF'
+[Interface]
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+Address = 10.66.66.2/32
+DNS = 10.64.0.1
 
-          [Peer]
-          PublicKey = BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
-          Endpoint = 198.51.100.1:51820
-          AllowedIPs = 0.0.0.0/0
-          EOF
+[Peer]
+PublicKey = BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
+Endpoint = 198.51.100.1:51820
+AllowedIPs = 0.0.0.0/0
+WGCONF
 
           docker run -d \
             --name tunnelvision-leak \
