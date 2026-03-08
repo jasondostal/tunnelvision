@@ -7,12 +7,12 @@ import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
 from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import StreamingResponse
 
 from api.constants import OPENVPN_DIR, SETTINGS_PATH, WIREGUARD_DIR
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -100,7 +100,7 @@ async def restore_backup(file: UploadFile = File(...)):
                     tar.extract(member, "/config", filter="data")
                     restored.append(member.name)
 
-    except Exception as e:
+    except Exception:
         logger.exception("Backup restore failed")
         return {"success": False, "error": "Backup restore failed — verify the file format and try again"}
 

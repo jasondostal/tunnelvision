@@ -8,8 +8,6 @@ import re
 import subprocess
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -30,6 +28,8 @@ from api.constants import (
 )
 from api.services.settings import save_settings
 from api.services.state import StateManager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -294,7 +294,7 @@ async def generate_keypair():
         return {"success": True, "private_key": private_key, "public_key": public_key}
     except FileNotFoundError:
         return {"success": False, "error": "wireguard-tools not found — install wg or use an existing key"}
-    except Exception as e:
+    except Exception:
         logger.exception("Keypair generation failed")
         return {"success": False, "error": "Keypair generation failed unexpectedly"}
 
