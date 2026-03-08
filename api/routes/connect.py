@@ -10,11 +10,10 @@ import logging
 import os
 import random
 import shutil
+import subprocess
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
-
-logger = logging.getLogger(__name__)
 
 from api.constants import (
     SCRIPT_INIT_VPN,
@@ -36,6 +35,8 @@ from api.services.state import StateManager
 from api.services.vpn import get_provider
 from api.services.history import log_event
 from api.routes.events import broadcast
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
