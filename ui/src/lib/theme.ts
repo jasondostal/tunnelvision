@@ -25,6 +25,21 @@ const SECONDARY_SHADES: { shade: number; l: number; c: number }[] = [
   { shade: 600, l: 0.609, c: 0.126 },
 ];
 
+/** Surface tints — very low chroma so it reads as warm/cool, not colored. */
+const SURFACE_TINTS: { token: string; l: number; c: number }[] = [
+  { token: "surface-bg", l: 0.1, c: 0.006 },
+  { token: "surface-card", l: 0.155, c: 0.008 },
+  { token: "surface-card-hover", l: 0.18, c: 0.01 },
+  { token: "surface-border", l: 0.25, c: 0.012 },
+];
+
+/** Text tints — barely perceptible warmth/coolness. */
+const TEXT_TINTS: { token: string; l: number; c: number }[] = [
+  { token: "text-primary", l: 0.95, c: 0.003 },
+  { token: "text-secondary", l: 0.65, c: 0.008 },
+  { token: "text-muted", l: 0.45, c: 0.006 },
+];
+
 function oklch(l: number, c: number, h: number): string {
   return `oklch(${l} ${c} ${h})`;
 }
@@ -64,6 +79,17 @@ export function applyAccentHue(hue: number) {
   }
   // status-warning follows primary accent
   root.style.setProperty("--color-status-warning", oklch(0.769, 0.188, h));
+
+  // surfaces + borders — subtle hue tint
+  for (const { token, l, c } of SURFACE_TINTS) {
+    root.style.setProperty(`--color-${token}`, oklch(l, c, h));
+  }
+  // text — barely-there warmth/coolness
+  for (const { token, l, c } of TEXT_TINTS) {
+    root.style.setProperty(`--color-${token}`, oklch(l, c, h));
+  }
+  // status-disabled picks up a hint of the theme
+  root.style.setProperty("--color-status-disabled", oklch(0.45, 0.005, h));
 }
 
 /** Named presets for quick selection. */

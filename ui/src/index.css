@@ -23,22 +23,22 @@
   --color-cyan-500: oklch(0.715 0.143 195);
   --color-cyan-600: oklch(0.609 0.126 196);
 
-  /* Surfaces */
-  --color-surface-bg: oklch(0.1 0 0);
-  --color-surface-card: oklch(0.155 0 0);
-  --color-surface-card-hover: oklch(0.18 0 0);
-  --color-surface-border: oklch(0.25 0 0);
+  /* Surfaces — subtle hue tint at default amber (70°) */
+  --color-surface-bg: oklch(0.1 0.006 70);
+  --color-surface-card: oklch(0.155 0.008 70);
+  --color-surface-card-hover: oklch(0.18 0.01 70);
+  --color-surface-border: oklch(0.25 0.012 70);
 
-  /* Text */
-  --color-text-primary: oklch(0.95 0 0);
-  --color-text-secondary: oklch(0.65 0 0);
-  --color-text-muted: oklch(0.45 0 0);
+  /* Text — barely-there warmth at default amber (70°) */
+  --color-text-primary: oklch(0.95 0.003 70);
+  --color-text-secondary: oklch(0.65 0.008 70);
+  --color-text-muted: oklch(0.45 0.006 70);
 
   /* Status */
   --color-status-up: oklch(0.723 0.191 149);
   --color-status-down: oklch(0.637 0.237 25);
   --color-status-warning: oklch(0.769 0.188 70);
-  --color-status-disabled: oklch(0.45 0 0);
+  --color-status-disabled: oklch(0.45 0.005 70);
 }
 
 html {
