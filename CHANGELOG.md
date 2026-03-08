@@ -2,10 +2,31 @@
 
 ## Unreleased
 
+## v3.8.0 — Full OKLCH theming (2026-03-08)
+
 ### UI/UX
-- **OKLCH theme picker** — accent hue slider in the header drives all amber + cyan
-  component colors via OKLCH. 10 presets (Amber→Lime), live preview, persisted in
-  localStorage. Cyan secondary derived as hue+124°.
+- **OKLCH theme picker** — accent hue slider in the header with 10 presets
+  (Rose→Pink, sorted by hue). Drives all component colors via OKLCH. Live preview,
+  persisted in localStorage. Cyan secondary derived as hue+124°.
+- **Full-theme surfaces** — background, cards, borders, and text carry a subtle
+  chroma tint at the active hue. The entire UI shifts warm/cool as you slide,
+  not just accents.
+- **Status color harmony** — status-up (green) and status-down (red) blend 30%
+  toward the active theme hue via shortest-arc interpolation. Stays semantically
+  recognizable while harmonizing with any theme choice.
+- **Eliminated last hardcoded color** — `text-red-500` → `text-status-down` in
+  health card. 100% of UI colors now flow through the OKLCH design token system.
+
+### Fixes
+- **Missing `subprocess` import** — fixed Ruff F821 in connect.py from v3.7.0
+  async subprocess changes.
+- **Import ordering** — moved logger after imports to fix Ruff E402 in connect.py.
+
+### CI/CD
+- **Dependabot** — added grouped updates with auto-merge for CI actions.
+- **CI action bumps** — hadolint 3.1→3.3, build-push-action 6→7, codeql-action
+  3→4, attest-build-provenance 2→4, setup-buildx-action 3→4.
+- **CodeQL remediation** — stack trace exposure and URL validation fixes.
 
 ## v3.7.0 — Rotate server reliability + UI responsiveness (2026-03-08)
 
