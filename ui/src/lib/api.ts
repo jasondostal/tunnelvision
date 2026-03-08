@@ -9,6 +9,8 @@ import type {
   ServerListResponse,
   ConfigListResponse,
   ProviderHealthResponse,
+  ConnectResponse,
+  ActionResponse,
 } from "./types";
 
 const cache = new Map<string, { data: unknown; ts: number }>();
@@ -42,6 +44,19 @@ async function get<T>(path: string): Promise<T> {
   return promise;
 }
 
+async function post<T>(path: string, body?: unknown): Promise<T> {
+  const opts: RequestInit = { method: "POST" };
+  if (body) {
+    opts.headers = { "Content-Type": "application/json" };
+    opts.body = JSON.stringify(body);
+  }
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  const data = await r.json();
+  if (data.success === false) throw new Error(data.error || "Operation failed");
+  return data as T;
+}
+
 export interface AuthResponse {
   authenticated: boolean;
   user?: string;
@@ -67,6 +82,13 @@ export const api = {
     const qs = params.toString();
     return get<ServerListResponse>(`/api/v1/vpn/servers${qs ? `?${qs}` : ""}`);
   },
+
+  rotate: () => post<ConnectResponse>("/api/v1/vpn/rotate"),
+  restart: () => post<ActionResponse>("/api/v1/vpn/restart"),
+  disconnect: () => post<ActionResponse>("/api/v1/vpn/disconnect"),
+  reconnectVpn: () => post<ActionResponse>("/api/v1/vpn/reconnect"),
+  connect: (body: { hostname?: string; country?: string; city?: string }) =>
+    post<ConnectResponse>("/api/v1/vpn/connect", body),
 
   async checkAuth(): Promise<AuthResponse> {
     const r = await fetch("/api/v1/auth/me");

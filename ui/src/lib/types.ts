@@ -90,6 +90,24 @@ export interface ServerListResponse {
   servers: ServerEntry[];
 }
 
+/* --- Connect / Action responses --- */
+
+export interface ConnectResponse {
+  success: boolean;
+  hostname: string;
+  country: string;
+  city: string;
+  config_file: string;
+  error: string;
+}
+
+export interface ActionResponse {
+  success: boolean;
+  action: string;
+  message: string;
+  error: string;
+}
+
 /* --- Config Manager --- */
 
 export interface ConfigEntry {

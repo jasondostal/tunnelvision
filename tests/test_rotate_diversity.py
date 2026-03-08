@@ -58,12 +58,12 @@ class TestRotateCountryDiversity:
 
         captured = []
 
-        async def fake_connect(body, request):
+        async def fake_connect(body, provider, state_mgr, config=None, *, prefetched_servers=None):
             captured.append(body)
             return ConnectResponse(success=True, hostname="de1.example.com", country="Germany")
 
         with patch("api.routes.connect.get_provider", return_value=mock_provider), \
-             patch("api.routes.connect.connect_to_server", new=AsyncMock(side_effect=fake_connect)), \
+             patch("api.routes.connect._do_connect", new=AsyncMock(side_effect=fake_connect)), \
              patch("api.services.settings.load_settings", return_value={}):
             resp = client.post("/api/v1/vpn/rotate")
 
@@ -89,12 +89,12 @@ class TestRotateCountryDiversity:
 
         seen_countries = set()
 
-        async def fake_connect(body, request):
+        async def fake_connect(body, provider, state_mgr, config=None, *, prefetched_servers=None):
             seen_countries.add(body.country)
             return ConnectResponse(success=True)
 
         with patch("api.routes.connect.get_provider", return_value=mock_provider), \
-             patch("api.routes.connect.connect_to_server", new=AsyncMock(side_effect=fake_connect)), \
+             patch("api.routes.connect._do_connect", new=AsyncMock(side_effect=fake_connect)), \
              patch("api.services.settings.load_settings", return_value={}):
             for _ in range(40):
                 client.post("/api/v1/vpn/rotate")
@@ -113,12 +113,12 @@ class TestRotateCountryDiversity:
 
         captured = []
 
-        async def fake_connect(body, request):
+        async def fake_connect(body, provider, state_mgr, config=None, *, prefetched_servers=None):
             captured.append(body)
             return ConnectResponse(success=True, hostname="ch2.example.com", country="Switzerland")
 
         with patch("api.routes.connect.get_provider", return_value=mock_provider), \
-             patch("api.routes.connect.connect_to_server", new=AsyncMock(side_effect=fake_connect)), \
+             patch("api.routes.connect._do_connect", new=AsyncMock(side_effect=fake_connect)), \
              patch("api.services.settings.load_settings", return_value={"vpn_country": "ch"}):
             resp = client.post("/api/v1/vpn/rotate")
 
@@ -137,12 +137,12 @@ class TestRotateCountryDiversity:
 
         captured = []
 
-        async def fake_connect(body, request):
+        async def fake_connect(body, provider, state_mgr, config=None, *, prefetched_servers=None):
             captured.append(body)
             return ConnectResponse(success=True)
 
         with patch("api.routes.connect.get_provider", return_value=mock_provider), \
-             patch("api.routes.connect.connect_to_server", new=AsyncMock(side_effect=fake_connect)), \
+             patch("api.routes.connect._do_connect", new=AsyncMock(side_effect=fake_connect)), \
              patch("api.services.settings.load_settings", return_value={"vpn_city": "Zurich"}):
             resp = client.post("/api/v1/vpn/rotate")
 
@@ -164,12 +164,12 @@ class TestRotateCountryDiversity:
 
         captured = []
 
-        async def fake_connect(body, request):
+        async def fake_connect(body, provider, state_mgr, config=None, *, prefetched_servers=None):
             captured.append(body)
             return ConnectResponse(success=True, hostname="ch2.example.com", country="Switzerland")
 
         with patch("api.routes.connect.get_provider", return_value=mock_provider), \
-             patch("api.routes.connect.connect_to_server", new=AsyncMock(side_effect=fake_connect)), \
+             patch("api.routes.connect._do_connect", new=AsyncMock(side_effect=fake_connect)), \
              patch("api.services.settings.load_settings", return_value={}):
             resp = client.post("/api/v1/vpn/rotate")
 
@@ -193,12 +193,12 @@ class TestRotateCountryDiversity:
 
         captured = []
 
-        async def fake_connect(body, request):
+        async def fake_connect(body, provider, state_mgr, config=None, *, prefetched_servers=None):
             captured.append(body)
             return ConnectResponse(success=True)
 
         with patch("api.routes.connect.get_provider", return_value=mock_provider), \
-             patch("api.routes.connect.connect_to_server", new=AsyncMock(side_effect=fake_connect)), \
+             patch("api.routes.connect._do_connect", new=AsyncMock(side_effect=fake_connect)), \
              patch("api.services.settings.load_settings", return_value={}):
             resp = client.post("/api/v1/vpn/rotate")
 
@@ -212,12 +212,12 @@ class TestRotateCountryDiversity:
 
         captured = []
 
-        async def fake_connect(body, request):
+        async def fake_connect(body, provider, state_mgr, config=None, *, prefetched_servers=None):
             captured.append(body)
             return ConnectResponse(success=True)
 
         with patch("api.routes.connect.get_provider", return_value=mock_provider), \
-             patch("api.routes.connect.connect_to_server", new=AsyncMock(side_effect=fake_connect)), \
+             patch("api.routes.connect._do_connect", new=AsyncMock(side_effect=fake_connect)), \
              patch("api.services.settings.load_settings", return_value={}):
             resp = client.post("/api/v1/vpn/rotate")
 

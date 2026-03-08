@@ -92,13 +92,10 @@ export function ServerBrowser({ onClose }: ServerBrowserProps) {
   const handleConnect = async (hostname: string) => {
     setConnecting(hostname);
     try {
-      await fetch("/api/v1/vpn/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hostname }),
-      });
+      await api.connect({ hostname });
       onClose();
-    } catch {
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Connection failed");
       setConnecting(null);
     }
   };

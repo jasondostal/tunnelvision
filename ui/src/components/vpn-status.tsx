@@ -13,8 +13,10 @@ import {
   Loader2,
   Check,
   X,
+  AlertCircle,
 } from "lucide-react";
 import type { VPNStatusResponse } from "@/lib/types";
+import { api } from "@/lib/api";
 import { humanBytes, humanDuration, cn } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
 
@@ -49,11 +51,13 @@ function ActionButton({
   label,
   onClick,
   variant = "default",
+  disabled = false,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-  onClick: () => void;
+  onClick: () => Promise<unknown>;
   variant?: "default" | "danger";
+  disabled?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<"success" | "error" | null>(null);
@@ -75,7 +79,7 @@ function ActionButton({
   return (
     <button
       onClick={handleClick}
-      disabled={loading}
+      disabled={loading || disabled}
       className={cn(
         "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors disabled:opacity-50",
         variant === "danger"
@@ -126,16 +130,44 @@ function formatProvider(id: string): string {
   return names[id] || id.charAt(0).toUpperCase() + id.slice(1);
 }
 
-async function apiPost(path: string) {
-  await fetch(path, { method: "POST" });
-}
-
 export function VPNStatus({ data }: { data: VPNStatusResponse }) {
+  const [busy, setBusy] = useState(false);
+  // Optimistic location override — set from ConnectResponse before poll catches up
+  const [pendingLocation, setPendingLocation] = useState<string | null>(null);
+  // Error message — shown inline below controls, auto-dismissed after 8s
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Clear optimistic override when poll data changes (real data arrived)
+  const locationKey = data.location;
+  const prevLocation = useState(locationKey)[0];
+  if (locationKey !== prevLocation && pendingLocation) {
+    setPendingLocation(null);
+  }
+
   const uptime = data.connected_since
     ? humanDuration(
         (Date.now() - new Date(data.connected_since).getTime()) / 1000
       )
     : "—";
+
+  const wrapAction = <T,>(fn: () => Promise<T>): (() => Promise<T>) => {
+    return async () => {
+      setBusy(true);
+      setErrorMessage(null);
+      try {
+        return await fn();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Operation failed";
+        setErrorMessage(msg);
+        setTimeout(() => setErrorMessage(null), 8000);
+        throw e;
+      } finally {
+        setBusy(false);
+      }
+    };
+  };
+
+  const displayLocation = pendingLocation || data.location;
 
   return (
     <div className="rounded-xl border border-surface-border bg-surface-card p-5">
@@ -151,23 +183,26 @@ export function VPNStatus({ data }: { data: VPNStatusResponse }) {
       </div>
 
       {/* Location hero — the thing you glance at */}
-      {data.location && (
-        <div className="mb-4 rounded-lg bg-amber-500/8 border border-amber-500/15 px-4 py-3">
+      {displayLocation && (
+        <div className={cn(
+          "mb-4 rounded-lg bg-amber-500/8 border border-amber-500/15 px-4 py-3 transition-opacity duration-300",
+          busy && "opacity-60",
+        )}>
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-amber-400" />
             <span className="text-lg font-medium text-amber-200">
-              {data.location}
+              {busy ? "Connecting…" : displayLocation}
             </span>
           </div>
           <div className="mt-1 font-mono text-sm text-amber-400/70">
-            {data.public_ip}
+            {busy ? "—" : data.public_ip}
           </div>
         </div>
       )}
 
       {/* Stats grid */}
       <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-3">
-        {!data.location && (
+        {!displayLocation && (
           <Stat icon={Globe} label="Public IP" value={data.public_ip} mono />
         )}
         <Stat icon={Shield} label="Killswitch" value={data.killswitch} />
@@ -194,29 +229,53 @@ export function VPNStatus({ data }: { data: VPNStatusResponse }) {
         <ActionButton
           icon={RotateCw}
           label="Restart VPN"
-          onClick={() => apiPost("/api/v1/vpn/restart")}
+          onClick={wrapAction(() => api.restart())}
+          disabled={busy}
         />
         <ActionButton
           icon={Shuffle}
           label="Rotate Server"
-          onClick={() => apiPost("/api/v1/vpn/rotate")}
+          onClick={wrapAction(async () => {
+            const r = await api.rotate();
+            if (r.city && r.country) {
+              setPendingLocation(`${r.city}, ${r.country}`);
+            }
+            return r;
+          })}
+          disabled={busy}
         />
         {data.state === "up" && (
           <ActionButton
             icon={Power}
             label="Disconnect"
-            onClick={() => apiPost("/api/v1/vpn/disconnect")}
+            onClick={wrapAction(() => api.disconnect())}
             variant="danger"
+            disabled={busy}
           />
         )}
         {data.state === "down" && (
           <ActionButton
             icon={Power}
             label="Reconnect"
-            onClick={() => apiPost("/api/v1/vpn/reconnect")}
+            onClick={wrapAction(() => api.reconnectVpn())}
+            disabled={busy}
           />
         )}
       </div>
+
+      {/* Error message — shown on action failure */}
+      {errorMessage && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-status-down/20 bg-status-down/5 px-3 py-2">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-down" />
+          <span className="text-xs text-status-down">{errorMessage}</span>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="ml-auto shrink-0 text-status-down/60 hover:text-status-down"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

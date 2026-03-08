@@ -5,13 +5,14 @@ but wg-quick reading stale /etc/wireguard/wg0.conf — tunnel never switched ser
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 
-def _make_fake_run(call_order=None):
-    def fake_run(cmd, **kwargs):
+def _make_fake_run_cmd(call_order=None):
+    """Create a mock for _run_cmd that tracks call order."""
+    async def fake_run_cmd(cmd, **kwargs):
         if call_order is not None:
             if "up" in cmd:
                 call_order.append("wg-quick-up")
@@ -19,11 +20,8 @@ def _make_fake_run(call_order=None):
                 call_order.append("wg-quick-down")
             elif "killall" in cmd:
                 call_order.append("killall-openvpn")
-        r = MagicMock()
-        r.returncode = 0
-        r.stderr = ""
-        return r
-    return fake_run
+        return 0, "", ""
+    return fake_run_cmd
 
 
 @pytest.fixture()
@@ -53,7 +51,7 @@ class TestReconnectWgSync:
              patch("shutil.copy2", side_effect=lambda s, d: synced_content.append(Path(s).read_text())), \
              patch("os.chmod"), \
              patch("pathlib.Path.mkdir"), \
-             patch("subprocess.run", side_effect=_make_fake_run()):
+             patch("api.routes.connect._run_cmd", new=AsyncMock(side_effect=_make_fake_run_cmd())):
             from api.routes.connect import _reconnect_vpn
             result = await _reconnect_vpn("wireguard")
 
@@ -70,7 +68,7 @@ class TestReconnectWgSync:
              patch("shutil.copy2", side_effect=lambda *a: call_order.append("copy")), \
              patch("os.chmod"), \
              patch("pathlib.Path.mkdir"), \
-             patch("subprocess.run", side_effect=_make_fake_run(call_order)):
+             patch("api.routes.connect._run_cmd", new=AsyncMock(side_effect=_make_fake_run_cmd(call_order))):
             from api.routes.connect import _reconnect_vpn
             await _reconnect_vpn("wireguard")
 
@@ -86,7 +84,7 @@ class TestReconnectWgSync:
 
         with patch("api.routes.connect.WG_CONF_PATH", missing), \
              patch("shutil.copy2", side_effect=lambda *a: copy_called.append(1)), \
-             patch("subprocess.run", side_effect=_make_fake_run()):
+             patch("api.routes.connect._run_cmd", new=AsyncMock(side_effect=_make_fake_run_cmd())):
             from api.routes.connect import _reconnect_vpn
             result = await _reconnect_vpn("wireguard")
 
@@ -100,7 +98,7 @@ class TestReconnectWgSync:
 
         with patch("api.routes.connect.WG_CONF_PATH", wg_conf), \
              patch("shutil.copy2", side_effect=lambda *a: copy_called.append(1)), \
-             patch("subprocess.run", side_effect=_make_fake_run()):
+             patch("api.routes.connect._run_cmd", new=AsyncMock(side_effect=_make_fake_run_cmd())):
             from api.routes.connect import _reconnect_vpn
             result = await _reconnect_vpn("openvpn")
 

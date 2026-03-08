@@ -6,13 +6,15 @@ Two rotation modes:
 """
 
 import asyncio
+import logging
 import os
 import random
 import shutil
-import subprocess
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from api.constants import (
     SCRIPT_INIT_VPN,
@@ -36,6 +38,9 @@ from api.services.history import log_event
 from api.routes.events import broadcast
 
 router = APIRouter()
+
+# Serialize connect/rotate/reconnect — concurrent VPN operations corrupt state.
+_vpn_lock = asyncio.Lock()
 
 # list_config_files() lives in constants — imported above. No local duplicate.
 
@@ -71,13 +76,26 @@ async def connect_to_server(body: ConnectRequest, request: Request):
     Custom provider with multiple configs: picks random config file.
     Custom provider with one config: reconnects using it.
     """
-    config = request.app.state.config
-    state_mgr: StateManager = request.app.state.state
-    provider = get_provider(config.vpn_provider, config)
+    if _vpn_lock.locked():
+        return ConnectResponse(success=False, error="VPN operation already in progress")
+    async with _vpn_lock:
+        config = request.app.state.config
+        state_mgr: StateManager = request.app.state.state
+        provider = get_provider(config.vpn_provider, config)
+        return await _do_connect(body, provider, state_mgr, config)
 
+
+async def _do_connect(
+    body: ConnectRequest, provider, state_mgr: StateManager, config=None,
+    *, prefetched_servers: list[ServerInfo] | None = None,
+) -> ConnectResponse:
+    """Internal connect logic — called under _vpn_lock by endpoints."""
     # --- API-capable providers: unified connect pipeline ---
     if provider.meta.supports_server_list:
-        return await _connect_provider(body, provider, state_mgr, config)
+        return await _connect_provider(
+            body, provider, state_mgr, config,
+            prefetched_servers=prefetched_servers,
+        )
 
     # --- Config-file rotation (custom/other providers) ---
     configs = list_config_files()
@@ -97,14 +115,22 @@ async def connect_to_server(body: ConnectRequest, request: Request):
     state_mgr.active_config = chosen.name
     result = await _reconnect_vpn(vpn_type)
     result.config_file = chosen.name
+    if result.success:
+        broadcast("vpn_status", {"event": "connected", "config": chosen.name})
     return result
 
 
 @router.post("/vpn/reconnect", response_model=ConnectResponse)
 async def reconnect(request: Request):
     """Reconnect to VPN using current config."""
-    vpn_type = request.app.state.state.vpn_type
-    return await _reconnect_vpn(vpn_type)
+    if _vpn_lock.locked():
+        return ConnectResponse(success=False, error="VPN operation already in progress")
+    async with _vpn_lock:
+        vpn_type = request.app.state.state.vpn_type
+        result = await _reconnect_vpn(vpn_type)
+        if result.success:
+            broadcast("vpn_status", {"event": "reconnected", "vpn_type": vpn_type})
+        return result
 
 
 @router.post("/vpn/rotate", response_model=ConnectResponse)
@@ -123,35 +149,50 @@ async def rotate_server(request: Request):
 
     Re-reads country/city from settings YAML so rotation filters are hot-reloadable.
     """
-    config = request.app.state.config
-    state_mgr: StateManager = request.app.state.state
-    # Hot-reload: prefer settings YAML over frozen Config
-    try:
-        from api.services.settings import load_settings
-        settings = load_settings()
-        country = settings.get("vpn_country", config.vpn_country) or None
-        city = settings.get("vpn_city", config.vpn_city) or None
-    except Exception:
-        country = config.vpn_country or None
-        city = config.vpn_city or None
-    current = state_mgr.vpn_server_hostname or ""
-
-    # No filter set + API provider: pick a random country to ensure diversity.
-    # Without this, the globally highest-scoring country wins every rotation.
-    provider = get_provider(config.vpn_provider, config)
-    if not country and not city and provider.meta.supports_server_list:
+    if _vpn_lock.locked():
+        return ConnectResponse(success=False, error="VPN operation already in progress")
+    async with _vpn_lock:
+        config = request.app.state.config
+        state_mgr: StateManager = request.app.state.state
+        # Hot-reload: prefer settings YAML over frozen Config
         try:
-            all_servers = await provider.list_servers()
-            current_country = next(
-                (s.country for s in all_servers if s.hostname == current), ""
-            )
-            countries = list({s.country for s in all_servers} - {current_country})
-            if countries:
-                country = random.choice(countries)
+            from api.services.settings import load_settings
+            settings = load_settings()
+            country = settings.get("vpn_country", config.vpn_country) or None
+            city = settings.get("vpn_city", config.vpn_city) or None
         except Exception:
-            pass  # Fall through to unfiltered scored selection
+            country = config.vpn_country or None
+            city = config.vpn_city or None
+        current = state_mgr.vpn_server_hostname or ""
 
-    return await connect_to_server(ConnectRequest(country=country, city=city, exclude_hostname=current), request)
+        # No filter set + API provider: pick a random country to ensure diversity.
+        # Without this, the globally highest-scoring country wins every rotation.
+        # Fetches the server list ONCE and passes it through to _connect_provider
+        # so we don't make a redundant second API call.
+        provider = get_provider(config.vpn_provider, config)
+        prefetched: list[ServerInfo] | None = None
+        if not country and not city and provider.meta.supports_server_list:
+            try:
+                all_servers = await provider.list_servers()
+                current_country = next(
+                    (s.country for s in all_servers if s.hostname == current), ""
+                )
+                countries = list({s.country for s in all_servers} - {current_country})
+                if countries:
+                    country = random.choice(countries)
+                    # Pre-filter to chosen country — pass directly to _connect_provider
+                    prefetched = [s for s in all_servers if s.country == country]
+                else:
+                    # All servers share current country — pass full list
+                    prefetched = all_servers
+            except Exception:
+                pass  # Fall through to fresh fetch in _connect_provider
+
+        return await _do_connect(
+            ConnectRequest(country=country, city=city, exclude_hostname=current),
+            provider, state_mgr, config,
+            prefetched_servers=prefetched,
+        )
 
 
 @router.get("/vpn/configs")
@@ -253,7 +294,10 @@ def _select_server(servers: list[ServerInfo], exclude_hostname: str = "") -> Ser
     return random.choice([s for s, _ in scored[:pool_size]])
 
 
-async def _connect_provider(body: ConnectRequest, provider, state_mgr: StateManager, config=None) -> ConnectResponse:
+async def _connect_provider(
+    body: ConnectRequest, provider, state_mgr: StateManager, config=None,
+    *, prefetched_servers: list[ServerInfo] | None = None,
+) -> ConnectResponse:
     """Unified connect pipeline for all API-capable providers.
 
     1. List & filter servers (prefer port-forward capable if enabled)
@@ -262,13 +306,20 @@ async def _connect_provider(body: ConnectRequest, provider, state_mgr: StateMana
     4. Write wg0.conf
     5. Reconnect VPN
     6. Post-connect hooks (port forwarding, etc.)
+
+    Args:
+        prefetched_servers: Skip list_servers() call — use these instead.
+            Used by rotate to avoid a redundant second API round-trip.
     """
-    server_filter = ServerFilter(
-        country=body.country, city=body.city, owned_only=body.owned_only,
-        p2p=body.p2p, streaming=body.streaming, port_forward=body.port_forward,
-        secure_core=body.secure_core, multihop=body.multihop, max_load=body.max_load,
-    )
-    servers = await provider.list_servers(filter=server_filter)
+    if prefetched_servers is not None:
+        servers = prefetched_servers
+    else:
+        server_filter = ServerFilter(
+            country=body.country, city=body.city, owned_only=body.owned_only,
+            p2p=body.p2p, streaming=body.streaming, port_forward=body.port_forward,
+            secure_core=body.secure_core, multihop=body.multihop, max_load=body.max_load,
+        )
+        servers = await provider.list_servers(filter=server_filter)
 
     if not servers:
         desc = ""
@@ -292,6 +343,9 @@ async def _connect_provider(body: ConnectRequest, provider, state_mgr: StateMana
         server = matching[0]
     else:
         server = _select_server(servers, exclude_hostname=body.exclude_hostname or "")
+
+    broadcast("vpn_state", {"state": "selecting", "hostname": server.hostname,
+                            "country": server.country, "city": server.city})
 
     # Resolve credentials + peer config (provider handles key exchange if needed)
     try:
@@ -324,54 +378,103 @@ async def _connect_provider(body: ConnectRequest, provider, state_mgr: StateMana
 
     # Post-connect hooks (port forwarding, etc.)
     if result.success:
+        broadcast("vpn_status", {
+            "event": "connected",
+            "hostname": server.hostname,
+            "country": server.country,
+            "city": server.city,
+        })
         await provider.post_connect(server, config, peer)
 
     return result
 
 
+async def _run_cmd(cmd: list[str], timeout: float) -> tuple[int, str, str]:
+    """Run a command asynchronously — does NOT block the event loop."""
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        raise
+    return proc.returncode or 0, (stdout or b"").decode().strip(), (stderr or b"").decode().strip()
+
+
 async def _reconnect_vpn(vpn_type: str = "wireguard") -> ConnectResponse:
-    """Tear down and bring up VPN."""
+    """Tear down and bring up VPN.
+
+    Uses async subprocess to avoid blocking the event loop — SSE keepalives,
+    health checks, and other API requests continue during reconnect.
+
+    On WireGuard wg-quick up failure, attempts rollback to previous config
+    so the user doesn't end up with VPN down + killswitch blocking everything.
+    """
     try:
         if vpn_type == "wireguard":
             # Sync config to /etc/wireguard/ so wg-quick reads the current version.
             # init-vpn.sh only runs once at startup; rotate/connect write to
             # /config/wireguard/wg0.conf which wg-quick doesn't read directly.
+            # Save previous config for rollback before overwriting.
+            prev_conf = None
+            if WG_RUNTIME_CONF.exists():
+                prev_conf = WG_RUNTIME_CONF.read_bytes()
             if WG_CONF_PATH.exists():
                 WG_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(WG_CONF_PATH, WG_RUNTIME_CONF)
                 os.chmod(WG_RUNTIME_CONF, 0o600)
-            subprocess.run(["wg-quick", "down", "wg0"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT)
-            result = subprocess.run(["wg-quick", "up", "wg0"], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_LONG)
-            if result.returncode != 0:
-                return ConnectResponse(success=False, error=result.stderr.strip())
+
+            broadcast("vpn_state", {"state": "disconnecting"})
+            await _run_cmd(["wg-quick", "down", "wg0"], timeout=SUBPROCESS_TIMEOUT_DEFAULT)
+
+            broadcast("vpn_state", {"state": "connecting"})
+            rc, _, stderr = await _run_cmd(["wg-quick", "up", "wg0"], timeout=SUBPROCESS_TIMEOUT_LONG)
+            if rc != 0:
+                # wg-quick up failed — VPN is down, killswitch blocks everything.
+                # Attempt rollback to previous config to restore connectivity.
+                if prev_conf is not None:
+                    logger.warning("wg-quick up failed, attempting rollback to previous config")
+                    WG_RUNTIME_CONF.write_bytes(prev_conf)
+                    os.chmod(WG_RUNTIME_CONF, 0o600)
+                    rb_rc, _, _ = await _run_cmd(["wg-quick", "up", "wg0"], timeout=SUBPROCESS_TIMEOUT_LONG)
+                    if rb_rc == 0:
+                        await _run_cmd([str(SCRIPT_KILLSWITCH)], timeout=SUBPROCESS_TIMEOUT_DEFAULT)
+                        broadcast("vpn_state", {"state": "up", "action": "rollback"})
+                        log_event("reconnect_rollback", {"vpn_type": vpn_type, "reason": stderr})
+                        return ConnectResponse(success=False, error=f"New config failed ({stderr}); rolled back to previous server")
+                # No rollback possible or rollback also failed — re-run killswitch
+                # for consistency and report the error.
+                await _run_cmd([str(SCRIPT_KILLSWITCH)], timeout=SUBPROCESS_TIMEOUT_DEFAULT)
+                broadcast("vpn_state", {"state": "error"})
+                return ConnectResponse(success=False, error=stderr)
+
             # Re-run killswitch after wg-quick up so nftables allows the new
             # server's endpoint. SCRIPT_KILLSWITCH reads the endpoint from
             # `wg show wg0` — must run AFTER wg-quick up configures the peer.
-            subprocess.run(
-                [str(SCRIPT_KILLSWITCH)],
-                capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
-            )
+            await _run_cmd([str(SCRIPT_KILLSWITCH)], timeout=SUBPROCESS_TIMEOUT_DEFAULT)
         elif vpn_type == "openvpn":
-            subprocess.run(["killall", "openvpn"], capture_output=True, timeout=SUBPROCESS_TIMEOUT_QUICK)
+            broadcast("vpn_state", {"state": "disconnecting"})
+            await _run_cmd(["killall", "openvpn"], timeout=SUBPROCESS_TIMEOUT_QUICK)
             # Give it a moment to clean up
             await asyncio.sleep(2)
             # Re-run killswitch before starting daemon so nftables allows the
             # new server's endpoint. OpenVPN reads endpoint from the config
             # file (grep ^remote), so this can run before the daemon starts —
             # unlike WireGuard which needs the interface up first.
-            subprocess.run(
-                [str(SCRIPT_KILLSWITCH)],
-                capture_output=True, timeout=SUBPROCESS_TIMEOUT_DEFAULT,
-            )
-            result = subprocess.run(
-                [str(SCRIPT_INIT_VPN)],
-                capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_VPN,
-            )
-            if result.returncode != 0:
+            await _run_cmd([str(SCRIPT_KILLSWITCH)], timeout=SUBPROCESS_TIMEOUT_DEFAULT)
+            broadcast("vpn_state", {"state": "connecting"})
+            rc, _, _ = await _run_cmd([str(SCRIPT_INIT_VPN)], timeout=SUBPROCESS_TIMEOUT_VPN)
+            if rc != 0:
+                broadcast("vpn_state", {"state": "error"})
                 return ConnectResponse(success=False, error="OpenVPN reconnect failed")
 
         log_event("reconnect", {"vpn_type": vpn_type})
         return ConnectResponse(success=True)
     except Exception as e:
         log_event("reconnect_failed", {"vpn_type": vpn_type, "error": str(e)})
+        broadcast("vpn_state", {"state": "error"})
         return ConnectResponse(success=False, error=str(e))

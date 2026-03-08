@@ -1,5 +1,43 @@
 # Changelog
 
+## v3.7.0 — Rotate server reliability + UI responsiveness (2026-03-08)
+
+### Rotate / Reconnect reliability
+- **Async subprocess** — `_reconnect_vpn` replaced blocking `subprocess.run()` with
+  `asyncio.create_subprocess_exec` via `_run_cmd()` helper. WireGuard and OpenVPN
+  reconnects no longer starve the event loop (was blocking up to 35s).
+- **Concurrency lock** — `asyncio.Lock` guards rotate, connect, disconnect, and reconnect
+  endpoints. Concurrent requests return a clear error instead of corrupting state.
+- **WireGuard rollback** — if `wg-quick up` fails after config swap, the previous
+  `/etc/wireguard/wg0.conf` is restored and brought back up automatically.
+- **Eliminated double `list_servers()`** — rotate pre-fetches the server list for country
+  diversity selection and passes it through to `_connect_provider` via `prefetched_servers`,
+  saving one round-trip to the provider API.
+- **SSE broadcasts** — rotate and reconnect now emit `vpn_state` events at each phase
+  (`selecting`, `disconnecting`, `connecting`, `error`) so the UI updates in real time
+  instead of waiting for the next 10s poll.
+
+### UI/UX
+- **Fixed error handling** — `api.ts` POST helper now checks `response.ok` and
+  `data.success`, throwing on either failure. Previously, HTTP errors and
+  `success: false` responses showed a green checkmark.
+- **Inline error messages** — VPN action failures display an error banner below controls
+  with dismiss button and 8s auto-clear, replacing silent failures.
+- **Optimistic location update** — rotate immediately shows the new city/country from
+  `ConnectResponse` before the next poll confirms it.
+- **Sibling button disable** — all VPN action buttons disable while any operation is
+  in progress, preventing accidental concurrent clicks.
+- **Busy state indicator** — location hero shows "Connecting…" with reduced opacity
+  during VPN operations.
+- **Server browser error handling** — connect failures now surface the error message
+  instead of silently failing.
+
+### Tests (updated)
+- `tests/test_rotate_diversity.py` — updated mocks for extracted `_do_connect` and
+  `prefetched_servers` passthrough.
+- `tests/test_reconnect_sync.py` — updated from `subprocess.run` mocks to async
+  `_run_cmd` mocks.
+
 ## v3.6.0 — Security audit remediation + accessibility (2026-03-07)
 
 ### Security (P0 / P1 — full audit remediation)
