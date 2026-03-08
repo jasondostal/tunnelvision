@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, Globe, LogOut, Settings } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { ThemePicker } from "@/components/theme-picker";
 import { api, invalidateCache } from "@/lib/api";
 import type { AuthResponse } from "@/lib/api";
 import { usePoll } from "@/lib/use-poll";
@@ -151,6 +152,7 @@ function Dashboard({ authState }: { authState: AuthResponse | null }) {
             API Docs
             <ExternalLink className="h-3 w-3" />
           </a>
+          <ThemePicker />
           <button
             onClick={() => setShowSettings(true)}
             className="flex items-center gap-1.5 rounded-lg border border-surface-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-amber-500/30 hover:text-amber-400"

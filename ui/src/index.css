@@ -57,3 +57,41 @@ body {
 .font-mono {
   font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
 }
+
+/* Hue slider — rainbow track */
+.hue-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    oklch(0.7 0.18 0),
+    oklch(0.7 0.18 60),
+    oklch(0.7 0.18 120),
+    oklch(0.7 0.18 180),
+    oklch(0.7 0.18 240),
+    oklch(0.7 0.18 300),
+    oklch(0.7 0.18 360)
+  );
+  outline: none;
+  cursor: pointer;
+}
+.hue-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: oklch(0.95 0 0);
+  border: 2px solid oklch(0.25 0 0);
+  box-shadow: 0 1px 4px oklch(0 0 0 / 0.4);
+}
+.hue-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: oklch(0.95 0 0);
+  border: 2px solid oklch(0.25 0 0);
+  box-shadow: 0 1px 4px oklch(0 0 0 / 0.4);
+}
