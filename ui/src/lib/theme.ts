@@ -25,6 +25,20 @@ const SECONDARY_SHADES: { shade: number; l: number; c: number }[] = [
   { shade: 600, l: 0.609, c: 0.126 },
 ];
 
+/**
+ * Blend two hue angles on the color wheel via shortest arc.
+ * weight=0 → pure `a`, weight=1 → pure `b`.
+ */
+function blendHue(a: number, b: number, weight: number): number {
+  let diff = ((b - a + 540) % 360) - 180; // shortest arc
+  return ((a + diff * weight) % 360 + 360) % 360;
+}
+
+/** Semantic status hues — blended 30% toward theme hue for harmony. */
+const STATUS_UP_HUE = 149; // green
+const STATUS_DOWN_HUE = 25; // red
+const STATUS_BLEND = 0.3; // 70% semantic, 30% theme
+
 /** Surface tints — very low chroma so it reads as warm/cool, not colored. */
 const SURFACE_TINTS: { token: string; l: number; c: number }[] = [
   { token: "surface-bg", l: 0.1, c: 0.006 },
@@ -88,6 +102,9 @@ export function applyAccentHue(hue: number) {
   for (const { token, l, c } of TEXT_TINTS) {
     root.style.setProperty(`--color-${token}`, oklch(l, c, h));
   }
+  // status colors — semantically anchored but blended toward theme hue
+  root.style.setProperty("--color-status-up", oklch(0.723, 0.191, blendHue(STATUS_UP_HUE, h, STATUS_BLEND)));
+  root.style.setProperty("--color-status-down", oklch(0.637, 0.237, blendHue(STATUS_DOWN_HUE, h, STATUS_BLEND)));
   // status-disabled picks up a hint of the theme
   root.style.setProperty("--color-status-disabled", oklch(0.45, 0.005, h));
 }
