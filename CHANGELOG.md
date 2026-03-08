@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### UI/UX
+- **OKLCH theme picker** — accent hue slider in the header drives all amber + cyan
+  component colors via OKLCH. 10 presets (Amber→Lime), live preview, persisted in
+  localStorage. Cyan secondary derived as hue+124°.
+
 ## v3.7.0 — Rotate server reliability + UI responsiveness (2026-03-08)
 
 ### Rotate / Reconnect reliability
