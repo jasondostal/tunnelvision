@@ -94,16 +94,16 @@ export function applyAccentHue(hue: number) {
 
 /** Named presets for quick selection. */
 export const HUE_PRESETS: { label: string; hue: number }[] = [
-  { label: "Amber", hue: 70 },
-  { label: "Orange", hue: 45 },
   { label: "Rose", hue: 15 },
-  { label: "Pink", hue: 350 },
-  { label: "Purple", hue: 300 },
-  { label: "Indigo", hue: 270 },
-  { label: "Blue", hue: 240 },
-  { label: "Teal", hue: 195 },
-  { label: "Green", hue: 150 },
+  { label: "Orange", hue: 45 },
+  { label: "Amber", hue: 70 },
   { label: "Lime", hue: 120 },
+  { label: "Green", hue: 150 },
+  { label: "Teal", hue: 195 },
+  { label: "Blue", hue: 240 },
+  { label: "Indigo", hue: 270 },
+  { label: "Purple", hue: 300 },
+  { label: "Pink", hue: 350 },
 ];
 
 // Apply on import — runs before React render to avoid flash.
