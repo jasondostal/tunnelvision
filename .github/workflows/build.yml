@@ -276,7 +276,7 @@ jobs:
 
       - name: Upload Nuclei results
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: nuclei-results.sarif
         continue-on-error: true
