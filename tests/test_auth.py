@@ -93,8 +93,10 @@ class TestSessionBounds:
 
     def test_max_sessions_returns_429(self, auth_client):
         """Exceeding MAX_SESSIONS returns 429."""
-        from api.routes.auth import _sessions, MAX_SESSIONS
+        from api.routes.auth import _login_attempts, _sessions, MAX_SESSIONS
         from datetime import datetime, timezone
+
+        _login_attempts.clear()
 
         # Fill up sessions
         now = datetime.now(timezone.utc).timestamp()
@@ -107,11 +109,13 @@ class TestSessionBounds:
 
         # Clean up
         _sessions.clear()
+        _login_attempts.clear()
 
     def test_expired_sessions_cleaned(self, auth_client):
         """Expired sessions are cleaned up during login."""
-        from api.routes.auth import _sessions
+        from api.routes.auth import _login_attempts, _sessions
 
+        _login_attempts.clear()
         _sessions.clear()
         # Add expired session
         _sessions["expired-token"] = {"user": "admin", "expires": 0}
@@ -121,6 +125,7 @@ class TestSessionBounds:
         assert "expired-token" not in _sessions
 
         _sessions.clear()
+        _login_attempts.clear()
 
 
 class TestProxyAuth:
@@ -136,6 +141,77 @@ class TestProxyAuth:
 
         r = client.get("/api/v1/health", headers={"Remote-User": "admin"})
         assert r.status_code == 401
+
+
+class TestLoginRateLimit:
+    """Per-IP login rate limiting."""
+
+    def test_rate_limit_blocks_after_max_attempts(self, auth_client):
+        """Exceeding LOGIN_MAX_ATTEMPTS within the window returns 429."""
+        from api.routes.auth import LOGIN_MAX_ATTEMPTS, _login_attempts
+
+        _login_attempts.clear()
+
+        for _ in range(LOGIN_MAX_ATTEMPTS):
+            r = auth_client.post("/api/v1/auth/login", json={"username": "admin", "password": "wrong"})
+            assert r.status_code == 401
+
+        # Next attempt should be rate-limited
+        r = auth_client.post("/api/v1/auth/login", json={"username": "admin", "password": "wrong"})
+        assert r.status_code == 429
+        assert "Too many login attempts" in r.json()["detail"]
+
+        _login_attempts.clear()
+
+    def test_rate_limit_blocks_valid_credentials_too(self, auth_client):
+        """Rate limit applies even if credentials are correct — prevents oracle."""
+        from api.routes.auth import LOGIN_MAX_ATTEMPTS, _login_attempts
+
+        _login_attempts.clear()
+
+        # Burn through attempts with bad creds
+        for _ in range(LOGIN_MAX_ATTEMPTS):
+            auth_client.post("/api/v1/auth/login", json={"username": "admin", "password": "wrong"})
+
+        # Valid creds should still be blocked
+        r = auth_client.post("/api/v1/auth/login", json={"username": "admin", "password": "testpass"})
+        assert r.status_code == 429
+
+        _login_attempts.clear()
+
+    def test_rate_limit_resets_after_window(self, auth_client):
+        """Attempts outside the window are pruned, allowing new logins."""
+        import time
+        from api.routes.auth import LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_SECONDS, _login_attempts
+
+        _login_attempts.clear()
+
+        # Simulate old attempts outside the window
+        old_time = time.monotonic() - LOGIN_WINDOW_SECONDS - 1
+        _login_attempts["testclient"] = [old_time] * LOGIN_MAX_ATTEMPTS
+
+        # Should succeed since old attempts are outside the window
+        r = auth_client.post("/api/v1/auth/login", json={"username": "admin", "password": "testpass"})
+        assert r.status_code == 200
+
+        _login_attempts.clear()
+
+    def test_rate_limit_per_ip(self, auth_client):
+        """Rate limiting is per-IP, not global."""
+        from api.routes.auth import LOGIN_MAX_ATTEMPTS, _login_attempts
+
+        _login_attempts.clear()
+
+        # Fill up attempts for a different IP
+        import time
+        now = time.monotonic()
+        _login_attempts["10.0.0.99"] = [now] * LOGIN_MAX_ATTEMPTS
+
+        # Our IP (testclient) should still be allowed
+        r = auth_client.post("/api/v1/auth/login", json={"username": "admin", "password": "testpass"})
+        assert r.status_code == 200
+
+        _login_attempts.clear()
 
 
 class TestConstantTimeComparison:

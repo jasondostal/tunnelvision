@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## v3.8.1 — Login rate limiting (2026-03-12)
+
+### Security
+- **Per-IP login rate limiting** — `/api/v1/auth/login` now tracks attempts per client IP.
+  5 attempts per 60-second window; exceeding returns 429 with a clear message. Prevents
+  brute-force attacks against the login endpoint. Rate limit applies even when credentials
+  are correct (no oracle). Window resets automatically.
+
+### Tests
+- 4 new rate-limit tests: blocks after max attempts, blocks valid creds under limit,
+  resets after window, per-IP isolation. Suite now at 771 tests.
 
 ## v3.8.0 — Full OKLCH theming (2026-03-08)
 

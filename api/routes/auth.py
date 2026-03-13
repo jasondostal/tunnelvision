@@ -3,6 +3,8 @@
 import ipaddress
 import logging
 import secrets
+import time
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
@@ -19,6 +21,11 @@ _sessions: dict[str, dict] = {}
 SESSION_COOKIE = "tv_session"
 SESSION_MAX_AGE = 86400 * 7  # 7 days
 MAX_SESSIONS = 100
+
+# Login rate limiting — per-IP tracking
+LOGIN_WINDOW_SECONDS = 60
+LOGIN_MAX_ATTEMPTS = 5
+_login_attempts: dict[str, list[float]] = defaultdict(list)
 
 
 class LoginRequest(BaseModel):
@@ -121,6 +128,15 @@ def check_auth(request: Request) -> str | None:
     return None
 
 
+def _check_rate_limit(client_ip: str) -> bool:
+    """Return True if the client is rate-limited. Prunes old entries."""
+    now = time.monotonic()
+    attempts = _login_attempts[client_ip]
+    # Prune attempts outside the window
+    _login_attempts[client_ip] = [t for t in attempts if now - t < LOGIN_WINDOW_SECONDS]
+    return len(_login_attempts[client_ip]) >= LOGIN_MAX_ATTEMPTS
+
+
 @router.post("/auth/login")
 async def login(body: LoginRequest, request: Request):
     """Login with username and password. Returns a session cookie."""
@@ -128,6 +144,17 @@ async def login(body: LoginRequest, request: Request):
 
     if not config.login_required:
         return {"user": "anonymous", "message": "Auth not configured"}
+
+    client_ip = request.client.host if request.client else "unknown"
+    if _check_rate_limit(client_ip):
+        log.warning("Login rate limit exceeded for %s", client_ip)
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many login attempts. Try again later."},
+        )
+
+    # Record attempt before checking credentials
+    _login_attempts[client_ip].append(time.monotonic())
 
     if body.username != config.admin_user or body.password != config.admin_pass:
         return JSONResponse(status_code=401, content={"detail": "Invalid credentials"})
