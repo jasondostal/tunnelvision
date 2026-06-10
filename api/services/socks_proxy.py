@@ -11,6 +11,7 @@ Lifecycle: started/stopped in FastAPI lifespan, same as HTTP proxy.
 
 import asyncio
 import logging
+import secrets
 import struct
 
 from api.config import Config
@@ -186,8 +187,9 @@ class SocksProxyService:
             plen = (await reader.readexactly(1))[0]
             password = (await reader.readexactly(plen)).decode("utf-8")
 
-            if username == self.config.socks_proxy_user and \
-               password == self.config.socks_proxy_pass:
+            user_ok = secrets.compare_digest(username, self.config.socks_proxy_user)
+            pass_ok = secrets.compare_digest(password, self.config.socks_proxy_pass)
+            if user_ok & pass_ok:
                 writer.write(b"\x01\x00")  # Success
                 await writer.drain()
                 return True

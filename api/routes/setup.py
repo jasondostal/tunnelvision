@@ -266,12 +266,15 @@ async def _geo_ip_check() -> tuple[str, str, str]:
 
 
 @router.post("/setup/generate-keypair")
-async def generate_keypair():
+async def generate_keypair(request: Request):
     """Generate a WireGuard keypair. Returns both private and public key.
 
     The private key is returned once — store it immediately. The public key
     must be registered with your VPN provider before connecting.
     """
+    gate = _require_setup(request)
+    if gate:
+        return gate
     try:
         private_result = subprocess.run(
             ["wg", "genkey"],
@@ -332,8 +335,11 @@ async def upload_openvpn_config(body: OpenVPNConfigRequest, request: Request):
 
 
 @router.post("/setup/verify", response_model=VerifyResponse)
-async def verify_connection():
+async def verify_connection(request: Request):
     """Bring up the VPN temporarily and verify connectivity. Supports WireGuard and OpenVPN."""
+    gate = _require_setup(request)
+    if gate:
+        return gate
     if WG_CONF_PATH.exists():
         return await _verify_wireguard()
     elif OPENVPN_CONF_PATH.exists():
@@ -500,6 +506,9 @@ async def setup_credentials(body: CredentialsRequest, request: Request):
 @router.post("/setup/server")
 async def setup_server(body: ServerSelectRequest, request: Request):
     """Select a server and generate WireGuard config. Reuses connect logic."""
+    gate = _require_setup(request)
+    if gate:
+        return gate
     from api.routes.connect import ConnectRequest, connect_to_server
     result = await connect_to_server(ConnectRequest(hostname=body.hostname), request)
     return result
@@ -508,6 +517,9 @@ async def setup_server(body: ServerSelectRequest, request: Request):
 @router.post("/setup/complete")
 async def complete_setup(request: Request):
     """Finalize setup — mark setup as complete and signal s6 to restart services."""
+    gate = _require_setup(request)
+    if gate:
+        return gate
     state_mgr: StateManager = request.app.state.state
     provider = state_mgr.setup_provider or "custom"
 

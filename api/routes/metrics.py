@@ -16,6 +16,11 @@ from api.constants import (
 router = APIRouter()
 
 
+def _escape_label(v: str) -> str:
+    """Escape a Prometheus label value per the exposition spec."""
+    return v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
 def _metric(name: str, value: float | int | str, help_text: str, type_: str = "gauge",
             labels: dict[str, str] | None = None) -> str:
     """Format a single Prometheus metric."""
@@ -24,7 +29,7 @@ def _metric(name: str, value: float | int | str, help_text: str, type_: str = "g
         f"# TYPE {name} {type_}",
     ]
     if labels:
-        label_str = ",".join(f'{k}="{v}"' for k, v in labels.items())
+        label_str = ",".join(f'{k}="{_escape_label(str(v))}"' for k, v in labels.items())
         lines.append(f"{name}{{{label_str}}} {value}")
     else:
         lines.append(f"{name} {value}")

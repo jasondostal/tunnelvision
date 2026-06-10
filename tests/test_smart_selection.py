@@ -17,7 +17,9 @@ client = TestClient(app)
 def _init_app_state(tmp_path):
     state_dir = tmp_path / "state"
     state_dir.mkdir()
-    app.state.state = StateManager(state_dir=state_dir)
+    state_mgr = StateManager(state_dir=state_dir)
+    state_mgr.setup_required = True  # Setup endpoints now require this
+    app.state.state = state_mgr
 
 
 def _server(hostname: str, load: int = 0, speed_gbps: int = 0) -> ServerInfo:

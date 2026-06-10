@@ -9,6 +9,7 @@ Lifecycle: started/stopped in FastAPI lifespan, same as watchdog/mqtt.
 import asyncio
 import base64
 import logging
+import secrets
 
 from api.config import Config
 from api.constants import ServiceState
@@ -80,7 +81,9 @@ class HttpProxyService:
         try:
             decoded = base64.b64decode(auth[6:]).decode("utf-8")
             provided_user, provided_pass = decoded.split(":", 1)
-            return provided_user == user and provided_pass == password
+            user_ok = secrets.compare_digest(provided_user, user)
+            pass_ok = secrets.compare_digest(provided_pass, password)
+            return user_ok & pass_ok
         except Exception:
             return False
 
