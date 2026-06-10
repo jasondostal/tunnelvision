@@ -95,7 +95,7 @@ class TestSurfsharkProvider:
             with patch("api.constants.httpx.AsyncClient", return_value=mock_client):
                 return await provider.list_servers()
 
-        servers = asyncio.get_event_loop().run_until_complete(run())
+        servers = asyncio.run(run())
         assert len(servers) == 1
 
     def test_provider_registered(self):

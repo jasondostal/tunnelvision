@@ -107,7 +107,15 @@ class NatPMPService:
             self._task.cancel()
         self._port = None
         self._state.delete_forwarded_port()
-        asyncio.ensure_future(fire_port_change_hook(self._hook_script, 0))
+        # Best-effort: notify the port-change hook of teardown (port 0).
+        # Only schedule when a loop is running; ensure_future/get_event_loop
+        # without a running loop raises on Python 3.12+ (e.g. synchronous stop()).
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is not None:
+            loop.create_task(fire_port_change_hook(self._hook_script, 0))
 
     async def _run(self, gateway_ip: str):
         """Request mapping, then keep alive before lifetime expires."""
