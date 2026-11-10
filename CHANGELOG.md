@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.8.3 — Healthcheck works with auth enabled (2026-11-10)
+
+### Fixed
+- **Docker healthcheck no longer fails when auth is on.** The probe called
+  `/api/v1/health` without credentials and treated the resulting 401 as "API
+  not responding", so setting `ADMIN_USER` or `API_KEY` marked the container
+  unhealthy. A 401/403 now counts as the API being up.
+
+### Security note
+- Running without `ADMIN_USER`/`ADMIN_PASS` or `API_KEY` leaves the whole API
+  open to anything that can reach the port, including config restore
+  (`/api/v1/restore` writes WireGuard and qBittorrent configs). Set them.
+
 ## v3.8.1 — Login rate limiting (2026-03-12)
 
 ### Security

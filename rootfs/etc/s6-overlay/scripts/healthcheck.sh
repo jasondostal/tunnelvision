@@ -57,10 +57,18 @@ fi
 
 # --- Check API (if enabled) ---
 if [ "$API_ENABLED" = "true" ]; then
-    if ! curl -sf -o /dev/null --max-time 5 "http://localhost:${API_PORT}/api/v1/health"; then
-        echo "UNHEALTHY: API not responding on port ${API_PORT}"
-        errors=$((errors + 1))
-    fi
+    # This is a liveness probe: is the API answering? With login or an API
+    # key configured the endpoint answers 401 to this unauthenticated call,
+    # and that still means "up". (curl -f used to count the 401 as a failure,
+    # so turning auth on marked the container unhealthy.)
+    api_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://localhost:${API_PORT}/api/v1/health" 2>/dev/null)
+    case "$api_code" in
+        200|401|403) ;;
+        *)
+            echo "UNHEALTHY: API not responding on port ${API_PORT} (HTTP ${api_code:-none})"
+            errors=$((errors + 1))
+            ;;
+    esac
 fi
 
 if [ $errors -gt 0 ]; then
