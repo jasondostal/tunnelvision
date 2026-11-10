@@ -32,7 +32,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install lint tools
-        run: pip install --quiet ruff bandit mypy pip-audit cryptography pydantic -r api/requirements.txt
+        # ruff is pinned: new releases widen the default rule set and fail
+        # the build on unchanged code. Bump deliberately.
+        run: pip install --quiet ruff==0.15.5 bandit mypy pip-audit cryptography pydantic -r api/requirements.txt
 
       - name: Ruff (lint)
         run: ruff check api/
