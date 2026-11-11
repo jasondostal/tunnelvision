@@ -31,7 +31,7 @@ A Docker container that manages your VPN tunnel and everything that depends on i
 - **qBittorrent** — built in, pre-wired through the tunnel, killswitch-protected
 - **Real-time dashboard** — React UI with SSE updates, connection history, speed testing
 - **REST API** — 30+ endpoints, Swagger docs, everything scriptable
-- **Home Assistant** — native HACS integration, 30 entities, SSE real-time updates, zero YAML
+- **Home Assistant** — native integration, 30 entities, SSE real-time updates, zero YAML
 - **Prometheus + Grafana** — metrics endpoint, ready-made dashboard
 - **Notifications** — Discord, Slack, Gotify, generic webhooks
 - **Settings UI** — hot-reloadable configuration, no restarts needed
@@ -139,13 +139,15 @@ Or use `/api/v1/qbt/status` for torrent-focused widgets:
   <img src="images/screenshot-ha.png" alt="TunnelVision Home Assistant Entities" width="400">
 </p>
 
-Native [HACS integration](https://github.com/jasondostal/tunnelvision-ha). 30 entities, real-time SSE updates, config flow, zero YAML.
+Native [Home Assistant integration](https://github.com/jasondostal/tunnelvision-ha). 30 entities, real-time SSE updates, config flow, zero YAML.
 
-**Install via HACS:**
-1. HACS → Integrations → Three dots → **Custom Repositories**
-2. Paste `https://github.com/jasondostal/tunnelvision-ha` → category **Integration** → **Add**
-3. Search **TunnelVision** → **Download** → Restart HA
+**Install via the Marketplace** (Home Assistant 2026.11+):
+1. **Marketplace** → **Add from link**
+2. Paste `https://github.com/jasondostal/tunnelvision-ha` → type **Integration** → **Add**
+3. Open **TunnelVision** → **Install** → Restart HA
 4. **Settings → Integrations → Add → TunnelVision** — enter your host and port
+
+On older Home Assistant versions, add the same link as a HACS custom repository. See the [integration README](https://github.com/jasondostal/tunnelvision-ha#install).
 
 You get:
 - **16 sensors** — VPN state, public IP, location, speeds, transfer stats, torrent counts, provider, forwarded port, DNS/HTTP proxy/SOCKS proxy state
@@ -193,7 +195,7 @@ Off by default. Three layers, all optional, all additive:
 | Method | Env Vars | How it works |
 |--------|----------|-------------|
 | **None** (default) | *(nothing set)* | Everything open |
-| **API key** | `API_KEY` | `X-API-Key` header for programmatic access (Homepage, HACS, Prometheus) |
+| **API key** | `API_KEY` | `X-API-Key` header for programmatic access (Homepage, Home Assistant, Prometheus) |
 | **Local login** | `ADMIN_USER` + `ADMIN_PASS` | Login form in the dashboard, session cookie |
 | **Proxy bypass** | `AUTH_PROXY_HEADER` + `TRUSTED_PROXY_IPS` | Trusted header from your reverse proxy — skips the login form for already-authenticated users |
 
